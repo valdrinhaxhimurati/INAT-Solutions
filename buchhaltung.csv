@@ -1,0 +1,378 @@
+id,datum,typ,kategorie,betrag,beschreibung
+1,,Einnahme,Sonstiges,73464.03,nan
+2,,Ausgabe,Sonstiges,66241.69999999998,nan
+3,2019-09-30 00:00:00,Ausgabe,Sonstiges,20000.0,Inventar Garage
+4,2019-09-30 00:00:00,Einnahme,Sonstiges,325.0,Eren - Golf 7 R (Federn / Distanzscheiben)
+5,2019-09-30 00:00:00,Ausgabe,Sonstiges,5.0,Kontoführung (Postfinance)
+6,2019-10-01 00:00:00,Ausgabe,Sonstiges,49.0,SumUp Kartenterminal
+7,2019-10-02 00:00:00,Einnahme,Sonstiges,500.0,"Nikola - Mercedes 250d (H&R, Folieren, Grill)"
+8,2019-10-02 00:00:00,Ausgabe,Sonstiges,257.6,Speedone - Nikola - Mercedes 250d (H&R Federn)
+9,2019-10-07 00:00:00,Ausgabe,Sonstiges,95.95,Holzbalken Hornbach (Valdrin Quittung vorhanden)
+10,2019-10-07 00:00:00,Ausgabe,Sonstiges,190.0,Wix Internet Abo (2 Monate & 1 Jahr)
+11,2019-10-07 00:00:00,Einnahme,Sonstiges,371.78,Marc Arnaboldi Reifen
+12,2019-10-07 00:00:00,Einnahme,Sonstiges,350.24,Lisa Piccoli Reifen
+13,2019-10-08 00:00:00,Ausgabe,Sonstiges,371.78,Autoreifenonline - Marc Arnaboldi
+14,2019-10-08 00:00:00,Ausgabe,Sonstiges,350.24,Autoreifenonline - Lisa Piccoli
+15,2019-10-12 00:00:00,Ausgabe,Sonstiges,96.6,"Hornbach Holz, Plexiglas und Spannset"
+16,2019-10-14 00:00:00,Ausgabe,Sonstiges,82.75,PanGas 4005196647
+17,2019-10-15 00:00:00,Ausgabe,Sonstiges,45.77,Hydrauliköl (Autoreifenonline)
+18,2019-10-17 00:00:00,Ausgabe,Sonstiges,23.97,Reifendruckprüfer (Autoreifenonline)
+19,2019-10-18 00:00:00,Ausgabe,Sonstiges,50.5,Derendinger Auswuchtblei (Rechnung)
+20,2019-10-26 00:00:00,Ausgabe,Sonstiges,27.95,RedBull (Landi mit Karte)
+21,2019-10-25 00:00:00,Ausgabe,Sonstiges,10.45,Stecknüsse 10 und 18 (Jumbo mit Karte)
+22,2019-10-28 00:00:00,Einnahme,Sonstiges,600.0,Golf 7 GTI TCR (ST-Federn)
+23,2019-10-31 00:00:00,Ausgabe,Sonstiges,23.9,Getränke (Landi mit Karte)
+24,2019-10-31 00:00:00,Ausgabe,Sonstiges,30.0,Postfinance Card
+25,2019-10-28 00:00:00,Ausgabe,Sonstiges,800.0,Leonz Walker Miete (November)
+26,2019-10-28 00:00:00,Einnahme,Sonstiges,115.0,Valdrin
+27,2019-10-28 00:00:00,Einnahme,Sonstiges,115.0,Julien
+28,2019-10-31 00:00:00,Ausgabe,Sonstiges,5.0,Kontoführung (Postfinance)
+29,2019-10-29 00:00:00,Einnahme,Sonstiges,115.0,Sokol
+30,2019-10-31 00:00:00,Einnahme,Sonstiges,115.0,Michael
+31,2019-11-01 00:00:00,Einnahme,Sonstiges,115.0,Shpend
+32,2019-11-02 00:00:00,Ausgabe,Sonstiges,21.65,Müllsäcke usw. Coop Pronto (Karte)
+33,2019-11-07 00:00:00,Einnahme,Sonstiges,195.0,Leolo - Golf 7 GTI (Mexton mit Karte)
+34,2019-11-11 00:00:00,Einnahme,Sonstiges,230.0,Liri (Oktober & November)
+35,2019-11-08 00:00:00,Ausgabe,Sonstiges,29.1,PanGas 4005397668
+36,2019-11-11 00:00:00,Ausgabe,Sonstiges,179.0,Profiwerkzeug24 Wandschrank
+37,2019-11-19 00:00:00,Einnahme,Sonstiges,146.25,Service und Reifenwechsel (Leolo Golf 7 GTI) Karte
+38,2019-11-21 00:00:00,Ausgabe,Sonstiges,25.9,RedBull Migro (mit Karte Michael)
+39,2019-11-25 00:00:00,Ausgabe,Sonstiges,238.33,Verbrauchsmaterial EBAY (Valdrin PayPal)
+40,2019-11-28 00:00:00,Ausgabe,Sonstiges,34.8,Saxoprint AG Visitenkarten
+41,2019-11-28 00:00:00,Einnahme,Sonstiges,115.0,Julien
+42,2019-11-28 00:00:00,Einnahme,Sonstiges,115.0,Valdrin
+43,2019-11-29 00:00:00,Einnahme,Sonstiges,115.0,Sokol
+44,2019-11-30 00:00:00,Ausgabe,Sonstiges,5.0,Kontoführung (Postfinance)
+45,2019-12-02 00:00:00,Einnahme,Sonstiges,115.0,Michael
+46,2019-12-02 00:00:00,Einnahme,Sonstiges,115.0,Jukic
+47,2019-12-02 00:00:00,Einnahme,Sonstiges,115.0,Shpend
+48,2019-12-03 00:00:00,Ausgabe,Sonstiges,800.0,Leonz Walker Miete Dezember
+49,2019-12-09 00:00:00,Einnahme,Sonstiges,115.0,Liri
+50,2019-12-11 00:00:00,Ausgabe,Sonstiges,152.93,Reifen Sokol Arbeitskollege (Autoreifenonline)
+51,2019-12-13 00:00:00,Einnahme,Sonstiges,115.0,Jukic (November)
+52,2019-12-27 00:00:00,Einnahme,Sonstiges,115.0,Sokol
+53,2019-12-27 00:00:00,Einnahme,Sonstiges,115.0,Julien
+54,2019-12-27 00:00:00,Einnahme,Sonstiges,115.0,Valdrin
+55,2019-12-30 00:00:00,Einnahme,Sonstiges,115.0,Michael
+56,2020-12-31 00:00:00,Ausgabe,Sonstiges,5.0,Kontoführung (Postfinance)
+57,2020-01-03 00:00:00,Ausgabe,Sonstiges,800.0,Leonz Walker Miete (Januar)
+58,2020-01-03 00:00:00,Einnahme,Sonstiges,115.0,Jukic
+59,2020-01-03 00:00:00,Einnahme,Sonstiges,115.0,Shpend
+60,2020-01-06 00:00:00,Ausgabe,Sonstiges,61.0,Abfallgebühren Bettlach 2019
+61,2020-01-09 00:00:00,Einnahme,Sonstiges,115.0,Liridon
+62,2020-01-28 00:00:00,Einnahme,Sonstiges,115.0,Julien
+63,2020-01-28 00:00:00,Einnahme,Sonstiges,115.0,Valdrin
+64,2020-01-29 00:00:00,Einnahme,Sonstiges,115.0,Sokol
+65,2020-01-30 00:00:00,Einnahme,Sonstiges,115.0,Michael
+66,2020-01-31 00:00:00,Einnahme,Sonstiges,115.0,Liridon
+67,2020-01-31 00:00:00,Ausgabe,Sonstiges,5.0,Kontoführung (Postfinance)
+68,2020-02-03 00:00:00,Ausgabe,Sonstiges,800.0,Leonz Walker Miete (Februar)
+69,2020-02-03 00:00:00,Einnahme,Sonstiges,115.0,Jukic
+70,2020-02-03 00:00:00,Einnahme,Sonstiges,115.0,Shpend
+71,2020-02-06 00:00:00,Einnahme,Sonstiges,269.0,Bruno Carneiro Magalhaes (ST Federn Audi A4 Cabrio)
+72,2020-02-10 00:00:00,Ausgabe,Sonstiges,156.15,Kaiser + Kraft Reifenregal 
+73,2020-02-11 00:00:00,Ausgabe,Sonstiges,41.75,Wischerblätter Audi RS3 (Leo)
+74,2020-02-13 00:00:00,Einnahme,Sonstiges,269.0,Carole Feuz - ST Federn
+75,2020-02-14 00:00:00,Einnahme,Sonstiges,380.0,Marc Arnaboldi - Service BMW E60 530xi
+76,2020-02-17 00:00:00,Ausgabe,Sonstiges,199.0,ATN - Marc Arnaboldi - Service BMW E60 530xi Material
+77,2020-02-18 00:00:00,Einnahme,Sonstiges,199.0,Palladini Cyrano -  H&R Federn Polo Gti
+78,2020-02-19 00:00:00,Ausgabe,Sonstiges,173.6,SpeedOne Bestellnr. 1699 - H&R Federn Polo Gti
+79,2020-02-19 00:00:00,Einnahme,Sonstiges,442.0,Frederic Radwanski - Distanzscheiben 
+80,2020-02-20 00:00:00,Ausgabe,Sonstiges,208.1,ST Regiestuhlset - Toni RE-11422
+81,2020-02-20 00:00:00,Ausgabe,Sonstiges,403.25,Distanzscheiben Federic Radwanski - Toni RE-11419
+82,2020-02-28 00:00:00,Einnahme,Sonstiges,115.0,Sokol Popaj - falsch überwiesen
+83,2020-02-28 00:00:00,Ausgabe,Sonstiges,722.7,Gewindefedern Mercedes E63 - Toni RE-11435
+84,2020-02-28 00:00:00,Einnahme,Sonstiges,839.0,Gewindefedern Mercedes E63 - Mergim Buzhala
+85,2020-02-29 00:00:00,Ausgabe,Sonstiges,5.0,Kontoführung (Postfinance)
+86,2020-03-03 00:00:00,Einnahme,Sonstiges,70.0,DTC Gutachten - Mergim Buzhala
+87,2020-03-05 00:00:00,Ausgabe,Sonstiges,115.0,Sokol Popaj - falsch überwiesen - Zürucküberweisung
+88,2020-03-05 00:00:00,Ausgabe,Sonstiges,32.5,PanGas 4005788073 Februar
+89,2020-03-06 00:00:00,Ausgabe,Sonstiges,55.25,RE-11438 DTC - Mergim Buzhala Koppelstange
+90,2020-03-27 00:00:00,Einnahme,Sonstiges,115.0,Sokol Popaj - falsch überwiesen
+91,2020-03-31 00:00:00,Ausgabe,Sonstiges,5.0,Kontoführung (Postfinance)
+92,2020-04-08 00:00:00,Ausgabe,Sonstiges,115.0,Sokol Popaj - falsch überwiesen - Zürucküberweisung
+93,2020-04-08 00:00:00,Ausgabe,Sonstiges,34.7,PanGas 4005676762 Januar
+94,2020-04-08 00:00:00,Ausgabe,Sonstiges,34.7,PanGas 4221075617 März
+95,2020-04-08 00:00:00,Ausgabe,Sonstiges,46.5,PanGas 4005576796 November Dezember
+96,2020-04-30 00:00:00,Ausgabe,Sonstiges,5.0,Kontoführung (Postfinance)
+97,2020-05-31 00:00:00,Ausgabe,Sonstiges,5.0,Kontoführung (Postfinance)
+98,2020-06-02 00:00:00,Einnahme,Sonstiges,450.0,RS3 H&R Federn - Alan Kulma
+99,2020-06-03 00:00:00,Ausgabe,Sonstiges,33.6,PanGas April 4221326062
+100,2020-06-26 00:00:00,Ausgabe,Sonstiges,50.0,Zu viel überwiesen. Alan Kulma RS3 H&R Federn
+101,2020-06-30 00:00:00,Ausgabe,Sonstiges,5.0,Kontoführung (Postfinance)
+102,2020-07-10 00:00:00,Ausgabe,Sonstiges,239.0,Hornbach Argon Gas
+103,2020-07-20 00:00:00,Einnahme,Sonstiges,312.64,Golf 7R H&R Federn (Raphael Zimmermann)
+104,2020-07-27 00:00:00,Ausgabe,Sonstiges,34.7,PanGas Mai 4221661915
+105,2020-07-27 00:00:00,Ausgabe,Sonstiges,33.6,PanGas Juni 4221931025
+106,2020-07-27 00:00:00,Einnahme,Sonstiges,830.05,Pirelli P Zero 275/45 ZR20 
+107,2020-07-31 00:00:00,Ausgabe,Sonstiges,5.0,Kontoführung (Postfinance)
+108,2020-08-04 00:00:00,Ausgabe,Sonstiges,781.04,Pirelli P Zero 275/45 ZR20  Korab
+109,2020-08-04 00:00:00,Ausgabe,Sonstiges,650.0,Ausbildungsfond
+110,2020-08-21 00:00:00,Ausgabe,Sonstiges,250.7,Hoststar Website 
+111,2020-08-31 00:00:00,Ausgabe,Sonstiges,5.0,Kontoführung (Postfinance)
+112,2020-09-20 00:00:00,Ausgabe,Sonstiges,38.3,Getränke Migrolino
+113,2020-09-24 00:00:00,Ausgabe,Sonstiges,31.9,PanGas September 4222324834
+114,2020-09-30 00:00:00,Ausgabe,Sonstiges,5.0,Kontoführung (Postfinance)
+115,2020-10-15 00:00:00,Einnahme,Sonstiges,530.0,Verkauf Schwerlastregal (Eurodach)
+116,2020-10-31 00:00:00,Ausgabe,Sonstiges,30.0,Preis für Postfinance Card
+117,2020-10-31 00:00:00,Ausgabe,Sonstiges,5.0,Kontoführung (Postfinance)
+118,2020-11-03 00:00:00,Einnahme,Sonstiges,480.0,Reifen Siegfried Larcher 
+119,2020-11-09 00:00:00,Ausgabe,Sonstiges,397.62,Autoreifenonline RD 42874455 Siegfried Larcher
+120,2020-11-09 00:00:00,Ausgabe,Sonstiges,162.84,Autoreifenonline RD 42980987 Arbeitskolleg Shpend
+121,2020-11-12 00:00:00,Einnahme,Sonstiges,4000.0,Diverses Inventar alte Garage
+122,2020-11-13 00:00:00,Einnahme,Sonstiges,250.0,Reifen Roman Zumerle
+123,2020-11-17 00:00:00,Einnahme,Sonstiges,228.0,Reifen Dominik Racine 
+124,2020-11-30 00:00:00,Ausgabe,Sonstiges,5.0,Kontoführung (Postfinance)
+125,2020-12-31 00:00:00,Ausgabe,Sonstiges,5.0,Kontoführung (Postfinance)
+126,2021-01-04 00:00:00,Ausgabe,Sonstiges,100.0,Adressänderung Departementssekretariat FD
+127,2021-01-31 00:00:00,Ausgabe,Sonstiges,5.0,Kontoführung (Postfinance)
+128,2021-02-28 00:00:00,Ausgabe,Sonstiges,5.0,Kontoführung (Postfinance)
+129,2021-02-28 00:00:00,Ausgabe,Sonstiges,5.0,Kontoführung (Postfinance)
+130,2021-03-17 00:00:00,Einnahme,Sonstiges,5.0,Kontoführung (Postfinance) Fehlbuchung
+131,2021-03-17 00:00:00,Ausgabe,Sonstiges,58.4,Stempel - Alstar Management AG 
+132,2021-03-22 00:00:00,Ausgabe,Sonstiges,183.1,Abfallgebühren Bettlach 2020
+133,2021-03-31 00:00:00,Ausgabe,Sonstiges,5.0,Kontoführung (Postfinance)
+134,2021-04-26 00:00:00,Einnahme,Sonstiges,1165.0,Reifen Siegfried Larcher
+135,2021-04-16 00:00:00,Einnahme,Sonstiges,930.0,Reifen Urs Stampfli
+136,2021-04-28 00:00:00,Ausgabe,Sonstiges,274.9,Rechnungs-Nr. 3882113 (Reifen Siegfried Larcher)
+137,2021-04-28 00:00:00,Ausgabe,Sonstiges,290.8,Rechnungs-Nr. 3889585 (Reifen Siegfried Larcher)
+138,2021-04-28 00:00:00,Ausgabe,Sonstiges,233.15,Rechnungs-Nr. 3888157 (Reifen Siegfried Larcher)
+139,2021-04-28 00:00:00,Ausgabe,Sonstiges,290.8,Rechnungs-Nr. 3890720 (Reifen Siegfried Larcher)
+140,2021-04-28 00:00:00,Ausgabe,Sonstiges,828.45,Rechnungs-Nr. 3890573 (Reifen Urs Stampfli)
+141,2021-04-28 00:00:00,Einnahme,Sonstiges,359.5,H&R Federn Timothy Hofer
+142,2021-05-03 00:00:00,Ausgabe,Sonstiges,292.6,H&R Federn Timothy Hofer 
+143,2021-05-31 00:00:00,Ausgabe,Sonstiges,5.0,Kontoführung (Postfinance)
+144,2021-04-30 00:00:00,Ausgabe,Sonstiges,5.0,Kontoführung (Postfinance)
+145,2021-05-03 00:00:00,Ausgabe,Sonstiges,828.45,Rechnungs-Nr. 3890573 (Reifen Urs Stampfli)
+146,2021-06-14 00:00:00,Einnahme,Sonstiges,1210.0,Betonrohre (Marti AG)
+147,2021-06-02 00:00:00,Einnahme,Sonstiges,269.0,ST Federn Stefan Böhi
+148,2021-06-04 00:00:00,Ausgabe,Sonstiges,198.3,ST Federn Stefan Böhi
+149,2021-06-30 00:00:00,Ausgabe,Sonstiges,5.0,Kontoführung (Postfinance)
+150,2021-07-21 00:00:00,Ausgabe,Sonstiges,1855.88,Krömer Material
+151,,Ausgabe,Sonstiges,494.6,Gewindefedern Eibach 
+152,2021-08-13 00:00:00,Einnahme,Sonstiges,400.0,Gewindefedern Eibach - Tolga (1)
+153,2021-08-16 00:00:00,Ausgabe,Sonstiges,11.9,Hoststar Website 
+154,2021-08-16 00:00:00,Ausgabe,Sonstiges,238.8,Hoststar Website 
+155,2021-07-31 00:00:00,Ausgabe,Sonstiges,5.0,Kontoführung (Postfinance)
+156,2021-07-31 00:00:00,Ausgabe,Sonstiges,2.0,Preis fir GIRO International
+157,2021-08-16 00:00:00,Ausgabe,Sonstiges,650.0,AGVS - Berufsbildungsfonds
+158,2021-08-30 00:00:00,Einnahme,Sonstiges,600.0,Gewindefedern Eibach - Tolga (2)
+159,2021-10-21 00:00:00,Einnahme,Sonstiges,1039.0,CLA 45 AMG Timmothy Hofer
+160,2021-08-31 00:00:00,Ausgabe,Sonstiges,5.0,Kontoführung (Postfinance)
+161,2021-09-30 00:00:00,Ausgabe,Sonstiges,5.0,Kontoführung (Postfinance)
+162,2021-10-04 00:00:00,Ausgabe,Sonstiges,222.0,Krömer Zoll
+163,2021-11-12 00:00:00,Einnahme,Sonstiges,320.0,Urs Stampfli Hankook Reifen
+164,2021-10-31 00:00:00,Ausgabe,Sonstiges,5.0,Kontoführung (Postfinance)
+165,2021-10-31 00:00:00,Ausgabe,Sonstiges,2.0,nan
+166,2021-11-01 00:00:00,Ausgabe,Sonstiges,30.0,nan
+167,2021-11-11 00:00:00,Ausgabe,Sonstiges,305.2,H&R Federn Audi TTS
+168,2021-12-08 00:00:00,Einnahme,Sonstiges,838.4,Timothy Hofer / Winterreifen
+169,2021-12-10 00:00:00,Ausgabe,Sonstiges,581.1,Einkauf Winterreifen Reifengöggel 
+170,2021-11-30 00:00:00,Ausgabe,Sonstiges,5.0,Kontoführung (Postfinance)
+171,2021-12-31 00:00:00,Ausgabe,Sonstiges,5.0,Kontoführung (Postfinance)
+172,2022-01-31 00:00:00,Ausgabe,Sonstiges,5.0,Kontoführung (Postfinance)
+173,2022-02-14 00:00:00,Ausgabe,Sonstiges,366.8,Staatssteuer 2020
+174,2022-02-16 00:00:00,Ausgabe,Sonstiges,264.95,Gemeindesteuer Bettlach 2020
+175,2022-02-16 00:00:00,Ausgabe,Sonstiges,183.1,Kehrricht Abgaben Bettlach
+176,2022-02-28 00:00:00,Ausgabe,Sonstiges,5.0,Kontoführung (Postfinance)
+177,2022-03-31 00:00:00,Ausgabe,Sonstiges,5.0,Kontoführung (Postfinance)
+178,2022-04-21 00:00:00,Ausgabe,Sonstiges,63.55,Derendinger AG
+179,2022-04-21 00:00:00,Ausgabe,Sonstiges,514.1,Derendinger AG
+180,2022-04-21 00:00:00,Ausgabe,Sonstiges,47.5,Steuer Vorbezug 2022 Gemeinde Bettlach
+181,2022-04-27 00:00:00,Ausgabe,Sonstiges,354.4,Reifen Mercedes CLA45 AMG
+182,2022-04-30 00:00:00,Ausgabe,Sonstiges,5.0,Kontoführung (Postfinance)
+183,2022-05-09 00:00:00,Einnahme,Sonstiges,1071.0,Sinterwerke Grenchen AG - Carwrapping-Folie Grau Matt
+184,2022-05-31 00:00:00,Ausgabe,Sonstiges,5.0,Kontoführung (Postfinance)
+185,2022-06-10 00:00:00,Einnahme,Sonstiges,500.0,T. Hofer - CLA45 Sommerreifen
+186,2022-06-23 00:00:00,Ausgabe,Sonstiges,432.65,Reifen Göggel - Reifenbestellung
+187,2022-06-30 00:00:00,Ausgabe,Sonstiges,5.0,Kontoführung (Postfinance)
+188,2022-07-25 00:00:00,Ausgabe,Sonstiges,68.15,Reifen Göggel - Chevy Ersatzrad
+189,2022-07-26 00:00:00,Einnahme,Sonstiges,1698.0,Carrosserie Gabi AG - Akrapovic Endrohre BMW M4 f82
+190,2022-07-31 00:00:00,Ausgabe,Sonstiges,5.0,Kontoführung (Postfinance)
+191,2022-08-04 00:00:00,Ausgabe,Sonstiges,65.75,Rädertechnik - RDKS BMW M4 f82
+192,2022-08-04 00:00:00,Ausgabe,Sonstiges,200.75,Autoreifenonline - Reifenbestellung
+193,2022-08-04 00:00:00,Ausgabe,Sonstiges,48.93,Motoröl - Mercedes C250d
+194,2022-08-08 00:00:00,Ausgabe,Sonstiges,31.47,Motoröl - Mercedes C250d
+195,2022-08-15 00:00:00,Ausgabe,Sonstiges,47.2,Service Material
+196,2022-08-19 00:00:00,Ausgabe,Sonstiges,650.0,AGVS - Berufsbildungsfonds
+197,2022-08-31 00:00:00,Ausgabe,Sonstiges,5.0,Kontoführung (Postfinance)
+198,2022-09-07 00:00:00,Ausgabe,Sonstiges,95.0,Steuer Vorbezug 2022 Gemeinde Bettlach
+199,2022-09-30 00:00:00,Ausgabe,Sonstiges,5.0,Kontoführung (Postfinance)
+200,2022-10-31 00:00:00,Ausgabe,Sonstiges,30.0,Kosten Bankkarte
+201,2022-10-31 00:00:00,Ausgabe,Sonstiges,5.0,Kontoführung (Postfinance)
+202,2022-11-04 00:00:00,Einnahme,Sonstiges,286.65,N. Spahr - Reifen
+203,2022-11-04 00:00:00,Einnahme,Sonstiges,604.0,B. Fritz Hyundai Winterreifen
+204,2022-11-25 00:00:00,Ausgabe,Sonstiges,5.0,Kontoführung (Postfinance)
+205,2022-11-30 00:00:00,Einnahme,Sonstiges,350.0,R. Jentsch - Renault Koleos - Service Material
+206,2022-12-02 00:00:00,Einnahme,Sonstiges,350.0,M. Jentsch - Mazda 2 -  Service Material
+207,2022-12-06 00:00:00,Einnahme,Sonstiges,290.0,M. Karabulut - Winterreifen
+208,2022-12-27 00:00:00,Einnahme,Sonstiges,650.0,V. Germann - Mazda 2 - Service Material Gross
+209,2022-12-30 00:00:00,Einnahme,Sonstiges,460.0,R. Jentsch - Renault Koleos - Winterreifen
+210,2022-12-31 00:00:00,Ausgabe,Sonstiges,5.0,Kontoführung (Postfinance)
+211,2023-01-03 00:00:00,Ausgabe,Sonstiges,212.5,Reifen Karabulut
+212,2023-01-03 00:00:00,Ausgabe,Sonstiges,360.6,Reifen - Jentsch
+213,2023-01-04 00:00:00,Ausgabe,Sonstiges,220.0,Staatssteuer 2021
+214,2023-01-04 00:00:00,Ausgabe,Sonstiges,190.0,Gemeindesteuer Bettlach 2021
+215,2023-01-04 00:00:00,Ausgabe,Sonstiges,47.5,Vorbezug Gemeindesteuer Bettlach
+216,2023-01-20 00:00:00,Ausgabe,Sonstiges,246.85,Hornbach Material
+217,2023-01-23 00:00:00,Einnahme,Sonstiges,235.0,Germann Mazda 2 - Dichtungen & Sensor
+218,2023-01-23 00:00:00,Ausgabe,Sonstiges,82.55,Jumbo Material
+219,2023-01-31 00:00:00,Ausgabe,Sonstiges,5.0,Kontoführung (Postfinance)
+220,2023-02-06 00:00:00,Ausgabe,Sonstiges,35.25,Derendinger AG - Dichtungen
+221,2023-02-06 00:00:00,Ausgabe,Sonstiges,95.65,Derendinger AG - Sensor
+222,2023-02-06 00:00:00,Ausgabe,Sonstiges,61.5,BMW AG - Ersatzteile
+223,2023-02-28 00:00:00,Ausgabe,Sonstiges,5.0,Kontoführung (Postfinance)
+224,2023-03-06 00:00:00,Ausgabe,Sonstiges,51.85,Derendinger AG - Service Material Opel Corsa
+225,2023-03-07 00:00:00,Ausgabe,Sonstiges,588.7,Derendinger AG - Service Material VW Golf 7
+226,2023-03-13 00:00:00,Ausgabe,Sonstiges,47.5,Vorbezug Gemeindesteuer Bettlach
+227,2023-03-31 00:00:00,Ausgabe,Sonstiges,5.0,Kontoführung (Postfinance)
+228,2023-04-17 00:00:00,Ausgabe,Sonstiges,185.0,Derendinger AG - Ersatzteile Passat
+229,2023-04-30 00:00:00,Ausgabe,Sonstiges,5.0,Kontoführung (Postfinance)
+230,2023-05-31 00:00:00,Ausgabe,Sonstiges,5.0,Kontoführung (Postfinance)
+231,2023-06-09 00:00:00,Ausgabe,Sonstiges,600.9,Reifen Göggel - Reifenbestellung
+232,2023-06-26 00:00:00,Ausgabe,Sonstiges,47.5,Vorbezug Gemeindesteuer Bettlach
+233,2023-06-29 00:00:00,Einnahme,Sonstiges,668.0,Reifen - Allround Cleaner GmbH
+234,2023-06-30 00:00:00,Ausgabe,Sonstiges,5.0,Kontoführung (Postfinance)
+235,2023-07-31 00:00:00,Ausgabe,Sonstiges,5.0,Kontoführung (Postfinance)
+236,2023-08-31 00:00:00,Ausgabe,Sonstiges,5.0,Kontoführung (Postfinance)
+237,2023-09-30 00:00:00,Ausgabe,Sonstiges,5.0,Kontoführung (Postfinance)
+238,2023-10-04 00:00:00,Ausgabe,Sonstiges,47.5,Vorbezug Gemeindesteuer Bettlach
+239,2023-10-31 00:00:00,Ausgabe,Sonstiges,30.0,Kosten Bankkarte
+240,2023-10-31 00:00:00,Ausgabe,Sonstiges,5.0,Kontoführung (Postfinance)
+241,2023-11-15 00:00:00,Ausgabe,Sonstiges,159.55,Reifen Göggel - Reifenbestellung
+242,2023-11-23 00:00:00,Einnahme,Sonstiges,304.0,Reifen - AST AG
+243,2023-11-30 00:00:00,Einnahme,Sonstiges,1182.0,Reifen - K. Widmer
+244,2023-11-21 00:00:00,Einnahme,Sonstiges,761.6,Reifen - E. Neubert
+245,2023-11-30 00:00:00,Einnahme,Sonstiges,260.0,Reifen - D. Racine
+246,2023-12-18 00:00:00,Einnahme,Sonstiges,500.0,Reifen - Sinterwerke
+247,2024-01-03 00:00:00,Einnahme,Sonstiges,1012.0,Reifen - Allround Cleaner GmbH
+248,2023-12-01 00:00:00,Einnahme,Sonstiges,1070.0,Fahrwerk - N. Bullegatto
+249,2023-12-01 00:00:00,Ausgabe,Sonstiges,1060.75,Fahrwerk
+250,2023-11-30 00:00:00,Ausgabe,Sonstiges,5.0,Kontoführung (Postfinance)
+251,2023-12-05 00:00:00,Ausgabe,Sonstiges,47.5,Vorbezug Gemeindesteuer Bettlach
+252,2023-12-10 00:00:00,Ausgabe,Sonstiges,30.0,Postfinance
+253,2023-12-31 00:00:00,Ausgabe,Sonstiges,5.0,Kontoführung (Postfinance)
+254,2023-12-31 00:00:00,Ausgabe,Sonstiges,5.0,Expresszuschlag
+255,2024-01-15 00:00:00,Ausgabe,Sonstiges,183.1,Kehrrichtgebühr Bettlach
+256,2024-01-31 00:00:00,Ausgabe,Sonstiges,5.0,Kontoführung (Postfinance)
+257,2024-02-13 00:00:00,Ausgabe,Sonstiges,121.75,Derendinger
+258,2024-02-13 00:00:00,Ausgabe,Sonstiges,21.15,Derendinger
+259,2024-02-26 00:00:00,Ausgabe,Sonstiges,650.0,AGVS 2023
+260,2024-02-26 00:00:00,Ausgabe,Sonstiges,205.6,Autoreifenonline
+261,2024-02-26 00:00:00,Ausgabe,Sonstiges,310.0,Steuern Solothurn
+262,2024-02-29 00:00:00,Ausgabe,Sonstiges,310.0,Steuern Solothurn
+263,2024-02-29 00:00:00,Ausgabe,Sonstiges,5.0,Kontoführung (Postfinance)
+264,2024-03-08 00:00:00,Einnahme,Sonstiges,310.0,Korrektur zu viel bezahlt
+265,2024-03-12 00:00:00,Ausgabe,Sonstiges,139.9,Derendinger
+266,2024-03-12 00:00:00,Ausgabe,Sonstiges,213.0,Derendinger
+267,2024-03-12 00:00:00,Ausgabe,Sonstiges,125.65,Derendinger
+268,2024-03-12 00:00:00,Ausgabe,Sonstiges,49.5,Steuern Bettlach
+269,2024-03-12 00:00:00,Ausgabe,Sonstiges,105.1,Derendinger
+270,2024-03-12 00:00:00,Ausgabe,Sonstiges,33.25,Derendinger
+271,2024-03-27 00:00:00,Ausgabe,Sonstiges,303.9,Reifen - Alloy Swiss Technonolgy
+272,2024-03-31 00:00:00,Ausgabe,Sonstiges,5.0,Kontoführung (Postfinance)
+273,2024-04-12 00:00:00,Einnahme,Sonstiges,600.0,Reifen - E. Neubert
+274,2024-04-25 00:00:00,Einnahme,Sonstiges,350.0,Tolga  - Fahrwerk Tiguan
+275,2024-04-22 00:00:00,Ausgabe,Sonstiges,601.3,Derendinger
+276,2024-04-22 00:00:00,Ausgabe,Sonstiges,189.2,Derendinger
+277,2024-05-08 00:00:00,Einnahme,Sonstiges,256.3,Reifen - Allround Cleaner GmbH
+278,2024-04-16 00:00:00,Ausgabe,Sonstiges,742.5,Reifen - B. Fritz
+279,2024-04-29 00:00:00,Ausgabe,Sonstiges,97.35,Reifen - Allround Cleaner GmbH
+280,2024-04-29 00:00:00,Ausgabe,Sonstiges,133.6,Reifen - Allround Cleaner GmbH
+281,2024-04-29 00:00:00,Ausgabe,Sonstiges,1225.98,Reifen - Ximi & Valdrin
+282,2024-04-30 00:00:00,Ausgabe,Sonstiges,5.0,Kontoführung (Postfinance)
+283,2024-05-01 00:00:00,Ausgabe,Sonstiges,612.35,Reifen - Diverse
+284,2024-05-23 00:00:00,Ausgabe,Sonstiges,508.5,Reifen - E. Polat
+285,2024-05-31 00:00:00,Ausgabe,Sonstiges,5.0,Kontoführung (Postfinance)
+286,2024-06-13 00:00:00,Einnahme,Sonstiges,916.0,Reifen - B. Fritz
+287,2024-06-18 00:00:00,Ausgabe,Sonstiges,139.85,Reifen - Timothy Turner
+288,2024-06-18 00:00:00,Ausgabe,Sonstiges,139.85,Reifen - Timothy Turner
+289,2024-06-18 00:00:00,Ausgabe,Sonstiges,279.75,Reifen - Timothy Turner
+290,2024-06-18 00:00:00,Ausgabe,Sonstiges,298.4,Reifen - C. Parziale
+291,2024-06-26 00:00:00,Ausgabe,Sonstiges,58.25,Reifen - E. Polat
+292,2024-06-30 00:00:00,Ausgabe,Sonstiges,5.0,Kontoführung (Postfinance)
+293,2024-07-01 00:00:00,Ausgabe,Sonstiges,432.2,Reifen - Shpend Barum
+294,2024-07-01 00:00:00,Einnahme,Sonstiges,810.0,Reifen - Timothy Turner
+295,2024-07-11 00:00:00,Einnahme,Sonstiges,350.0,Reifen - Alloy Swiss Technonolgy
+296,2024-07-11 00:00:00,Einnahme,Sonstiges,1171.2,Reifen - Gzim Kosumi
+297,2024-07-31 00:00:00,Ausgabe,Sonstiges,5.0,Kontoführung (Postfinance)
+298,2024-08-30 00:00:00,Ausgabe,Sonstiges,99.0,Steuern Bettlach
+299,2024-08-31 00:00:00,Ausgabe,Sonstiges,5.0,Kontoführung (Postfinance)
+300,2024-09-19 00:00:00,Ausgabe,Sonstiges,650.0,AGVS 2024
+301,2024-09-23 00:00:00,Einnahme,Sonstiges,335.0,Reifen - R. Ziegler Winter
+302,2024-09-30 00:00:00,Ausgabe,Sonstiges,5.0,Kontoführung (Postfinance)
+303,2024-10-15 00:00:00,Ausgabe,Sonstiges,599.45,Reifen - Aebischer
+304,2024-10-17 00:00:00,Einnahme,Sonstiges,132.0,Reifen - Z. Chintilian
+305,2024-10-18 00:00:00,Einnahme,Sonstiges,655.0,Reifen - R. Ziegler Sommer
+306,2024-12-20 00:00:00,Einnahme,Sonstiges,199.0,Reinigung - Dacia Logan 41medical AG
+307,2024-11-12 00:00:00,Einnahme,Sonstiges,230.0,Reifen - R. Ziegler
+308,2024-10-28 00:00:00,Einnahme,Sonstiges,729.0,Reifen - A. Aebischer
+309,2024-10-31 00:00:00,Ausgabe,Sonstiges,30.0,Postfinace Kartengebühr
+310,2024-10-31 00:00:00,Ausgabe,Sonstiges,5.0,Kontoführung (Postfinance)
+311,2024-10-31 00:00:00,Ausgabe,Sonstiges,2.35,Gebühr Einzahlungsschein Postfinance
+312,2024-11-01 00:00:00,Ausgabe,Sonstiges,306.53,Reifen - R. Ziegler Winter
+313,2024-11-01 00:00:00,Ausgabe,Sonstiges,319.42,Reifen - Allround Cleaner GmbH (1 Stück) Porsche
+314,2024-11-05 00:00:00,Ausgabe,Sonstiges,497.3,Reifen - R. Ziegler Sommer
+315,2024-11-12 00:00:00,Einnahme,Sonstiges,120.0,Reifen - Gzim Kosumi (Bmw 5er)
+316,2024-11-12 00:00:00,Einnahme,Sonstiges,94.15,Reifen - S. Behluli (VW Tiguan)
+317,2024-11-07 00:00:00,Einnahme,Sonstiges,600.0,Reifen - Allround Cleaner GmbH (Audi A5)
+318,2024-11-19 00:00:00,Einnahme,Sonstiges,78.96,Reifen - Moretti 
+319,2024-11-19 00:00:00,Ausgabe,Sonstiges,241.65,Reifen - Allround Cleaner GmbH (1 Stück) Porsche
+320,2024-11-26 00:00:00,Einnahme,Sonstiges,148.05,Reifen - H. Spahr (VW ID3) & Moretti (Toyota)
+321,2025-01-10 00:00:00,Einnahme,Sonstiges,72.0,Reifen - Alloy Swiss Technonolgy
+322,2024-12-27 00:00:00,Einnahme,Sonstiges,1500.0,Servicematerial - R. Jentsch (Renault Koleos)
+323,2024-12-19 00:00:00,Einnahme,Sonstiges,540.0,Reifen - B. Fritz (Hyundai)
+324,2024-12-03 00:00:00,Einnahme,Sonstiges,98.7,Reifen - VW Sharan
+325,2024-12-11 00:00:00,Einnahme,Sonstiges,360.0,Kühlmittelschlauch Audi TT RS
+326,2024-11-30 00:00:00,Ausgabe,Sonstiges,5.0,Kontoführung (Postfinance)
+327,2024-12-23 00:00:00,Einnahme,Sonstiges,482.0,Reifen - Michel Hodel 
+328,2024-12-24 00:00:00,Einnahme,Sonstiges,380.0,Reifen - S. Beluli 
+329,2024-12-24 00:00:00,Einnahme,Sonstiges,291.16,Reifen - B. Baumgärtner & Fahrwerk Audi RS4 M. Sila
+330,2024-12-27 00:00:00,Einnahme,Sonstiges,450.0,Reifen - D. Fischer
+331,2024-12-31 00:00:00,Ausgabe,Sonstiges,5.0,Kontoführung (Postfinance)
+332,2025-01-06 00:00:00,Ausgabe,Sonstiges,252.8,Reifen - Wyss
+333,2025-01-06 00:00:00,Ausgabe,Sonstiges,374.65,Reifen - S. Beluli 
+334,2025-01-06 00:00:00,Ausgabe,Sonstiges,565.5,Ersatzteile - Jentsch
+335,2025-01-06 00:00:00,Ausgabe,Sonstiges,44.7,Ersatzteile - Derendinger
+336,2025-01-06 00:00:00,Ausgabe,Sonstiges,49.5,Vorbezug Steuern Bettlach 4. Rate
+337,2025-01-06 00:00:00,Ausgabe,Sonstiges,183.75,Kehrrichtgebühr Bettlach
+338,2025-01-13 00:00:00,Einnahme,Sonstiges,550.0,Reifen - Allround Cleaner GmbH (2 Stück) Porsche
+339,2025-01-21 00:00:00,Ausgabe,Sonstiges,401.85,Reifen - D. Fischer
+340,2025-01-21 00:00:00,Ausgabe,Sonstiges,276.27,Reifen - Allround Cleaner GmbH (1 Stück) Porsche
+341,2025-01-27 00:00:00,Ausgabe,Sonstiges,335.2,Servicematerial - 420er & 335er
+342,2025-01-27 00:00:00,Ausgabe,Sonstiges,44.7,Schellen
+343,2025-01-31 00:00:00,Ausgabe,Sonstiges,5.0,Kontoführung (Postfinance)
+345,2025-05-26 00:00:00,Einnahme,Sonstiges,237.0,Dylan Fischer - Versicherung
+346,2025-02-13 00:00:00,Ausgabe,Sonstiges,155.65,Verbrauchsmaterial Reifenmontage 
+347,2025-02-13 00:00:00,Ausgabe,Sonstiges,79.4,Bremsen - Tiguan
+348,2025-02-13 00:00:00,Ausgabe,Sonstiges,246.65,Material - Tiguan
+349,2025-02-17 00:00:00,Ausgabe,Sonstiges,301.45,Reifen - Jentsch
+350,2025-02-17 00:00:00,Ausgabe,Sonstiges,464.05,Reifen - J. Staniec
+351,2025-03-27 00:00:00,Einnahme,Sonstiges,400.0,Reifen - Marco Jentsch
+352,2025-02-25 00:00:00,Einnahme,Sonstiges,345.45,Service - Ruth Glanzmann
+353,2025-02-28 00:00:00,Ausgabe,Sonstiges,49.5,Vorbezug Steuern Bettlach 1. Rate
+354,2025-02-28 00:00:00,Ausgabe,Sonstiges,5.0,Kontoführung (Postfinance)
+355,2025-03-11 00:00:00,Ausgabe,Sonstiges,600.8,Reifen - Hadis
+356,2025-03-11 00:00:00,Ausgabe,Sonstiges,195.0,Servicematerial - Ruth Glanzmann
+357,2025-03-18 00:00:00,Ausgabe,Sonstiges,250.0,Steuern Kanton Solothurn
+358,2025-05-07 00:00:00,Einnahme,Sonstiges,100.0,Sinterwerke
+359,2025-03-31 00:00:00,Ausgabe,Sonstiges,5.0,Kontoführung (Postfinance)
+360,2025-04-17 00:00:00,Einnahme,Sonstiges,762.0,Reifen & Montage - Hartmann
+361,2025-04-14 00:00:00,Ausgabe,Sonstiges,260.2,Reifen - Hartmann
+362,2025-04-14 00:00:00,Ausgabe,Sonstiges,341.05,Reifen - Hartmann
+363,2025-04-15 00:00:00,Einnahme,Sonstiges,78.96,Radwechsel - Gxim
+364,2025-04-23 00:00:00,Einnahme,Sonstiges,138.18,Reifenwechsel - Ammann
+365,2025-06-26,Einnahme,Sonstiges,246.0,"Remo Jentsch - Reifen, Reifenwechsel"
+366,2025-04-30 00:00:00,Ausgabe,Sonstiges,5.0,Kontoführung (Postfinance)
+367,2025-07-01,Einnahme,Sonstiges,769.86,Bremsen - Tiguan Shibo
+368,2025-06-05 00:00:00,Ausgabe,Sonstiges,588.1,Derendinger - Bremsen - Tiguan Shibo
+369,2025-05-30 00:00:00,Ausgabe,Sonstiges,285.75,Reifen - Hadis E46
+370,2025-06-03 00:00:00,Einnahme,Sonstiges,98.7,Reifen - Giger
+371,,Ausgabe,Sonstiges,767.0,Hartmann
+372,,Einnahme,Sonstiges,1270.0,Hartmann
+373,2025-06-03 00:00:00,Ausgabe,Sonstiges,49.5,Vorbezug Gemeindesteuer Bettlach 2. Rate
+374,2025-06-20,Ausgabe,Sonstiges,773.45,BOPP - Diagnose
+375,2025-06-24,Ausgabe,Sonstiges,227.0,Reifen - Mark
+376,2025-07-08,Einnahme,Sonstiges,90.8,Reifenwechsel - Ammann
+377,,Einnahme,Sonstiges,73464.03,nan
+378,,Ausgabe,Sonstiges,66241.69999999998,nan

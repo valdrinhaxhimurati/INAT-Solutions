@@ -1,0 +1,7 @@
+{
+    "db_backend": "postgres",
+    "postgres_url": "postgresql://avnadmin:AVNS_GWTlPjh9-o3JnzhzM7L@inatsolutionsdb2025-inat2025.b.aivencloud.com:23057/defaultdb?sslmode=require&connect_timeout=10",
+    "db_pfad": "db\\datenbank.sqlite",
+    "firmenname": "INAT Performance GmbH",
+    "uid": "1231649"
+}
