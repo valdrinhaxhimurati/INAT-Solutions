@@ -1,10 +1,10 @@
-from PyQt5.QtWidgets import (
+﻿from PyQt5.QtWidgets import (
     QDialog, QVBoxLayout, QLabel, QLineEdit, QTextEdit, QComboBox,
     QPushButton, QDateEdit
 )
 from PyQt5.QtCore import QDate
 from gui.utils import create_button_bar
-from db_connection import get_db, dict_cursor
+from db_connection import get_db, dict_cursor_factory
 
 class BuchhaltungDialog(QDialog):
     def __init__(self, eintrag=None, kategorien=None):
@@ -88,3 +88,5 @@ class BuchhaltungDialog(QDialog):
             "betrag": self.input_betrag.text(),
             "beschreibung": self.input_beschreibung.toPlainText(),
         }
+
+

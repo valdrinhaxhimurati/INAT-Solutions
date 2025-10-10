@@ -1,8 +1,8 @@
-from PyQt5.QtWidgets import (
+﻿from PyQt5.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QTableWidget,
     QTableWidgetItem, QDialog, QMessageBox
 )
-from db_connection import get_db, dict_cursor
+from db_connection import get_db, dict_cursor_factory
 import sqlite3
 import datetime
 from PyQt5.QtGui import QColor
@@ -66,7 +66,7 @@ class ReifenlagerTab(QWidget):
 
     def lade_reifen(self):
         conn = get_db()
-        cursor = conn.cursor(cursor_factory=dict_cursor(conn))
+        cursor = conn.cursor(cursor_factory=dict_cursor_factory(conn))
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS reifenlager (
                 reifen_id SERIAL PRIMARY KEY,
@@ -138,7 +138,7 @@ class ReifenlagerTab(QWidget):
         if dialog.exec_() == QDialog.Accepted:
             daten = dialog.get_daten()
             conn = get_db()
-            cursor = conn.cursor(cursor_factory=dict_cursor(conn))
+            cursor = conn.cursor(cursor_factory=dict_cursor_factory(conn))
             cursor.execute("""
                 INSERT INTO reifenlager (kundennr, kunde_anzeige, fahrzeug, dimension, typ, dot, lagerort, eingelagert_am, ausgelagert_am, bemerkung)
                 VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
@@ -172,7 +172,7 @@ class ReifenlagerTab(QWidget):
         if dialog.exec_() == QDialog.Accepted:
             daten = dialog.get_daten()
             conn = get_db()
-            cursor = conn.cursor(cursor_factory=dict_cursor(conn))
+            cursor = conn.cursor(cursor_factory=dict_cursor_factory(conn))
             cursor.execute("""
                 UPDATE reifenlager
                 SET kundennr= %s, kunde_anzeige= %s, fahrzeug= %s, dimension= %s, typ= %s, dot= %s, lagerort= %s, eingelagert_am= %s, ausgelagert_am= %s, bemerkung= %s
@@ -192,8 +192,10 @@ class ReifenlagerTab(QWidget):
             return
         reifen_id = int(self.table.item(zeile, 0).text())
         conn = get_db()
-        cursor = conn.cursor(cursor_factory=dict_cursor(conn))
+        cursor = conn.cursor(cursor_factory=dict_cursor_factory(conn))
         cursor.execute("DELETE FROM reifenlager WHERE reifen_id= %s", (reifen_id,))
         conn.commit()
         conn.close()
         self.lade_reifen()
+
+

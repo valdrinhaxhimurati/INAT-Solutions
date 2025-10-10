@@ -1,8 +1,8 @@
-from PyQt5.QtWidgets import (
+﻿from PyQt5.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QTableWidget,
     QTableWidgetItem, QDialog, QMessageBox
 )
-from db_connection import get_db, dict_cursor
+from db_connection import get_db, dict_cursor_factory
 import sqlite3
 import webbrowser
 from PyQt5.QtWidgets import QToolButton
@@ -53,7 +53,7 @@ class LieferantenTab(QWidget):
 
     def lade_lieferanten(self):
         conn = get_db()
-        cursor = conn.cursor(cursor_factory=dict_cursor(conn))
+        cursor = conn.cursor(cursor_factory=dict_cursor_factory(conn))
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS lieferanten (
                 lieferantnr SERIAL PRIMARY KEY,
@@ -87,7 +87,7 @@ class LieferantenTab(QWidget):
         if dialog.exec_() == QDialog.Accepted:
             daten = dialog.get_daten()
             conn = get_db()
-            cursor = conn.cursor(cursor_factory=dict_cursor(conn))
+            cursor = conn.cursor(cursor_factory=dict_cursor_factory(conn))
             cursor.execute("""
                 INSERT INTO lieferanten (name, portal_link, login, passwort)
                 VALUES (%s, %s, %s, %s)
@@ -112,7 +112,7 @@ class LieferantenTab(QWidget):
         if dialog.exec_() == QDialog.Accepted:
             daten = dialog.get_daten()
             conn = get_db()
-            cursor = conn.cursor(cursor_factory=dict_cursor(conn))
+            cursor = conn.cursor(cursor_factory=dict_cursor_factory(conn))
             cursor.execute("""
                 UPDATE lieferanten
                 SET name= %s, portal_link= %s, login= %s, passwort= %s
@@ -128,7 +128,7 @@ class LieferantenTab(QWidget):
             return
         lieferant_id = int(self.table.item(zeile, 0).text())
         conn = get_db()
-        cursor = conn.cursor(cursor_factory=dict_cursor(conn))
+        cursor = conn.cursor(cursor_factory=dict_cursor_factory(conn))
         cursor.execute("DELETE FROM lieferanten WHERE lieferantnr= %s", (lieferant_id,))
         conn.commit()
         conn.close()
@@ -143,3 +143,5 @@ class LieferantenTab(QWidget):
             webbrowser.open(link)
         else:
             QMessageBox.information(self, "Kein Link", "Kein Link hinterlegt.")
+
+

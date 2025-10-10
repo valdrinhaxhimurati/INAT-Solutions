@@ -1,20 +1,10 @@
-# gui/artikellager_tab.py
+﻿# gui/artikellager_tab.py
 from PyQt5.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QTableWidget,
     QTableWidgetItem, QDialog, QMessageBox, QToolButton
 )
-import psycopg2
-import os
+from db_connection import get_db, dict_cursor_factory
 
-def get_pg_conn():
-    return psycopg2.connect(
-        host=os.getenv("PGHOST"),
-        port=os.getenv("PGPORT"),
-        dbname=os.getenv("PGDATABASE"),
-        user=os.getenv("PGUSER"),
-        password=os.getenv("PGPASSWORD"),
-        sslmode=os.getenv("PGSSLMODE"),
-    )
 
 class ArtikellagerTab(QWidget):
     def __init__(self):
@@ -56,13 +46,13 @@ class ArtikellagerTab(QWidget):
             lagerort      TEXT
         )
         """
-        with get_pg_conn() as con:
+        with get_db() as con:
             with con.cursor() as cur:
                 cur.execute(sql)
             con.commit()
 
     def lade_artikel(self):
-        with get_pg_conn() as con:
+        with get_db() as con:
             with con.cursor() as cur:
                 cur.execute("""
                     SELECT artikel_id, artikelnummer, bezeichnung, COALESCE(bestand,0), COALESCE(lagerort,'')
@@ -88,7 +78,7 @@ class ArtikellagerTab(QWidget):
         dlg = LagerDialog(self, artikel=None)
         if dlg.exec_() == QDialog.Accepted:
             d = dlg.get_daten()
-            with get_pg_conn() as con:
+            with get_db() as con:
                 with con.cursor() as cur:
                     cur.execute("""
                         INSERT INTO public.artikellager (artikelnummer, bezeichnung, bestand, lagerort)
@@ -112,7 +102,7 @@ class ArtikellagerTab(QWidget):
         dlg = LagerDialog(self, artikel=artikel)
         if dlg.exec_() == QDialog.Accepted:
             d = dlg.get_daten()
-            with get_pg_conn() as con:
+            with get_db() as con:
                 with con.cursor() as cur:
                     cur.execute("""
                         UPDATE public.artikellager
@@ -127,8 +117,10 @@ class ArtikellagerTab(QWidget):
         if z < 0:
             return
         artikel_id = int(self.table.item(z, 0).text())
-        with get_pg_conn() as con:
+        with get_db() as con:
             with con.cursor() as cur:
                 cur.execute("DELETE FROM public.artikellager WHERE artikel_id=%s", (artikel_id,))
             con.commit()
         self.lade_artikel()
+
+

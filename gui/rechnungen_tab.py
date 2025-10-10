@@ -1,14 +1,15 @@
+
 # -*- coding: utf-8 -*-
 from PyQt5.QtWidgets import (
-    QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QTableWidget, QTableWidgetItem,
+    QWidget, QVBoxLayout, QHBoxLayout, QToolButton, QTableWidget, QTableWidgetItem,
     QMessageBox, QDialog, QFileDialog, QInputDialog
 )
-from db_connection import get_db, dict_cursor
-import sqlite3
-import json
-import os
-import subprocess
-from gui.rechnung_dialog import RechnungDialog, RechnungLayoutDialog
+from PyQt5.QtGui import QBrush, QColor
+from PyQt5.QtCore import Qt
+from db_connection import get_db, dict_cursor_factory
+import json, os, subprocess, tempfile
+from gui.rechnung_dialog import RechnungDialog
+from gui.rechnung_layout_dialog import RechnungLayoutDialog
 from reportlab.lib.pagesizes import A4
 from reportlab.pdfgen import canvas
 from reportlab.lib.units import mm
@@ -17,11 +18,7 @@ from reportlab.platypus import Table, TableStyle
 from svglib.svglib import svg2rlg
 from reportlab.graphics import renderPDF
 from decimal import Decimal
-from PyQt5.QtGui import QBrush, QColor
 from datetime import datetime, timedelta
-import tempfile
-from PyQt5.QtWidgets import QToolButton
-
 
 # Pastell-Farben wie im Buchhaltungstab
 PASTELL_GRUEN  = QColor(230, 255, 230)   # bezahlt
@@ -52,39 +49,26 @@ class RechnungenTab(QWidget):
         self._setup_table()
         self.layout_main.addWidget(self.table, stretch=1)
 
-        # Buttons rechts
+        # Buttons rechts (wie im Kunden-Tab: QToolButton + role-Properties)
         btn_layout = QVBoxLayout()
+        self.btn_neu = QToolButton();               self.btn_neu.setText("Neue Rechnung");             self.btn_neu.setProperty("role", "add")
+        self.btn_bearbeiten = QToolButton();        self.btn_bearbeiten.setText("Rechnung bearbeiten"); self.btn_bearbeiten.setProperty("role", "edit")
+        self.btn_loeschen = QToolButton();          self.btn_loeschen.setText("Rechnung löschen");      self.btn_loeschen.setProperty("role", "delete")
+        self.btn_set_status = QToolButton();        self.btn_set_status.setText("Status ändern");       self.btn_set_status.setProperty("role", "refresh")
+        self.btn_exportieren = QToolButton();       self.btn_exportieren.setText("Export PDF");         self.btn_exportieren.setProperty("role", "download")
+        self.btn_vorschau = QToolButton();          self.btn_vorschau.setText("Vorschau PDF");         self.btn_vorschau.setProperty("role", "preview")
+        self.btn_layout_bearbeiten = QToolButton(); self.btn_layout_bearbeiten.setText("Rechnungslayout bearbeiten");      self.btn_layout_bearbeiten.setProperty("role", "edit")
 
-        # --- Buttons als Instanzattribute (QToolButton) + sinnvolle Rollen ---
-        self.btn_neu = QToolButton()
-        self.btn_neu.setText('Neue Rechnung')
-        self.btn_neu.setProperty("role", "add")
+        for btn in [
+            self.btn_neu, self.btn_bearbeiten, self.btn_loeschen,
+            self.btn_set_status, self.btn_exportieren, self.btn_vorschau, self.btn_layout_bearbeiten
+        ]:
+            btn_layout.addWidget(btn)
+        btn_layout.addStretch()
 
-        self.btn_bearbeiten = QToolButton()
-        self.btn_bearbeiten.setText('Rechnung bearbeiten')
-        self.btn_bearbeiten.setProperty("role", "edit")
+        self.layout_main.addLayout(btn_layout)
 
-        self.btn_loeschen = QToolButton()
-        self.btn_loeschen.setText('Rechnung löschen')
-        self.btn_loeschen.setProperty("role", "delete")
-
-        self.btn_set_status = QToolButton()
-        self.btn_set_status.setText('Status ändern')
-        self.btn_set_status.setProperty("role", "refresh")   # besser als "edit" für Status ändern
-
-        self.btn_exportieren = QToolButton()
-        self.btn_exportieren.setText('Export PDF')
-        self.btn_exportieren.setProperty("role", "download")
-
-        self.btn_vorschau = QToolButton()
-        self.btn_vorschau.setText("Vorschau PDF")
-        self.btn_vorschau.setProperty("role", "preview")
-
-        self.btn_layout_bearbeiten = QToolButton()
-        self.btn_layout_bearbeiten.setText('Rechnungslayout bearbeiten')
-        self.btn_layout_bearbeiten.setProperty("role", "settings")
-
-        # --- Verbindungen ---
+        # Button-Events verbinden
         self.btn_neu.clicked.connect(self.neue_rechnung)
         self.btn_bearbeiten.clicked.connect(self.bearbeite_rechnung)
         self.btn_loeschen.clicked.connect(self.loesche_rechnung)
@@ -93,82 +77,58 @@ class RechnungenTab(QWidget):
         self.btn_vorschau.clicked.connect(self.vorschau_ausgewaehlte_rechnung)
         self.btn_layout_bearbeiten.clicked.connect(self.oeffne_rechnungslayout_dialog)
 
-        # --- Layout ---
-        for btn in [
-            self.btn_neu, self.btn_bearbeiten, self.btn_loeschen,
-            self.btn_set_status, self.btn_exportieren, self.btn_vorschau,
-            self.btn_layout_bearbeiten
-        ]:
-            btn_layout.addWidget(btn)
-
-
-
-        btn_layout.addStretch()
-
-        self.layout_main.addLayout(btn_layout)
-
         # Rechnungen laden
         self.lade_rechnungen()
 
-    
     def aktualisiere_kunden_liste(self):
-        """Vom KundenTab-Signal aufgerufen: Kundenlisten neu laden und Tabelle refreshen."""
+        """Vom Kunden-Tab getriggert: Kunden-Cache + Tabelle neu laden."""
         self.kunden_liste = self._lade_kundennamen()
         self.kunden_adressen = self._lade_kunden_adressen()
         self.kunden_firmen = self._lade_kunden_firmen()
         self.lade_rechnungen()
+
 # ---------------- DB / Settings ----------------
 
     def initialisiere_datenbank(self):
-        conn = get_db()
-        cursor = conn.cursor(cursor_factory=dict_cursor(conn))
-
-        # Tabelle Kunden
-        cursor.execute("""
-            CREATE TABLE IF NOT EXISTS public.kunden (
-                kundennr BIGSERIAL PRIMARY KEY,
-                name     TEXT,
-                firma    TEXT,
-                plz      TEXT,
-                strasse  TEXT,
-                stadt    TEXT,
-                email    TEXT,
-                anrede   TEXT
-            )
-        """)
-
-
-        # Tabelle Rechnungen
-        cursor.execute("""
-            CREATE TABLE IF NOT EXISTS rechnungen (
-                id SERIAL PRIMARY KEY,
-                rechnung_nr TEXT,
-                kunde TEXT,
-                firma TEXT,
-                adresse TEXT,
-                datum TEXT,
-                mwst REAL,
-                zahlungskonditionen TEXT,
-                positionen TEXT,
-                uid TEXT,
-                abschluss TEXT
-            )
-        """)
-
-        # Alte DBs: Spalten nachziehen (idempotent)
-        for spalte in ["abschluss", "uid", "firma", "abschluss_text"]:
-            try:
-                # Spalten idempotent nachziehen (PostgreSQL)
-                cursor.execute("ALTER TABLE rechnungen ADD COLUMN IF NOT EXISTS abschluss TEXT")
-                cursor.execute("ALTER TABLE rechnungen ADD COLUMN IF NOT EXISTS uid TEXT")
-                cursor.execute("ALTER TABLE rechnungen ADD COLUMN IF NOT EXISTS firma TEXT")
-                cursor.execute("ALTER TABLE rechnungen ADD COLUMN IF NOT EXISTS abschluss_text TEXT")
-
-            except sqlite3.OperationalError:
-                pass
-
-        conn.commit()
-        conn.close()
+        with get_db() as conn:
+            with conn.cursor() as cursor:
+                # Kunden
+                cursor.execute("""
+                    CREATE TABLE IF NOT EXISTS public.kunden (
+                        kundennr BIGSERIAL PRIMARY KEY,
+                        name     TEXT,
+                        firma    TEXT,
+                        plz      TEXT,
+                        strasse  TEXT,
+                        stadt    TEXT,
+                        email    TEXT,
+                        anrede   TEXT
+                    )
+                """)
+                # Rechnungen
+                cursor.execute("""
+                    CREATE TABLE IF NOT EXISTS public.rechnungen (
+                        id BIGSERIAL PRIMARY KEY,
+                        rechnung_nr TEXT,
+                        kunde TEXT,
+                        firma TEXT,
+                        adresse TEXT,
+                        datum TEXT,
+                        mwst REAL,
+                        zahlungskonditionen TEXT,
+                        positionen TEXT,
+                        uid TEXT,
+                        abschluss TEXT,
+                        abschluss_text TEXT
+                    )
+                """)
+                # Alte DBs: Spalten nachziehen (idempotent)
+                for spalte in ["abschluss", "uid", "firma", "abschluss_text"]:
+                    try:
+                        cursor.execute(f"ALTER TABLE public.rechnungen ADD COLUMN {spalte} TEXT")
+                    except Exception:
+                        pass
+            conn.commit()
 
     def oeffne_rechnungslayout_dialog(self):
         dialog = RechnungLayoutDialog(self)
@@ -246,27 +206,24 @@ class RechnungenTab(QWidget):
     # ---------------- Kunden Daten ----------------
 
     def _lade_kunden_adressen(self):
-        conn = get_db()
-        cursor = conn.cursor(cursor_factory=dict_cursor(conn))
-        cursor.execute("SELECT name, firma, plz, strasse, stadt FROM kunden ORDER BY name")
-        daten = cursor.fetchall()
-        conn.close()
+        with get_db() as conn:
+            with conn.cursor() as cursor:
+                cursor.execute("SELECT name, firma, plz, strasse, stadt FROM public.kunden ORDER BY name")
+                daten = cursor.fetchall()
         return {name: f"{strasse}\n{plz} {stadt}" for name, firma, plz, strasse, stadt in daten}
 
     def _lade_kunden_firmen(self):
-        conn = get_db()
-        cursor = conn.cursor(cursor_factory=dict_cursor(conn))
-        cursor.execute("SELECT name, firma FROM kunden ORDER BY name")
-        daten = cursor.fetchall()
-        conn.close()
+        with get_db() as conn:
+            with conn.cursor() as cursor:
+                cursor.execute("SELECT name, firma FROM public.kunden ORDER BY name")
+                daten = cursor.fetchall()
         return {name: firma for name, firma in daten}
 
     def _lade_kundennamen(self):
-        conn = get_db()
-        cursor = conn.cursor(cursor_factory=dict_cursor(conn))
-        cursor.execute("SELECT name FROM kunden ORDER BY name")
-        namen = [row[0] for row in cursor.fetchall()]
-        conn.close()
+        with get_db() as conn:
+            with conn.cursor() as cursor:
+                cursor.execute("SELECT name FROM public.kunden ORDER BY name")
+                namen = [row[0] for row in cursor.fetchall()]
         return namen
 
     # ---------------- Tabelle / UI ----------------
@@ -293,15 +250,13 @@ class RechnungenTab(QWidget):
             it.setBackground(brush)
 
     def lade_rechnungen(self):
-        conn = get_db()
-        cursor = conn.cursor(cursor_factory=dict_cursor(conn))
-
-        cursor.execute("""
-            SELECT id, rechnung_nr, kunde, firma, adresse, datum, mwst, zahlungskonditionen, positionen, uid, abschluss, abschluss_text
-            FROM rechnungen ORDER BY datum DESC
-        """)
-        daten = cursor.fetchall()
-        conn.close()
+        with get_db() as conn:
+            with conn.cursor() as cursor:
+                cursor.execute("""
+                    SELECT id, rechnung_nr, kunde, firma, adresse, datum, mwst, zahlungskonditionen, positionen, uid, abschluss, COALESCE(abschluss_text,'')
+                    FROM public.rechnungen ORDER BY datum DESC NULLS LAST, id DESC
+                """)
+                daten = cursor.fetchall()
 
         self.rechnungen = []
         self.table.setRowCount(len(daten))
@@ -342,13 +297,8 @@ class RechnungenTab(QWidget):
     def _berechne_status(self, datum_str, zahlungskonditionen, abschluss):
         """
         Gibt (status_text, farbe_qcolor) zurück.
-
-        Regeln:
-        - Wenn 'abschluss' explizit einen Status enthält ('bezahlt'/'offen'/'überfällig'),
-          gilt das als **manuelle Festlegung** -> keine Automatik, nur Farbe setzen.
-        - Sonst automatische Berechnung aus Datum + Zahlungsziel.
-          Standard-Zahlungsziel = 10 Tage, wenn Feld leer.
-        Farben: Pastell wie im Buchhaltungstab.
+        - 'abschluss' (bezahlt/offen/überfällig) = manuell -> Vorrang
+        - sonst Automatik: Datum + Zahlungsziel (Standard 10 Tage)
         """
         status_man = (abschluss or "").strip().lower()
         if status_man in ("bezahlt", "offen", "überfällig"):
@@ -359,8 +309,7 @@ class RechnungenTab(QWidget):
             else:
                 return "offen", PASTELL_ORANGE
 
-        # -------- Automatik --------
-        # Datum parsen
+        # Automatik
         rechnungsdatum = None
         for fmt in ("%Y-%m-%d", "%d.%m.%Y", "%d.%m.%y"):
             try:
@@ -371,7 +320,6 @@ class RechnungenTab(QWidget):
         if not rechnungsdatum:
             rechnungsdatum = datetime.today().date()
 
-        # Zahlungsziel: Standard 10 Tage
         ziel_tage = 10
         if isinstance(zahlungskonditionen, str) and zahlungskonditionen.strip():
             import re as _re
@@ -389,7 +337,7 @@ class RechnungenTab(QWidget):
         return "offen", PASTELL_ORANGE
 
     def _status_aendern(self):
-        """Status per Button wählen; manuelle Auswahl überschreibt Automatik dauerhaft (in DB)."""
+        """Status per Button; manuelle Auswahl überschreibt Automatik (in DB)."""
         zeile = self.table.currentRow()
         if zeile < 0:
             QMessageBox.warning(self, "Keine Auswahl", "Bitte zuerst eine Rechnung auswählen.")
@@ -397,20 +345,16 @@ class RechnungenTab(QWidget):
         rechnung_id = int(self.table.item(zeile, 0).text())
 
         status, ok = QInputDialog.getItem(
-            self, "Rechnungsstatus wählen",
-            "Status:",
-            ["offen", "bezahlt", "überfällig"],
-            0, False
+            self, "Rechnungsstatus wählen", "Status:",
+            ["offen", "bezahlt", "überfällig"], 0, False
         )
         if not ok:
             return
 
-        # In DB als 'abschluss' speichern (gilt als manuell)
-        conn = get_db()
-        cursor = conn.cursor(cursor_factory=dict_cursor(conn))
-        cursor.execute("UPDATE rechnungen SET abschluss= %s WHERE id= %s", (status, rechnung_id))
-        conn.commit()
-        conn.close()
+        with get_db() as conn:
+            with conn.cursor() as cursor:
+                cursor.execute("UPDATE public.rechnungen SET abschluss=%s WHERE id=%s", (status, rechnung_id))
+            conn.commit()
 
         # UI aktualisieren
         datum = self.table.item(zeile, 3).text()
@@ -418,13 +362,12 @@ class RechnungenTab(QWidget):
         for r in self.rechnungen:
             if r["id"] == rechnung_id:
                 zahlk = r.get("zahlungskonditionen", "")
-                r["abschluss"] = status  # in Memory nachziehen
+                r["abschluss"] = status
                 break
 
         status_text, farbe = self._berechne_status(datum, zahlk or "", status)
         self.table.setItem(zeile, 4, QTableWidgetItem(status_text))
         self._setze_zeilenfarbe(zeile, farbe)
-
         QMessageBox.information(self, "Rechnung", f"Status geändert zu: {status_text}")
 
     # ---------------- CRUD Rechnungen ----------------
@@ -433,10 +376,8 @@ class RechnungenTab(QWidget):
         dialog = RechnungDialog(self.kunden_liste, self.kunden_firmen, self.kunden_adressen, mwst_voreinstellung=self.mwst)
         if dialog.exec_() == QDialog.Accepted:
             rechnung = dialog.get_rechnung()
-            # Default-Zahlungsziel-Text setzen, falls leer
             if not rechnung.get("zahlungskonditionen", "").strip():
-                rechnung["zahlungskonditionen"] = "Zahlbar inner 10 Tagen"
-            # 'abschluss' leer lassen -> Automatik
+                rechnung["zahlungskonditionen"] = "zahlbar innert 10 Tagen"
             if not rechnung.get("abschluss", ""):
                 rechnung["abschluss"] = ""
             self.speichere_rechnung(rechnung)
@@ -457,8 +398,7 @@ class RechnungenTab(QWidget):
         if dialog.exec_() == QDialog.Accepted:
             neue_rechnung = dialog.get_rechnung()
             if not neue_rechnung.get("zahlungskonditionen", "").strip():
-                neue_rechnung["zahlungskonditionen"] = "Zahlbar inner 10 Tagen"
-            # abschluss so lassen wie im Dialog (leer = Automatik)
+                neue_rechnung["zahlungskonditionen"] = "zahlbar innert 10 Tagen"
             self.speichere_rechnung(neue_rechnung, rechnung_id)
             self.lade_rechnungen()
 
@@ -475,59 +415,60 @@ class RechnungenTab(QWidget):
             QMessageBox.Yes | QMessageBox.No
         )
         if antwort == QMessageBox.Yes:
-            conn = get_db()
-            cursor = conn.cursor(cursor_factory=dict_cursor(conn))
-            cursor.execute("DELETE FROM rechnungen WHERE id = %s", (rechnung_id,))
-            conn.commit()
-            conn.close()
+            with get_db() as conn:
+                with conn.cursor() as cursor:
+                    cursor.execute("DELETE FROM public.rechnungen WHERE id = %s", (rechnung_id,))
+                conn.commit()
             self.lade_rechnungen()
 
     def speichere_rechnung(self, rechnung, rechnung_id=None):
         """Rechnung in DB speichern (neu oder update)"""
         positionen_json = json.dumps(rechnung.get("positionen", []), ensure_ascii=False)
-        conn = get_db()
-        cursor = conn.cursor(cursor_factory=dict_cursor(conn))
-
         if rechnung_id is not None:
-            cursor.execute("""
-                UPDATE rechnungen SET
-                    rechnung_nr = %s, kunde = %s, firma = %s, adresse = %s, datum = %s,
-                    mwst = %s, zahlungskonditionen = %s, positionen = %s, uid = %s, abschluss = %s
-                WHERE id = %s
-            """, (
-                rechnung.get("rechnung_nr", ""),
-                rechnung.get("kunde", ""),
-                rechnung.get("firma", ""),
-                rechnung.get("adresse", ""),
-                rechnung.get("datum", ""),
-                rechnung.get("mwst", 0),
-                rechnung.get("zahlungskonditionen", ""),
-                positionen_json,
-                rechnung.get("uid", ""),
-                rechnung.get("abschluss", ""),
-                rechnung_id
-            ))
+            with get_db() as conn:
+                with conn.cursor() as cursor:
+                    cursor.execute("""
+                        UPDATE public.rechnungen SET
+                            rechnung_nr = %s, kunde = %s, firma = %s, adresse = %s, datum = %s,
+                            mwst = %s, zahlungskonditionen = %s, positionen = %s, uid = %s, abschluss = %s, abschluss_text=%s
+                        WHERE id = %s
+                    """, (
+                        rechnung.get("rechnung_nr", ""),
+                        rechnung.get("kunde", ""),
+                        rechnung.get("firma", ""),
+                        rechnung.get("adresse", ""),
+                        rechnung.get("datum", ""),
+                        rechnung.get("mwst", 0),
+                        rechnung.get("zahlungskonditionen", ""),
+                        positionen_json,
+                        rechnung.get("uid", ""),
+                        rechnung.get("abschluss", ""),
+                        rechnung.get("abschluss_text", ""),
+                        rechnung_id
+                    ))
+                conn.commit()
         else:
-            cursor.execute("""
-                INSERT INTO rechnungen (
-                    rechnung_nr, kunde, firma, adresse, datum,
-                    mwst, zahlungskonditionen, positionen, uid, abschluss, abschluss_text
-                ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)""", (
-                rechnung.get("rechnung_nr", ""),
-                rechnung.get("kunde", ""),
-                rechnung.get("firma", ""),
-                rechnung.get("adresse", ""),
-                rechnung.get("datum", ""),
-                rechnung.get("mwst", 0),
-                rechnung.get("zahlungskonditionen", ""),
-                positionen_json,
-                rechnung.get("uid", ""),
-                rechnung.get("abschluss", ""),
-                rechnung.get("abschluss_text", ""),
-            ))
-
-        conn.commit()
-        conn.close()
+            with get_db() as conn:
+                with conn.cursor() as cursor:
+                    cursor.execute("""
+                        INSERT INTO public.rechnungen (
+                            rechnung_nr, kunde, firma, adresse, datum,
+                            mwst, zahlungskonditionen, positionen, uid, abschluss, abschluss_text
+                        ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                    """, (
+                        rechnung.get("rechnung_nr", ""),
+                        rechnung.get("kunde", ""),
+                        rechnung.get("firma", ""),
+                        rechnung.get("adresse", ""),
+                        rechnung.get("datum", ""),
+                        rechnung.get("mwst", 0),
+                        rechnung.get("zahlungskonditionen", ""),
+                        positionen_json,
+                        rechnung.get("uid", ""),
+                        rechnung.get("abschluss", ""),
+                        rechnung.get("abschluss_text", ""),
+                    ))
+                conn.commit()
 
     # ---------------- Helpers ----------------
 
@@ -536,6 +477,8 @@ class RechnungenTab(QWidget):
             if rechnung["id"] == rechnung_id:
                 return rechnung
         return None
+
+    # ---------------- PDF Export / Vorschau ----------------
 
     def exportiere_ausgewaehlte_rechnung(self):
         zeile = self.table.currentRow()
@@ -551,7 +494,7 @@ class RechnungenTab(QWidget):
         pfad, _ = QFileDialog.getSaveFileName(self, "PDF speichern", f"Rechnung_{rechnung['rechnung_nr']}.pdf", "PDF-Dateien (*.pdf)")
         if pfad:
             try:
-                self._exportiere_pdf(rechnung, pfad)
+                self._exportiere_pdf(rechnung, pfad, logo_skala=self.layout_config.get("logo_skala", 100))
                 QMessageBox.information(self, "Erfolg", f"PDF wurde gespeichert unter:\n{pfad}")
             except Exception as e:
                 QMessageBox.critical(self, "Fehler", f"Fehler beim PDF Export:\n{str(e)}")
@@ -587,7 +530,7 @@ class RechnungenTab(QWidget):
         c = canvas.Canvas(dateipfad, pagesize=A4)
         width, height = A4
 
-        # Blöcke: Name: (x_links, y_unten, breite, höhe)
+        # Blöcke
         blocks = {
             "logo":      (20*mm, 250*mm, 170*mm, 35*mm),
             "adresse":   (20*mm, 200*mm, 70*mm, 25*mm),
@@ -597,7 +540,7 @@ class RechnungenTab(QWidget):
             "fusszeile": (20*mm, 10*mm, 170*mm, 10*mm),
         }
 
-        rand_links = 20 * mm  # wird mehrfach genutzt
+        rand_links = 20 * mm
 
         # Schriftfarbe
         c.setFillColorRGB(*[v / 255 for v in self.layout_config["farbe_text"]])
@@ -610,7 +553,7 @@ class RechnungenTab(QWidget):
                 from PIL import Image
                 with Image.open(logo_pfad) as img:
                     original_breite, original_hoehe = img.size
-                faktor = min((w_logo / original_breite), (h_logo / original_hoehe), 1.0) * (self.layout_config.get("logo_skala", 100) / 100.0)
+                faktor = min((w_logo / original_breite), (h_logo / original_hoehe), 1.0) * (logo_skala / 100.0)
                 logo_breite = original_breite * faktor
                 logo_hoehe = original_hoehe * faktor
                 logo_x = x_logo
@@ -733,26 +676,62 @@ class RechnungenTab(QWidget):
             c.drawRightString(gesamt_x, summen_y - 20, f"{gesamtbetrag_brutto:.2f} CHF")
 
         # Zahlungsbedingungen
-        zahlungstext = rechnung.get("zahlungskonditionen", "")
+        zahlungstext = (rechnung.get("zahlungskonditionen") or "").strip()
+        c.setFont(self.layout_config["schrift"], self.layout_config["schriftgroesse"])
+        leading = self.layout_config["schriftgroesse"] * 1.3
+
+        y_zahlung = summen_y - 30  # Startpunkt beibehalten
+        next_y = y_zahlung
+
         if zahlungstext:
-            c.setFont(self.layout_config["schrift"], self.layout_config["schriftgroesse"])
             textobj = c.beginText()
-            textobj.setTextOrigin(rand_links, summen_y - 30)
-            textobj.setLeading(self.layout_config["schriftgroesse"] * 1.3)
-            for zeile in zahlungstext.splitlines():
+            textobj.setTextOrigin(rand_links, y_zahlung)
+            textobj.setLeading(leading)
+            zahl_lines = zahlungstext.splitlines()
+            for zeile in zahl_lines:
+                textobj.textLine(zeile)
+            c.drawText(textobj)
+            # genau 2 Zeilen Abstand; für 3 Zeilen ändere zu gap_lines = 3
+            gap_lines = 3
+            next_y = y_zahlung - leading * (len(zahl_lines) + gap_lines)
+
+        # Abschiedsgruss (oder "abschluss") genau 2 Zeilen unter Zahlungsbedingungen
+        abschluss_text = (rechnung.get("abschluss_text") or rechnung.get("abschluss") or "").strip()
+        if abschluss_text:
+            textobj = c.beginText()
+            textobj.setTextOrigin(rand_links, next_y)
+            textobj.setLeading(leading)
+            for zeile in abschluss_text.splitlines():
                 textobj.textLine(zeile)
             c.drawText(textobj)
 
-        # Abschiedsgruss (optional)
-        abschluss_text = (rechnung.get('abschluss_text','') or '').strip()
-        if abschluss_text:
-            c.setFont(self.layout_config['schrift'], self.layout_config['schriftgroesse'])
-            textobj2 = c.beginText()
-            textobj2.setTextOrigin(rand_links, (summen_y - 30) - 30)
-            textobj2.setLeading(self.layout_config['schriftgroesse'] * 1.3)
-            for zeile in abschluss_text.splitlines():
-                textobj2.textLine(zeile)
-            c.drawText(textobj2)
+        # Fusszeile aus dem Layout-Dialog (JSON-Key 'fusszeile') – zentriert
+        x_f, y_f, w_f, h_f = blocks["fusszeile"]
+        fuss = self.layout_config.get("fusszeile", {}) or {}
+        fuss_text  = (fuss.get("text") or "").strip()
+        fuss_font  = fuss.get("schrift", self.layout_config["schrift"])
+        fuss_size  = int(fuss.get("groesse", self.layout_config["schriftgroesse"]))
+        fuss_farbe = fuss.get("farbe", [100, 100, 100])
+
+        if fuss_text:
+            # Farbe optional übernehmen
+            try:
+                c.setFillColorRGB(*(v/255 for v in fuss_farbe))
+            except Exception:
+                pass
+
+            c.setFont(fuss_font, fuss_size)
+            leading = fuss_size * 1.15
+            x_center = x_f + w_f / 2.0
+            y_line = y_f + h_f - fuss_size  # obere Linie im Fusszeilen-Block
+
+            for line in fuss_text.splitlines():
+                c.drawCentredString(x_center, y_line, line)
+                y_line -= leading
+
+            # Schriftfarbe für nachfolgende Elemente zurücksetzen
+            c.setFillColorRGB(*[v/255 for v in self.layout_config["farbe_text"]])
+
 
         # QR-Code Seite
         c.showPage()
@@ -799,7 +778,6 @@ class RechnungenTab(QWidget):
                     debtor['city'] = addr_lines[1].strip()
 
         from qrbill import QRBill
-        # Betrag als Decimal
         amount = Decimal(str(betrag)) if betrag is not None else Decimal("0")
 
         my_bill = QRBill(
@@ -811,25 +789,23 @@ class RechnungenTab(QWidget):
             language='de'
         )
 
-        # SVG generieren und ins PDF einfügen
-        fd, tmp_svg_path = tempfile.mkstemp(suffix=".svg")
-        os.close(fd)
+        # SVG generieren und ins PDF einfügen (Textmodus für svgwrite)
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".svg", mode="w", encoding="utf-8") as tmp_svg:
+            my_bill.as_svg(tmp_svg)
+            tmp_svg_path = tmp_svg.name
+
+        drawing = svg2rlg(tmp_svg_path)
+        x = 20 * mm
+        y = -5 * mm
+        w = 180 * mm
+        h = 90 * mm
+        canvas_obj.saveState()
+        canvas_obj.translate(x, y)
+        canvas_obj.scale(w / drawing.width, h / drawing.height)
+        renderPDF.draw(drawing, canvas_obj, 0, 0)
+        canvas_obj.restoreState()
+
         try:
-            my_bill.as_svg(tmp_svg_path)
-
-            drawing = svg2rlg(tmp_svg_path)
-            x = 20 * mm
-            y = -5 * mm
-            w = 180 * mm
-            h = 90 * mm
-            canvas_obj.saveState()
-            canvas_obj.translate(x, y)
-            canvas_obj.scale(w / drawing.width, h / drawing.height)
-            renderPDF.draw(drawing, canvas_obj, 0, 0)
-            canvas_obj.restoreState()
-        finally:
-            try:
-                os.remove(tmp_svg_path)
-            except Exception:
-                pass
-
+            os.remove(tmp_svg_path)
+        except Exception:
+            pass

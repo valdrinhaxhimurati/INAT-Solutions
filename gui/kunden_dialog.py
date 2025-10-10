@@ -1,5 +1,5 @@
-from PyQt5.QtWidgets import QDialog, QVBoxLayout, QHBoxLayout, QLabel, QLineEdit, QPushButton
-from db_connection import get_db, dict_cursor
+﻿from PyQt5.QtWidgets import QDialog, QVBoxLayout, QHBoxLayout, QLabel, QLineEdit, QPushButton
+from db_connection import get_db, dict_cursor_factory
 
 class KundenDialog(QDialog):
     def __init__(self, parent=None, kunde=None):
@@ -69,3 +69,5 @@ class KundenDialog(QDialog):
             "stadt": self.input_stadt.text(),
             "email": self.input_email.text(),
         }
+
+

@@ -170,7 +170,7 @@ QToolButton[role="preview"]:pressed {
 }
 
 /* === Einheitlicher Look für Icon-Buttons === */
-QToolButton {
+QToolButton[role] {
     qproperty-toolButtonStyle: ToolButtonTextUnderIcon; /* Icon über Text */
     qproperty-iconSize: 40px 40px;                      /* groß */
     padding: 14px 16px;
@@ -219,3 +219,11 @@ QToolButton:focus {
     box-shadow: 0 0 0 3px rgba(46,90,163,0.25);
 }
 
+/* --- Kompakter Kalender für QDateEdit --- */
+QCalendarWidget QToolButton {
+    padding: 0px;
+    min-height: 18px;
+    min-width: 18px;
+    qproperty-iconSize: 12px 12px;
+    font-size: 9pt;
+}

@@ -1,7 +1,7 @@
-from PyQt5.QtWidgets import (
+﻿from PyQt5.QtWidgets import (
     QDialog, QVBoxLayout, QLabel, QLineEdit, QPushButton, QMessageBox
 )
-from db_connection import get_db, dict_cursor
+from db_connection import get_db, dict_cursor_factory
 import json
 import os
 
@@ -107,3 +107,5 @@ class QRDatenDialog(QDialog):
 
         QMessageBox.information(self, "Gespeichert", "QR-Rechnungsdaten wurden gespeichert.")
         self.accept()
+
+

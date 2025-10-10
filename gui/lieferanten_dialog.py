@@ -1,5 +1,5 @@
-from PyQt5.QtWidgets import QDialog, QVBoxLayout, QHBoxLayout, QLabel, QLineEdit, QPushButton, QMessageBox
-from db_connection import get_db, dict_cursor
+﻿from PyQt5.QtWidgets import QDialog, QVBoxLayout, QHBoxLayout, QLabel, QLineEdit, QPushButton, QMessageBox
+from db_connection import get_db, dict_cursor_factory
 
 class LieferantenDialog(QDialog):
     def __init__(self, parent=None, lieferant=None):
@@ -58,3 +58,5 @@ class LieferantenDialog(QDialog):
             "login": self.login_input.text().strip(),
             "passwort": self.pass_input.text().strip()
         }
+
+

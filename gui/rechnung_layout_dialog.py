@@ -1,10 +1,10 @@
-# datei: gui/rechnung_layout_dialog.py
+﻿# datei: gui/rechnung_layout_dialog.py
 from PyQt5.QtWidgets import QDialog, QVBoxLayout, QLabel, QTextEdit, QPushButton, QHBoxLayout, QMessageBox, QFileDialog
 from PyQt5.QtGui import QPixmap
 import json
 import os
 import sys
-from db_connection import get_db, dict_cursor
+from db_connection import get_db, dict_cursor_factory
 
 
 class RechnungLayoutDialog(QDialog):
@@ -119,3 +119,4 @@ class RechnungLayoutDialog(QDialog):
         if dateipfad:
             self.logo_pfad = dateipfad
             self.logo_vorschau.setPixmap(QPixmap(dateipfad))
+

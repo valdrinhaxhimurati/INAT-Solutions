@@ -1,10 +1,10 @@
-from PyQt5.QtWidgets import (
+﻿from PyQt5.QtWidgets import (
     QDialog, QVBoxLayout, QLineEdit, QPushButton,
     QListWidget, QHBoxLayout, QMessageBox, QLabel,
     QSpacerItem, QSizePolicy
 )
 import json, os
-from db_connection import get_db, dict_cursor
+from db_connection import get_db, dict_cursor_factory
 class KategorienDialog(QDialog):
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -100,3 +100,5 @@ class KategorienDialog(QDialog):
 
         with open("config/einstellungen.json", "w") as f:
             json.dump(daten, f, indent=4)
+
+

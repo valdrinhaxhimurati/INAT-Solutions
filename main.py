@@ -1,5 +1,6 @@
-import sys
-from db_connection import get_db, dict_cursor
+﻿import sys
+from db_connection import get_db, dict_cursor_factory
+
 
 # --- Erststart: DB-Verbindung sicherstellen ---
 from PyQt5.QtWidgets import QDialog
@@ -252,23 +253,20 @@ if __name__ == "__main__":
                 
         config = config_laden()
 
-        db_pfad = config.get("db_pfad")
-        # <<<< HIER auf absolut umbauen, falls nötig!
-        if db_pfad and not os.path.isabs(db_pfad):
-            db_pfad = os.path.abspath(db_pfad)
+        # --- Datenbank sicherstellen (nur PostgreSQL) ---
+        from db_connection import get_db
+        from db_setup_dialog import DBSetupDialog
 
-        if not db_pfad or not os.path.exists(db_pfad):
-            db_pfad = frage_datenbank_pfad()
-            if not db_pfad:
-                print("Kein Datenbankpfad ausgewählt. Programm wird beendet.")
-                sys.exit()
-            # Relativ speichern
-            rel_pfad = os.path.relpath(db_pfad, start=os.getcwd())
-            config["db_pfad"] = rel_pfad
-            config_speichern(config)
-            # Danach für weitere Nutzung wieder absolut machen:
-            if not os.path.isabs(db_pfad):
-                db_pfad = os.path.abspath(db_pfad)
+        try:
+            conn = get_db()
+            conn.close()
+        except Exception:
+            # Wenn keine Verbindung aufgebaut werden kann -> Setup-Dialog öffnen
+            dlg = DBSetupDialog()
+            if dlg.exec_() != QDialog.Accepted:
+                QMessageBox.critical(None, "Abbruch", "Keine Datenbankverbindung konfiguriert.")
+                sys.exit(1)
+
 
         init_login_db(LOGIN_DB_PATH)
 
@@ -328,3 +326,4 @@ if __name__ == "__main__":
             f.write("Fehler beim Start der Anwendung:\n\n")
             f.write(traceback.format_exc())
         print("Ein Fehler ist aufgetreten. Details wurden in 'error.log' gespeichert.")
+

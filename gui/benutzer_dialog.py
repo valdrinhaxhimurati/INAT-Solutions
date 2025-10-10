@@ -1,6 +1,6 @@
-from PyQt5.QtWidgets import QDialog, QVBoxLayout, QLineEdit, QPushButton, QListWidget, QMessageBox, QLabel, QHBoxLayout
+﻿from PyQt5.QtWidgets import QDialog, QVBoxLayout, QLineEdit, QPushButton, QListWidget, QMessageBox, QLabel, QHBoxLayout
 from login import get_users, add_user, delete_user, init_db
-from db_connection import get_db, dict_cursor
+from db_connection import get_db, dict_cursor_factory
 
 class BenutzerVerwaltenDialog(QDialog):
     def __init__(self, db_path, parent=None):
@@ -77,3 +77,4 @@ class BenutzerVerwaltenDialog(QDialog):
                 self.liste_aktualisieren()
             else:
                 QMessageBox.warning(self, "Fehler", "Konnte Benutzer nicht löschen.")
+

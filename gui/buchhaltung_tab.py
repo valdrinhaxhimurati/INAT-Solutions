@@ -1,8 +1,8 @@
-from PyQt5.QtWidgets import (
+﻿from PyQt5.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QTableWidget, QTableWidgetItem,
     QMessageBox, QLineEdit, QFileDialog, QComboBox, QLabel, QDateEdit, QAbstractItemView, QToolButton  
 )
-from db_connection import get_db, dict_cursor
+from db_connection import get_db, dict_cursor_factory
 from PyQt5.QtCore import Qt, QDate
 from PyQt5.QtGui import QColor, QFont
 import sqlite3
@@ -228,7 +228,7 @@ class BuchhaltungTab(QWidget):
         )
         if antwort == QMessageBox.Yes:
             conn = get_db()
-            cursor = conn.cursor(cursor_factory=dict_cursor(conn))
+            cursor = conn.cursor(cursor_factory=dict_cursor_factory(conn))
             cursor.execute("DELETE FROM buchhaltung WHERE id = %s", (eintrag_id,))
             conn.commit()
             conn.close()
@@ -378,7 +378,7 @@ class BuchhaltungTab(QWidget):
 
     def lade_eintrag_aus_db(self, eintrag_id):
         conn = get_db()
-        cursor = conn.cursor(cursor_factory=dict_cursor(conn))
+        cursor = conn.cursor(cursor_factory=dict_cursor_factory(conn))
         cursor.execute("SELECT id, datum, typ, kategorie, betrag, beschreibung FROM buchhaltung WHERE id = %s", (eintrag_id,)
         )
         row = cursor.fetchone()
@@ -403,7 +403,7 @@ class BuchhaltungTab(QWidget):
             betrag = 0.0
 
         conn = get_db()
-        cursor = conn.cursor(cursor_factory=dict_cursor(conn))
+        cursor = conn.cursor(cursor_factory=dict_cursor_factory(conn))
 
         # ID als int, wenn möglich
         try:
@@ -456,7 +456,7 @@ class BuchhaltungTab(QWidget):
 
     def lade_eintraege(self):
         conn = get_db()
-        cursor = conn.cursor(cursor_factory=dict_cursor(conn))
+        cursor = conn.cursor(cursor_factory=dict_cursor_factory(conn))
 
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS buchhaltung (
@@ -689,7 +689,7 @@ class BuchhaltungTab(QWidget):
         daten = daten[daten["Belegnr"].notnull() & daten["Belegnr"].apply(lambda x: str(x).strip().isdigit())]
 
         conn = get_db()
-        cursor = conn.cursor(cursor_factory=dict_cursor(conn))
+        cursor = conn.cursor(cursor_factory=dict_cursor_factory(conn))
 
         def parse_datum(val):
             import datetime
@@ -733,6 +733,8 @@ class BuchhaltungTab(QWidget):
         conn.close()
         QMessageBox.information(self, "Fertig", f"{len(daten)} Buchungen importiert!")
         self.lade_eintraege()
+
+
 
 
 

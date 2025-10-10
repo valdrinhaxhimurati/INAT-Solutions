@@ -1,7 +1,7 @@
-from PyQt5.QtWidgets import (
+﻿from PyQt5.QtWidgets import (
     QMainWindow, QTabWidget, QLabel, QWidget 
 )
-from db_connection import get_db, dict_cursor
+from db_connection import get_db, dict_cursor_factory
 from PyQt5.QtGui import QFont
 from gui.kunden_tab import KundenTab
 from gui.rechnungen_tab import RechnungenTab
@@ -45,7 +45,7 @@ class MainWindow(QMainWindow):
         self.buchhaltung_tab = BuchhaltungTab()
         self.lieferanten_tab = LieferantenTab()
         self.lager_tab = LagerTab()  
-        self.einstellungen_tab = EinstellungenTab(LOGIN_DB_PATH)      
+        self.einstellungen_tab = EinstellungenTab(self)
         self.kunden_tab.kunde_aktualisiert.connect(self.rechnungen_tab.aktualisiere_kunden_liste)
 
         self.tabs.addTab(self.kunden_tab, "Kunden")
@@ -56,7 +56,7 @@ class MainWindow(QMainWindow):
         self.tabs.addTab(self.einstellungen_tab, "Einstellungen")
 
         self.status_bar = self.statusBar()
-        user_label = QLabel(f"👤  Angemeldet als: {self.benutzername}")
+        user_label = QLabel(f"ðŸ‘¤  Angemeldet als: {self.benutzername}")
         font = QFont("Segoe UI", 15)
         font.setBold(False)
         user_label.setFont(font)

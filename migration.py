@@ -1,4 +1,4 @@
-# -*- coding: utf-8 -*-
+﻿# -*- coding: utf-8 -*-
 """
 SQLite -> PostgreSQL Migration (robust, mit Normalisierung)
 - Spalten-Schnittmenge je Tabelle
@@ -229,3 +229,4 @@ def migration_ausfuehren(sqlite_path="db/datenbank.sqlite", pg_url=None):
 
 if __name__ == "__main__":
     main()
+

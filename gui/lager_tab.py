@@ -1,7 +1,7 @@
-from PyQt5.QtWidgets import QWidget, QVBoxLayout, QTabWidget
+﻿from PyQt5.QtWidgets import QWidget, QVBoxLayout, QTabWidget
 from gui.artikellager_tab import ArtikellagerTab
 from gui.reifenlager_tab import ReifenlagerTab
-from db_connection import get_db, dict_cursor
+from db_connection import get_db, dict_cursor_factory
 
 class LagerTab(QWidget):
     def __init__(self):
@@ -14,3 +14,4 @@ class LagerTab(QWidget):
         self.tabs.addTab(self.reifenlager_tab, "Reifen")
         layout.addWidget(self.tabs)
         self.setLayout(layout)
+

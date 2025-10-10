@@ -1,4 +1,4 @@
-# -*- coding: utf-8 -*-
+﻿# -*- coding: utf-8 -*-
 from typing import Optional
 import psycopg2, psycopg2.extras
 

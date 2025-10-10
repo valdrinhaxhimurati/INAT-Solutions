@@ -1,9 +1,8 @@
-from PyQt5.QtWidgets import (
+﻿from PyQt5.QtWidgets import (
     QDialog, QVBoxLayout, QHBoxLayout, QLabel, QLineEdit, QComboBox, QPushButton, QDateEdit
 )
-from db_connection import get_db, dict_cursor
+from db_connection import get_db, dict_cursor_factory
 from PyQt5.QtCore import Qt, QDate
-import sqlite3
 
 class ReifenlagerDialog(QDialog):
     def __init__(self, parent=None, reifen=None):
@@ -99,17 +98,42 @@ class ReifenlagerDialog(QDialog):
         self.setLayout(layout)
 
     def lade_kundenliste(self):
-        conn = get_db()
-        cursor = conn.cursor(cursor_factory=dict_cursor(conn))
+        con = get_db()
+        cur = con.cursor(cursor_factory=dict_cursor_factory(con))
         try:
-            cursor.execute("SELECT kundennr, anrede, name, firma, plz, stadt FROM kunden")
-            kunden = cursor.fetchall()
-        except Exception:
-            kunden = []
-        conn.close()
-        return [
-            (k[0], f"{k[1]} {k[2]} ({k[3]}) - {k[4]} {k[5]}") for k in kunden
-        ]
+            cur.execute("""
+                SELECT 
+                    kundennr,
+                    COALESCE(anrede,'') AS anrede,
+                    COALESCE(name,'')   AS name,
+                    COALESCE(firma,'')  AS firma,
+                    COALESCE(plz,'')    AS plz,
+                    COALESCE(stadt,'')  AS stadt
+                FROM public.kunden
+                ORDER BY name
+            """)
+            kunden = cur.fetchall()  # Liste von Dicts
+        finally:
+            cur.close()
+            con.close()
+
+        out = []
+        for k in kunden:
+            anrede = k["anrede"].strip()
+            name   = k["name"].strip()
+            firma  = k["firma"].strip()
+            plz    = k["plz"].strip()
+            stadt  = k["stadt"].strip()
+
+            # Anzeige-String bauen
+            left = f"{anrede} {name}".strip() if anrede else name
+            firmapart = f" ({firma})" if firma else ""
+            right = f"{plz} {stadt}".strip()
+            display = f"{left}{firmapart} - {right}" if right else f"{left}{firmapart}"
+
+            out.append((k["kundennr"], display))
+        return out
+
 
     def get_daten(self):
         return {
@@ -124,3 +148,4 @@ class ReifenlagerDialog(QDialog):
             "ausgelagert_am": self.ausgelagert_am_input.date().toString("yyyy-MM-dd"),
             "bemerkung": self.bemerkung_input.text().strip()
         }
+

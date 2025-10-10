@@ -1,7 +1,7 @@
-from PyQt5.QtWidgets import (
+﻿from PyQt5.QtWidgets import (
     QDialog, QVBoxLayout, QHBoxLayout, QLabel, QLineEdit, QPushButton, QMessageBox
 )
-from db_connection import get_db, dict_cursor
+from db_connection import get_db, dict_cursor_factory
 class LagerDialog(QDialog):
     def __init__(self, parent=None, artikel=None):
         super().__init__(parent)
@@ -61,3 +61,5 @@ class LagerDialog(QDialog):
             "bestand": int(self.bestand_input.text().strip()),
             "lagerort": self.lagerort_input.text().strip()
         }
+
+

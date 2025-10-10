@@ -1,10 +1,10 @@
-# -*- coding: utf-8 -*-
+﻿# -*- coding: utf-8 -*-
 from PyQt5.QtWidgets import (
     QDialog, QWidget, QVBoxLayout, QHBoxLayout, QGridLayout, QLabel, QLineEdit,
     QTextEdit, QPushButton, QComboBox, QDateEdit, QMessageBox, QTableWidget,
     QTableWidgetItem, QDoubleSpinBox, QSizePolicy
 )
-from db_connection import get_db, dict_cursor
+from db_connection import get_db, dict_cursor_factory
 from PyQt5.QtCore import Qt, QDate
 import json
 
@@ -151,6 +151,12 @@ class RechnungDialog(QDialog):
         # --- Positionen (hinzugefügt) ---
         self.tbl_pos = QTableWidget(0, 4)
         self.tbl_pos.setHorizontalHeaderLabels(["Beschreibung", "Menge", "Einzelpreis", "Total"])
+        # Spaltenbreiten festlegen: Beschreibung grösser, Total kleiner
+        self.tbl_pos.setColumnWidth(0, 800)   # Beschreibung
+        self.tbl_pos.setColumnWidth(1, 80)    # Menge
+        self.tbl_pos.setColumnWidth(2, 100)   # Einzelpreis
+        self.tbl_pos.setColumnWidth(3, 100)   # Total
+
         self.tbl_pos.horizontalHeader().setStretchLastSection(True)
         self.tbl_pos.setSelectionBehavior(self.tbl_pos.SelectRows)
         self.tbl_pos.setEditTriggers(self.tbl_pos.AllEditTriggers)
@@ -307,8 +313,19 @@ class RechnungDialog(QDialog):
             self._add_position(beschr, menge, epreis, recalc=False)
         self._recalc_totals()
 
-    # -- Positionen API --
+         # -- Positionen API --
     def _add_position(self, beschreibung: str = "", menge: float = 1.0, epreis: float = 0.0, recalc=True):
+        # Begrenzung: maximal 10 Positionen
+        if self.tbl_pos.rowCount() >= 10:
+            from PyQt5.QtWidgets import QMessageBox
+            QMessageBox.warning(
+                self,
+                "Maximale Anzahl erreicht",
+                "Es können maximal 10 Positionen pro Rechnung hinzugefügt werden."
+            )
+            return
+
+
         self.tbl_pos.blockSignals(True)
         row = self.tbl_pos.rowCount()
         self.tbl_pos.insertRow(row)
@@ -366,6 +383,9 @@ class RechnungDialog(QDialog):
         return it.text() if it else ""
 
     def _choose_from_stock(self):
+        if self.tbl_pos.rowCount() >= 10:
+            QMessageBox.warning(self, "Limit erreicht", "Es können maximal 10 Positionen pro Rechnung hinzugefügt werden.")
+            return
         if not HAS_LAGER:
             QMessageBox.information(self, "Nicht verfügbar", "Der Lagerdialog ist nicht verfügbar.")
             return
@@ -444,3 +464,4 @@ class RechnungLayoutDialog(QDialog):
         btn = QPushButton("Schließen")
         btn.clicked.connect(self.reject)
         lay.addWidget(btn)
+

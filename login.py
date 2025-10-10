@@ -1,4 +1,4 @@
-import sqlite3
+﻿import sqlite3
 import bcrypt
 from PyQt5.QtWidgets import (
     QDialog, QVBoxLayout, QLabel, QLineEdit,

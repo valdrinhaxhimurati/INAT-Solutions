@@ -1,5 +1,5 @@
-from PyQt5.QtWidgets import QHBoxLayout, QPushButton
-from db_connection import get_db, dict_cursor
+﻿from PyQt5.QtWidgets import QHBoxLayout, QPushButton
+from db_connection import get_db, dict_cursor_factory
 
 def create_button_bar(*buttons):
     layout = QHBoxLayout()
@@ -98,3 +98,4 @@ def exportiere_rechnung_pdf(rechnung):
     c.showPage()
     c.save()
     print(f"PDF {datei_name} wurde erstellt.")
+
