@@ -1,155 +1,126 @@
-﻿import sys
-from db_connection import get_db, dict_cursor_factory
+﻿import os
+import sys
+import json
+import sqlite3
+import shutil
+import subprocess
+import tempfile
+import traceback
 
+# PyQt
+from PyQt5.QtWidgets import (
+    QApplication, QMessageBox, QFileDialog, QDialog, QProgressDialog
+)
+from PyQt5.QtCore import Qt
+from PyQt5.QtGui import QIcon
 
-# --- Erststart: DB-Verbindung sicherstellen ---
-from PyQt5.QtWidgets import QDialog
+# Projekt
+import resources_rc  # Ressourcen aus resources_rc.py
+from gui.main_window import MainWindow
+from gui.benutzer_dialog import BenutzerVerwaltenDialog
+from login import init_db as init_login_db, LoginDialog
+
+# DB-Setup optional laden
 try:
     from db_setup_dialog import DBSetupDialog
 except Exception:
     DBSetupDialog = None
+
+# DB-Verbindung
 from db_connection import get_db
 
-def ensure_db_on_first_start():
+# Version sicher laden
+try:
+    from version import __version__
+except Exception:
+    __version__ = "0.0.0"
+
+
+# ---------------------- Pfade & Helpers ----------------------
+def app_base_dir() -> str:
+    # Ordner der laufenden EXE oder des Skripts
+    if getattr(sys, "frozen", False):
+        return os.path.dirname(sys.executable)
+    return os.path.dirname(os.path.abspath(__file__))
+
+def resource_path(*parts) -> str:
+    return os.path.join(app_base_dir(), *parts)
+
+# Schreibbares Benutzerverzeichnis (AppData)
+APPDATA_DIR = os.path.join(os.environ.get("APPDATA", app_base_dir()), "INAT Solutions")
+os.makedirs(APPDATA_DIR, exist_ok=True)
+
+# Konfig & Login-DB
+CONFIG_PATH_DEFAULT = resource_path("config.json")
+CONFIG_PATH = os.path.join(APPDATA_DIR, "config.json")
+LOGIN_DB_PATH = os.path.join(APPDATA_DIR, "users.db")
+DEFAULT_DB_PATH = os.path.join(APPDATA_DIR, "datenbank.sqlite")  # Fallback für lokale DB
+
+def lade_stylesheet(filename="style.qss") -> str:
+    qss = resource_path(filename)
     try:
-        conn = get_db()
-        conn.close()
-        return True
+        with open(qss, "r", encoding="utf-8") as f:
+            return f.read()
     except Exception:
-        pass
-    if DBSetupDialog is None:
-        return False
-    dlg = DBSetupDialog()
-    if dlg.exec_() == QDialog.Accepted:
-        conn = get_db()
-        conn.close()
-        return True
-    return False
+        return ""  # Stylesheet optional
 
-
-# Zuerst, bevor alles andere passiert:
-if "--do-update" in sys.argv:
-    # sys.argv = ["INAT Solutions.exe", "--do-update", src_path, dst_path, parent_pid]
-    import time, os, shutil, subprocess
-
-    _, _, src, dst, parent_pid = sys.argv
-    parent_pid = int(parent_pid)
-
-    # 1) Warten, bis der Parent (die alte App) wirklich beendet ist
-    while True:
-        try:
-            # für Windows: prüfen, ob PID noch existiert
-            os.kill(parent_pid, 0)
-        except OSError:
-            break
-        time.sleep(0.5)
-
-    # 2) Backup & Überschreiben
-    try:
-        shutil.copy2(dst, dst + ".old")   # Sicherung der alten EXE
-    except:
-        pass
-    shutil.copy2(src, dst)
-
-    # 3) Neue EXE starten
-    subprocess.Popen([dst])
-    sys.exit(0)
-
-import sqlite3
-import traceback
-import json
-import os
-import resources_rc
-
-
-from PyQt5.QtWidgets import QApplication, QFileDialog, QMessageBox, QDialog
-from gui.main_window import MainWindow
-from gui.benutzer_dialog import BenutzerVerwaltenDialog
-from login import init_db as init_login_db, LoginDialog
-#from migration import migration_ausfuehren
-from gui.kunden_tab import KundenTab
-from gui.rechnungen_tab import RechnungenTab
-from logo_splash import LogoSplash 
-import requests, tempfile, shutil, subprocess, sys
-from version import __version__
-from PyQt5.QtWidgets import QMessageBox
-import requests
-from packaging import version
-from PyQt5.QtWidgets import QApplication, QMessageBox, QProgressDialog
-from PyQt5.QtCore    import Qt
-from PyQt5.QtGui import QIcon
-
-
-
-
-LOCAL_FOLDER  = r"C:\Users\V.Haxhimurati\Documents\TEST\dist\INAT Solutions"
-LOCAL_EXE    = "INAT Solutions.exe"
-
-
-def resource_path(relative_path):
-    try:
-        base_path = sys._MEIPASS
-    except AttributeError:
-        base_path = os.path.abspath(".")
-    return os.path.join(base_path, relative_path)
-
-CONFIG_PATH = resource_path("config.json")
-DEFAULT_DB_PATH = resource_path(os.path.join("db", "datenbank.sqlite"))
-LOGIN_DB_PATH = resource_path(os.path.join("db", "users.db"))
-main_window = None
-
-
-def lade_stylesheet(dateipfad="style.qss"):
-    pfad = resource_path(dateipfad)
-    with open(pfad, "r", encoding="utf-8") as f:
-        return f.read()
-
-def config_laden():
+def config_laden() -> dict:
+    # Nutzer-Konfig bevorzugen, sonst Default
     if os.path.exists(CONFIG_PATH):
-        with open(CONFIG_PATH, "r") as f:
-            return json.load(f)
+        try:
+            with open(CONFIG_PATH, "r", encoding="utf-8") as f:
+                return json.load(f)
+        except Exception:
+            pass
+    if os.path.exists(CONFIG_PATH_DEFAULT):
+        try:
+            with open(CONFIG_PATH_DEFAULT, "r", encoding="utf-8") as f:
+                return json.load(f)
+        except Exception:
+            pass
     return {}
 
-def config_speichern(config):
-    with open(CONFIG_PATH, "w") as f:
-        json.dump(config, f, indent=4)
+def config_speichern(cfg: dict) -> None:
+    try:
+        with open(CONFIG_PATH, "w", encoding="utf-8") as f:
+            json.dump(cfg, f, indent=2, ensure_ascii=False)
+    except Exception:
+        pass
 
-def frage_datenbank_pfad():
-    info_box = QMessageBox()
-    info_box.setWindowTitle("Datenbank speichern")
-    info_box.setText(
+def frage_datenbank_pfad() -> str:
+    info = QMessageBox()
+    info.setWindowTitle("Datenbank speichern")
+    info.setText(
         "Willkommen! Bitte wählen Sie im nächsten Dialog den Speicherort für die Datenbank-Datei aus.\n\n"
         "Falls Sie noch keine Datenbank haben, wird dort eine neue angelegt."
     )
-    info_box.setIcon(QMessageBox.Information)
-    info_box.exec_()
+    info.setIcon(QMessageBox.Information)
+    info.exec_()
 
     datei, _ = QFileDialog.getSaveFileName(
-        None,
-        "Speicherort für Datenbank wählen",
-        DEFAULT_DB_PATH,
-        "SQLite Dateien (*.sqlite *.db)"
+        None, "Speicherort für Datenbank wählen", DEFAULT_DB_PATH, "SQLite Dateien (*.sqlite *.db)"
     )
-    return datei if datei else None
+    return datei or ""
 
-def benutzer_existieren():
+def benutzer_existieren(db_path: str) -> bool:
     try:
-        conn = sqlite3.connect(LOGIN_DB_PATH)
-        cursor = conn.cursor()
-        cursor.execute("CREATE TABLE IF NOT EXISTS users (username TEXT PRIMARY KEY, password TEXT)")
-        cursor.execute("SELECT COUNT(*) FROM users")
-        count = cursor.fetchone()[0]
+        conn = sqlite3.connect(db_path)
+        cur = conn.cursor()
+        cur.execute("CREATE TABLE IF NOT EXISTS users (username TEXT PRIMARY KEY, password TEXT)")
+        cur.execute("SELECT COUNT(*) FROM users")
+        cnt = cur.fetchone()[0]
         conn.close()
-        return count > 0
-    except sqlite3.Error as e:
-        print(f"Fehler beim Prüfen der Benutzer: {e}")
+        return cnt > 0
+    except sqlite3.Error:
         return False
 
 
-
+# ---------------------- Lokales Update (optional) ----------------------
+LOCAL_FOLDER = r"C:\Users\V.Haxhimurati\Documents\TEST\dist\INAT Solutions"
+LOCAL_EXE = "INAT Solutions.exe"
 
 def sync_from_local():
-    # 0) Progress-Dialog anzeigen
+    # Progress nur, wenn GUI läuft
     progress = QProgressDialog("Suche nach Updates…", None, 0, 0)
     progress.resize(400, 120)
     progress.setWindowModality(Qt.ApplicationModal)
@@ -159,20 +130,16 @@ def sync_from_local():
     progress.show()
     QApplication.processEvents()
 
-    # 1) Ordner und Datei prüfen
     candidate = os.path.join(LOCAL_FOLDER, LOCAL_EXE)
     if not os.path.isfile(candidate):
         progress.close()
         return
 
-    # 2) Versionsvergleich
+    from packaging import version
     current_ver = version.parse(__version__)
     try:
         out = subprocess.check_output(
-            [candidate, "--version"],
-            stderr=subprocess.DEVNULL,
-            universal_newlines=True,
-            timeout=3
+            [candidate, "--version"], stderr=subprocess.DEVNULL, universal_newlines=True, timeout=3
         ).strip()
         local_ver = version.parse(out)
     except Exception:
@@ -183,147 +150,119 @@ def sync_from_local():
         progress.close()
         return
 
-    # 3) Update-Dialog mit Favicon
     progress.close()
-    dlg = QMessageBox(None)
-    dlg.setWindowIcon(QIcon(resource_path("favicon.ico")))
-    answer = dlg.question(
+    ans = QMessageBox.question(
         None,
         "Update verfügbar",
         f"Deine lokale Version {local_ver} ist neuer als {current_ver}.\nJetzt aktualisieren?",
-        QMessageBox.Yes | QMessageBox.No
+        QMessageBox.Yes | QMessageBox.No,
     )
-    if answer != QMessageBox.Yes:
+    if ans != QMessageBox.Yes:
         return
 
-    # 4) Backup und Batch-Update-Skript erzeugen
-    import tempfile
-
-    dst         = sys.executable
-    backup_path = dst + ".old"
-    new_exe     = candidate
-
+    dst = sys.executable
+    backup = dst + ".old"
     try:
-        shutil.copy2(dst, backup_path)
+        shutil.copy2(dst, backup)
     except Exception:
         pass
 
     bat_path = os.path.join(tempfile.gettempdir(), "inat_update.bat")
-    with open(bat_path, "w") as bat:
+    with open(bat_path, "w", encoding="utf-8") as bat:
         bat.write(f"""@echo off
 :WAIT
 tasklist /FI "IMAGENAME eq {os.path.basename(dst)}" | find /I "{os.path.basename(dst)}" >nul
 if %ERRORLEVEL%==0 (
-    timeout /t 1 >nul
-    goto WAIT
+  timeout /t 1 >nul
+  goto WAIT
 )
-if exist "{backup_path}" del /F /Q "{backup_path}"
-copy /Y "{new_exe}" "{dst}"
+if exist "{backup}" del /F /Q "{backup}"
+copy /Y "{candidate}" "{dst}"
 start "" "{dst}"
 del "%~f0"
 """)
-
-    # 5) Batch-Skript starten und aktuelle App beenden
     subprocess.Popen(["cmd", "/c", bat_path], creationflags=subprocess.CREATE_NEW_CONSOLE)
     sys.exit(0)
 
 
-
+# ---------------------- Main ----------------------
 if __name__ == "__main__":
     try:
-         # GUI aufsetzen
-        app = QApplication(sys.argv)
-        with open("style.qss", "r", encoding="utf-8") as f:
-            app.setStyleSheet(f.read())
-
-
-        app.setStyle("Fusion")
-        stylesheet = lade_stylesheet()
-        app.setStyleSheet(stylesheet)
-        
-        
-        # CLI-Flag für --version abfangen
+        # --version für Updater/Checks
         if "--version" in sys.argv:
             print(__version__)
             sys.exit(0)
 
-        # Lokalen Update-Check durchführen
+        app = QApplication(sys.argv)
+        app.setStyle("Fusion")
+        ss = lade_stylesheet("style.qss")
+        if ss:
+            app.setStyleSheet(ss)
+
+        # Optionaler Update-Check
         sync_from_local()
 
-                
-        config = config_laden()
-
-        # --- Datenbank sicherstellen (nur PostgreSQL) ---
-        from db_connection import get_db
-        from db_setup_dialog import DBSetupDialog
-
+        # DB-Verbindung sicherstellen (PostgreSQL/SQLite per get_db)
         try:
             conn = get_db()
             conn.close()
         except Exception:
-            # Wenn keine Verbindung aufgebaut werden kann -> Setup-Dialog öffnen
+            if DBSetupDialog is None:
+                QMessageBox.critical(None, "Abbruch", "Keine Datenbankverbindung konfiguriert.")
+                sys.exit(1)
             dlg = DBSetupDialog()
             if dlg.exec_() != QDialog.Accepted:
                 QMessageBox.critical(None, "Abbruch", "Keine Datenbankverbindung konfiguriert.")
                 sys.exit(1)
 
-
+        # Login-DB initialisieren (lokal, schreibbar)
         init_login_db(LOGIN_DB_PATH)
 
-        while not benutzer_existieren():
-            hinweis = QMessageBox()
-            hinweis.setWindowTitle("Benutzer anlegen")
-            hinweis.setText("Es sind noch keine Benutzer vorhanden.\nBitte legen Sie nun einen Benutzer an.")
-            hinweis.setIcon(QMessageBox.Information)
-            hinweis.exec_()
-
-            benutzer_dialog = BenutzerVerwaltenDialog(LOGIN_DB_PATH)
-            result = benutzer_dialog.exec_()
-            if result != QDialog.Accepted:
+        # Benutzer sicherstellen
+        while not benutzer_existieren(LOGIN_DB_PATH):
+            QMessageBox.information(
+                None, "Benutzer anlegen", "Es sind noch keine Benutzer vorhanden.\nBitte legen Sie nun einen Benutzer an."
+            )
+            dlg = BenutzerVerwaltenDialog(LOGIN_DB_PATH)
+            if dlg.exec_() != QDialog.Accepted:
                 print("Benutzererstellung abgebrochen. Programm wird beendet.")
-                sys.exit()
-
+                sys.exit(0)
             if not benutzer_existieren(LOGIN_DB_PATH):
-                warnung = QMessageBox()
-                warnung.setWindowTitle("Fehler")
-                warnung.setText("Es wurde kein Benutzer angelegt.\nBitte versuchen Sie es erneut.")
-                warnung.setIcon(QMessageBox.Warning)
-                warnung.exec_()
+                QMessageBox.warning(None, "Fehler", "Es wurde kein Benutzer angelegt.\nBitte versuchen Sie es erneut.")
 
+        # Login
         login_dialog = LoginDialog(LOGIN_DB_PATH)
-        
-        if login_dialog.exec_() and login_dialog.login_ok:
-            angemeldeter_benutzer = login_dialog.logged_in_user
+        if login_dialog.exec_() and getattr(login_dialog, "login_ok", False):
+            angemeldeter_benutzer = getattr(login_dialog, "logged_in_user", "")
 
-            #migration_ausfuehren(db_pfad)
-            stylesheet = lade_stylesheet()
-            app.setStyleSheet(stylesheet)
+            # Splash
+            splash_png = resource_path("INAT SOLUTIONS.png")
+            try:
+                from logo_splash import LogoSplash
+                splash = LogoSplash(splash_png)
+                splash.show()
 
-            # ========== SPLASH ========== #
-            splash = LogoSplash(resource_path("INAT SOLUTIONS.png"))
-            splash.show()
+                def _show_main():
+                    mw = MainWindow(benutzername=angemeldeter_benutzer)
+                    mw.show()
 
-            def zeige_mainwindow():
-                global main_window
-                main_window = MainWindow(benutzername=angemeldeter_benutzer)
-                main_window.show()
-                # splash.close() – wird vom Splash selbst gemacht
-
-
-
-            # Splash beendet → MainWindow zeigen
-            splash.finished.connect(zeige_mainwindow)
+                splash.finished.connect(_show_main)
+            except Exception:
+                # Fallback: direkt öffnen
+                mw = MainWindow(benutzername=angemeldeter_benutzer)
+                mw.show()
 
             sys.exit(app.exec_())
         else:
             print("Login fehlgeschlagen oder abgebrochen.")
-            sys.exit()
+            sys.exit(0)
 
-
-
-    except Exception as e:
-        with open("error.log", "w", encoding="utf-8") as f:
-            f.write("Fehler beim Start der Anwendung:\n\n")
-            f.write(traceback.format_exc())
+    except Exception:
+        try:
+            with open(os.path.join(APPDATA_DIR, "error.log"), "w", encoding="utf-8") as f:
+                f.write("Fehler beim Start der Anwendung:\n\n")
+                f.write(traceback.format_exc())
+        except Exception:
+            pass
         print("Ein Fehler ist aufgetreten. Details wurden in 'error.log' gespeichert.")
 

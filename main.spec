@@ -8,15 +8,15 @@ a = Analysis(
     pathex=['.'],
     binaries=[],
     datas=[
+        ('style.qss', '.'),
+        ('config.json', '.'),
+        ('schema.sql', '.'),
+        ('gui/*', 'gui'),
+        ('swissqr/*', 'swissqr'),
+        ('rechnungen/*', 'rechnungen'),
+        ('version.py', '.'),
         ('favicon.ico', '.'),
         ('INAT SOLUTIONS.png', '.'),
-        ('style.qss', '.'),
-        ('config.json', '.'),      # hinzugefügt
-        ('schema.sql', '.'),       # hinzugefügt
-        ('gui/*', 'gui'),
-        ('rechnungen/*', 'rechnungen'),
-        ('swissqr/*', 'swissqr'),
-        ('version.py', '.'),
     ],
     hiddenimports=[
         'PyQt5.sip',
