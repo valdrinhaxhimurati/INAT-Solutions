@@ -5,18 +5,25 @@ block_cipher = None
 
 a = Analysis(
     ['main.py'],
-    pathex=['.'],  # ggf. Pfad anpassen
+    pathex=['.'],
     binaries=[],
     datas=[
         ('favicon.ico', '.'),
         ('INAT SOLUTIONS.png', '.'),
         ('style.qss', '.'),
+        ('config.json', '.'),      # hinzugefügt
+        ('schema.sql', '.'),       # hinzugefügt
         ('gui/*', 'gui'),
         ('rechnungen/*', 'rechnungen'),
         ('swissqr/*', 'swissqr'),
-        ('version.py', '.'),    
+        ('version.py', '.'),
     ],
-    hiddenimports=[],
+    hiddenimports=[
+        'PyQt5.sip',
+        'PyQt5.QtPrintSupport',
+        'reportlab.lib.utils',
+        'reportlab.pdfgen',
+    ],
     hookspath=[],
     runtime_hooks=[],
     excludes=[],
@@ -38,8 +45,8 @@ exe = EXE(
     bootloader_ignore_signals=False,
     strip=False,
     upx=True,
-    console=False,  # Wenn GUI, dann False, sonst True
-    icon='favicon.ico',  # Icon für exe
+    console=False,
+    icon='favicon.ico',
 )
 
 coll = COLLECT(
