@@ -1,11 +1,11 @@
-
 # -*- coding: utf-8 -*-
 from PyQt5.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QToolButton, QTableWidget, QTableWidgetItem,
     QMessageBox, QDialog, QFileDialog, QInputDialog
 )
 from PyQt5.QtGui import QBrush, QColor
-from PyQt5.QtCore import Qt
+from reportlab.lib.utils import ImageReader
+import io
 from db_connection import get_db, dict_cursor_factory
 import json, os, subprocess, tempfile
 from gui.rechnung_dialog import RechnungDialog
@@ -147,61 +147,79 @@ class RechnungenTab(QWidget):
             self.uid = ""
 
     def _lade_rechnungslayout(self):
-        """Layout aus JSON-Datei laden oder Defaults setzen"""
+        """Layout primär aus DB lesen (rechnung_layout), sonst JSON/Defaults"""
+        # Defaults
+        self.layout_config = {
+            "kopfzeile": {
+                "text": "Deine Firma GmbH\nMusterstraße 1\n8000 Zürich",
+                "schrift": "Helvetica-Bold",
+                "groesse": 14,
+                "farbe": [0, 0, 0]
+            },
+            "einleitung": ("Sehr geehrte Damen und Herren,\n\n"
+                           "vielen Dank für Ihren Auftrag. Hiermit erhalten Sie unsere Rechnung:"),
+            "fusszeile": {
+                "text": "Vielen Dank für Ihren Auftrag!",
+                "schrift": "Helvetica-Oblique",
+                "groesse": 8,
+                "farbe": [100, 100, 100]
+            },
+            "logo_datei": None,
+            "logo_bytes": None,
+            "logo_mime": None,
+            "logo_skala": 100,
+            "betreff": "Rechnung",
+            "schrift": "Helvetica",
+            "schrift_bold": "Helvetica-Bold",
+            "schrift_kursiv": "Helvetica-Oblique",
+            "farbe_text": [0, 0, 0],
+            "schriftgroesse": 10,
+            "schriftgroesse_betreff": 12
+        }
+        # 1) Aus DB laden
+        try:
+            with get_db() as conn:
+                with conn.cursor(cursor_factory=dict_cursor_factory) as cur:
+                    cur.execute("SELECT kopfzeile, einleitung, fusszeile, logo, logo_mime, logo_skala FROM rechnung_layout WHERE id=1")
+                    row = cur.fetchone()
+                    if row is not None and not isinstance(row, dict):
+                        cols = [d[0] for d in cur.description]
+                        row = dict(zip(cols, row))
+            if row:
+                self.layout_config["kopfzeile"]["text"] = (row.get("kopfzeile") or "")
+                self.layout_config["einleitung"] = (row.get("einleitung") or "")
+                self.layout_config["fusszeile"]["text"] = (row.get("fusszeile") or "")
+                lb = row.get("logo")
+                self.layout_config["logo_bytes"] = bytes(lb) if lb is not None else None
+                self.layout_config["logo_mime"] = row.get("logo_mime")
+                try:
+                    self.layout_config["logo_skala"] = int(float(row.get("logo_skala") or 100))
+                except Exception:
+                    self.layout_config["logo_skala"] = 100
+                return
+        except Exception:
+            pass
+        # 2) JSON-Fallback laden (falls vorhanden)
         pfad = "config/rechnung_layout.json"
         if os.path.exists(pfad):
-            with open(pfad, "r", encoding="utf-8") as f:
-                daten = json.load(f)
-            self.layout_config = {
-                "kopfzeile": {
-                    "text": daten.get("kopfzeile", ""),
-                    "schrift": "Helvetica",
-                    "groesse": 10,
-                    "farbe": [0, 0, 0]
-                },
-                "einleitung": daten.get("einleitung", ""),
-                "fusszeile": {
-                    "text": daten.get("fusszeile", ""),
-                    "schrift": "Helvetica-Oblique",
-                    "groesse": 8,
-                    "farbe": [100, 100, 100]
-                },
-                "logo_datei": daten.get("logo_pfad"),
-                "logo_skala": daten.get("logo_skala", 100),
-                "betreff": daten.get("betreff", "Rechnung"),
-                "schrift": daten.get("schrift", "Helvetica"),
-                "schrift_bold": daten.get("schrift_bold", "Helvetica-Bold"),
-                "schrift_kursiv": daten.get("schrift_kursiv", "Helvetica-Oblique"),
-                "farbe_text": daten.get("farbe_text", [0, 0, 0]),
-                "schriftgroesse": daten.get("schriftgroesse", 10),
-                "schriftgroesse_betreff": daten.get("schriftgroesse_betreff", 12)
-            }
-        else:
-            self.layout_config = {
-                "kopfzeile": {
-                    "text": "Deine Firma GmbH\nMusterstraße 1\n8000 Zürich",
-                    "schrift": "Helvetica-Bold",
-                    "groesse": 14,
-                    "farbe": [0, 0, 0]
-                },
-                "einleitung": ("Sehr geehrte Damen und Herren,\n\n"
-                               "vielen Dank für Ihren Auftrag. Hiermit erhalten Sie unsere Rechnung:"),
-                "fusszeile": {
-                    "text": "Vielen Dank für Ihren Auftrag!",
-                    "schrift": "Helvetica-Oblique",
-                    "groesse": 8,
-                    "farbe": [100, 100, 100]
-                },
-                "logo_datei": None,
-                "logo_skala": 100,
-                "betreff": "Rechnung",
-                "schrift": "Helvetica",
-                "schrift_bold": "Helvetica-Bold",
-                "schrift_kursiv": "Helvetica-Oblique",
-                "farbe_text": [0, 0, 0],
-                "schriftgroesse": 10,
-                "schriftgroesse_betreff": 12
-            }
+            try:
+                with open(pfad, "r", encoding="utf-8") as f:
+                    daten = json.load(f)
+                self.layout_config["kopfzeile"]["text"] = daten.get("kopfzeile", "") or ""
+                self.layout_config["einleitung"] = daten.get("einleitung", "") or ""
+                self.layout_config["fusszeile"]["text"] = daten.get("fusszeile", "") or ""
+                self.layout_config["logo_datei"] = daten.get("logo_pfad")
+                self.layout_config["logo_skala"] = int(daten.get("logo_skala", 100) or 100)
+                self.layout_config["betreff"] = daten.get("betreff", "Rechnung")
+                self.layout_config["schrift"] = daten.get("schrift", "Helvetica")
+                self.layout_config["schrift_bold"] = daten.get("schrift_bold", "Helvetica-Bold")
+                self.layout_config["schrift_kursiv"] = daten.get("schrift_kursiv", "Helvetica-Oblique")
+                self.layout_config["farbe_text"] = daten.get("farbe_text", [0, 0, 0])
+                self.layout_config["schriftgroesse"] = daten.get("schriftgroesse", 10)
+                self.layout_config["schriftgroesse_betreff"] = daten.get("schriftgroesse_betreff", 12)
+            except Exception:
+                pass
+        # sonst bleiben Defaults aktiv
 
     # ---------------- Kunden Daten ----------------
 
@@ -527,6 +545,11 @@ class RechnungenTab(QWidget):
             subprocess.Popen(["xdg-open", tmp_path])
 
     def _exportiere_pdf(self, rechnung, dateipfad, logo_skala=100):
+        # Layout frisch laden, damit Vorschau das aktuelle Logo nutzt
+        try:
+            self._lade_rechnungslayout()
+        except Exception:
+            pass
         c = canvas.Canvas(dateipfad, pagesize=A4)
         width, height = A4
 
@@ -547,20 +570,30 @@ class RechnungenTab(QWidget):
 
         # Logo
         x_logo, y_logo, w_logo, h_logo = blocks["logo"]
+        eff_scale = int(self.layout_config.get("logo_skala") or logo_skala or 100)
+        logo_bytes = self.layout_config.get("logo_bytes")
         logo_pfad = self.layout_config.get("logo_datei")
-        if logo_pfad and os.path.exists(logo_pfad):
-            try:
-                from PIL import Image
-                with Image.open(logo_pfad) as img:
-                    original_breite, original_hoehe = img.size
-                faktor = min((w_logo / original_breite), (h_logo / original_hoehe), 1.0) * (logo_skala / 100.0)
-                logo_breite = original_breite * faktor
-                logo_hoehe = original_hoehe * faktor
-                logo_x = x_logo
-                logo_y = y_logo + h_logo - logo_hoehe
-                c.drawImage(logo_pfad, logo_x, logo_y, width=logo_breite, height=logo_hoehe, mask='auto', preserveAspectRatio=True)
-            except Exception as e:
-                print("Logo-Fehler:", e)
+        try:
+            if logo_bytes:
+                reader = ImageReader(io.BytesIO(bytes(logo_bytes)))
+                ow, oh = reader.getSize()
+                factor = min(w_logo / ow, h_logo / oh, 1.0) * (eff_scale / 100.0)
+                lw = max(1, ow * factor)
+                lh = max(1, oh * factor)
+                lx = x_logo
+                ly = y_logo + h_logo - lh  # oben links im Block
+                c.drawImage(reader, lx, ly, width=lw, height=lh, mask='auto')
+            elif logo_pfad and os.path.exists(logo_pfad):
+                reader = ImageReader(logo_pfad)
+                ow, oh = reader.getSize()
+                factor = min(w_logo / ow, h_logo / oh, 1.0) * (eff_scale / 100.0)
+                lw = max(1, ow * factor)
+                lh = max(1, oh * factor)
+                lx = x_logo
+                ly = y_logo + h_logo - lh
+                c.drawImage(reader, lx, ly, width=lw, height=lh, mask='auto')
+        except Exception as e:
+            print("Logo-Fehler:", e)
 
         # Kundenadresse
         x, y, w, h = blocks["adresse"]

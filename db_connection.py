@@ -4,6 +4,7 @@ import re
 import json
 import sqlite3
 import traceback
+from typing import Iterable, List
 
 ROOT = os.path.dirname(__file__)
 CONFIG_PATH = os.path.join(ROOT, "config.json")
@@ -187,9 +188,10 @@ class ConnectionWrapper:
             self.close()
 
 # --- DB connect / policy -------------------------------------------------
-def _sqlite_connect():
+def _sqlite_connect(path=None):
     os.makedirs(os.path.dirname(_SQLITE_PATH), exist_ok=True)
-    conn = sqlite3.connect(_SQLITE_PATH)
+    conn = sqlite3.connect(path or _SQLITE_PATH)
+    conn.row_factory = sqlite3.Row   # Dict-Zugriff: r["spalte"]
     return ConnectionWrapper(conn, is_sqlite=True)
 
 def _try_postgres_connect(dsn):
@@ -285,3 +287,135 @@ def connect_sqlite_at(path: str):
     except Exception:
         pass
     return ConnectionWrapper(conn, is_sqlite=True)
+
+def clear_business_database():
+    """
+    Löscht alle Daten aus der aktiven Business-DB (SQLite/PostgreSQL).
+    - SQLite: DELETE aus allen Tabellen außer internen und 'users', reset AUTOINCREMENT.
+    - PostgreSQL: TRUNCATE aller Tabellen im current_schema() RESTART IDENTITY CASCADE.
+    """
+    conn = get_db()
+    try:
+        if getattr(conn, "is_sqlite", False):
+            with conn.cursor() as cur:
+                cur.execute("PRAGMA foreign_keys=OFF")
+                cur.execute("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'")
+                rows = cur.fetchall()
+                def _val(r): 
+                    try: return r["name"]
+                    except Exception: return r[0]
+                tables = [str(_val(r)) for r in rows]
+                # Sicherheits-Exclude: 'users' nicht leeren, falls versehentlich in derselben Datei
+                tables = [t for t in tables if t.lower() != "users"]
+                for t in tables:
+                    cur.execute(f"DELETE FROM {t}")
+                # Autoincrement zurücksetzen (falls vorhanden)
+                try:
+                    cur.execute("DELETE FROM sqlite_sequence")
+                except Exception:
+                    pass
+                cur.execute("PRAGMA foreign_keys=ON")
+            conn.commit()
+        else:
+            with conn.cursor() as cur:
+                cur.execute("""
+                    SELECT table_schema, table_name
+                    FROM information_schema.tables
+                    WHERE table_type='BASE TABLE' AND table_schema = current_schema()
+                """)
+                rows = cur.fetchall()
+                def _schema(r): 
+                    try: return r["table_schema"]
+                    except Exception: return r[0]
+                def _name(r): 
+                    try: return r["table_name"]
+                    except Exception: return r[1]
+                tbls = []
+                for r in rows:
+                    schema = _schema(r)
+                    name = _name(r)
+                    # 'users' vorsorglich ausnehmen
+                    if name.lower() == "users":
+                        continue
+                    tbls.append(f'{schema}."{name}"')
+                if tbls:
+                    sql = "TRUNCATE TABLE " + ", ".join(tbls) + " RESTART IDENTITY CASCADE"
+                    cur.execute(sql)
+            conn.commit()
+    finally:
+        try:
+            conn.close()
+        except Exception:
+            pass
+
+def list_business_tables(exclude: Iterable[str] = ("users",)) -> List[str]:
+    """
+    Liefert alle 'Business'-Tabellen der aktiven DB (aktuelles Schema bei PG, alle User-Tabellen bei SQLite).
+    'users' wird standardmäßig ausgeschlossen.
+    """
+    ex = {str(x).lower() for x in (exclude or [])}
+    conn = get_db()
+    try:
+        names = []
+        with conn.cursor() as cur:
+            if getattr(conn, "is_sqlite", False):
+                cur.execute("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'")
+                rows = cur.fetchall()
+                for r in rows:
+                    name = (r["name"] if isinstance(r, dict) else r[0])
+                    if str(name).lower() not in ex:
+                        names.append(str(name))
+            else:
+                cur.execute("""
+                    SELECT table_name
+                    FROM information_schema.tables
+                    WHERE table_schema = current_schema() AND table_type='BASE TABLE'
+                """)
+                rows = cur.fetchall()
+                for r in rows:
+                    name = (r["table_name"] if isinstance(r, dict) else r[0])
+                    if str(name).lower() not in ex:
+                        names.append(str(name))
+        return sorted(names, key=lambda x: x.lower())
+    finally:
+        try: conn.close()
+        except Exception: pass
+
+def clear_selected_tables(tables: Iterable[str]) -> None:
+    """
+    Löscht Inhalte der angegebenen Tabellen.
+    - SQLite: DELETE FROM "t"; sqlite_sequence für diese Tabellen zurücksetzen (falls vorhanden).
+    - PostgreSQL: TRUNCATE schema."t" ... RESTART IDENTITY CASCADE im current_schema().
+    """
+    to_clear = [t for t in (tables or []) if t]
+    if not to_clear:
+        return
+    conn = get_db()
+    try:
+        if getattr(conn, "is_sqlite", False):
+            with conn.cursor() as cur:
+                cur.execute("PRAGMA foreign_keys=OFF")
+                for t in to_clear:
+                    qt = '"' + str(t).replace('"', '""') + '"'
+                    cur.execute(f"DELETE FROM {qt}")
+                # ggf. Autoincrement zurücksetzen
+                try:
+                    for t in to_clear:
+                        cur.execute("DELETE FROM sqlite_sequence WHERE name=%s", (t,))
+                except Exception:
+                    pass
+                cur.execute("PRAGMA foreign_keys=ON")
+            conn.commit()
+        else:
+            # aktuelles Schema ermitteln
+            with conn.cursor() as cur:
+                cur.execute("SELECT current_schema()")
+                schema_row = cur.fetchone()
+                schema = (schema_row[0] if isinstance(schema_row, tuple) else (schema_row.get(0) if isinstance(schema_row, dict) else None)) or "public"
+                idents = [f'{schema}."{str(t).replace(chr(34), chr(34)*2)}"' for t in to_clear]
+                sql = "TRUNCATE TABLE " + ", ".join(idents) + " RESTART IDENTITY CASCADE"
+                cur.execute(sql)
+            conn.commit()
+    finally:
+        try: conn.close()
+        except Exception: pass

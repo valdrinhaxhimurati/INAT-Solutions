@@ -4,6 +4,5 @@
     "db_pfad": "db\\datenbank.sqlite",
     "firmenname": "INAT Performance GmbH",
     "uid": "1231649",
-  "use_remote": false,
-  "db_url": "postgresql://user:pass@host:port/dbname"
+    "use_remote": false
 }

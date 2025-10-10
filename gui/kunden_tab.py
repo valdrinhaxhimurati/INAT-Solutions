@@ -16,6 +16,9 @@ class KundenTab(QWidget):
         self.table = QTableWidget()
         self.table.setSelectionBehavior(self.table.SelectRows)
         self.table.setSelectionMode(self.table.SingleSelection)
+        # Spalten fix definieren, damit das UI konsistent ist
+        self.table.setColumnCount(8)
+        self.table.setHorizontalHeaderLabels(["ID", "Anrede", "Name", "PLZ", "Straße", "Stadt", "E-Mail", "Firma"])
 
         btn_layout = QVBoxLayout()
         btn_add = QToolButton(); btn_add.setText("Kunde hinzufügen"); btn_add.setProperty("role", "add")
@@ -32,6 +35,62 @@ class KundenTab(QWidget):
 
         self._ensure_table()
         self.lade_kunden()
+
+    # --- Helpers: Spalten erkennen und Adressausdruck bauen ---
+    def _detect_kunden_columns(self, conn):
+        names = set()
+        with conn.cursor() as cur:
+            try:
+                if getattr(conn, "is_sqlite", False):
+                    cur.execute("PRAGMA table_info(kunden)")
+                    rows = cur.fetchall()
+                    for r in rows:
+                        name = r["name"] if isinstance(r, dict) else (r[1] if len(r) > 1 else r[0])
+                        names.add(str(name).lower())
+                else:
+                    cur.execute(
+                        "SELECT column_name FROM information_schema.columns "
+                        "WHERE table_schema = current_schema() AND table_name = %s",
+                        ("kunden",)
+                    )
+                    rows = cur.fetchall()
+                    for r in rows:
+                        name = r["column_name"] if isinstance(r, dict) else r[0]
+                        names.add(str(name).lower())
+            except Exception:
+                pass
+        def pick(cands):
+            for c in cands:
+                if c in names:
+                    return c
+            return None
+        return {
+            "kundennr": pick(["kundennr", "id", "kunde_id"]) or "kundennr",
+            "name":     pick(["name", "kundenname"]) or "name",
+            "anrede":   pick(["anrede", "salutation"]),
+            "email":    pick(["email", "e_mail", "mail"]),
+            "firma":    pick(["firma", "company", "unternehmen"]),
+            "plz":      pick(["plz", "postleitzahl", "zip"]),
+            "strasse":  pick(["strasse", "straße", "street", "adresse", "address"]),
+            "stadt":    pick(["stadt", "ort", "city", "ortschaft"]),
+        }
+
+    def _adresse_expr(self, cols):
+        def coalesce(col): return f"COALESCE({col}, '')"
+        plz = cols.get("plz")
+        stadt = cols.get("stadt")
+        strasse = cols.get("strasse")
+        if plz and stadt:
+            zip_city = f"({coalesce(plz)} || CASE WHEN ({coalesce(plz)} <> '' AND {coalesce(stadt)} <> '') THEN ' ' ELSE '' END || {coalesce(stadt)})"
+        elif plz:
+            zip_city = coalesce(plz)
+        elif stadt:
+            zip_city = coalesce(stadt)
+        else:
+            zip_city = "''"
+        if strasse and zip_city != "''":
+            return f"({coalesce(strasse)} || CASE WHEN LENGTH(TRIM({zip_city})) > 0 THEN ', ' ELSE '' END || {zip_city})"
+        return (coalesce(strasse) if strasse else zip_city)
 
     def _ensure_table(self):
         with get_db() as con:
@@ -51,36 +110,50 @@ class KundenTab(QWidget):
             con.commit()
 
     def lade_kunden(self):
-        headers = ["ID", "Anrede", "Name", "PLZ", "Strasse", "Stadt", "Email", "Firma"]
-        self.table.setColumnCount(len(headers))
-        self.table.setHorizontalHeaderLabels(headers)
+        conn = get_db()
+        try:
+            cols = self._detect_kunden_columns(conn)
+            def alias_or_empty(dbcol, alias): return f"{dbcol} AS {alias}" if dbcol else f"'' AS {alias}"
+            adresse_expr = self._adresse_expr(cols)
 
-        with get_db() as con:
-            with con.cursor(cursor_factory=dict_cursor_factory(con)) as cur:
-                cur.execute("""
-                    SELECT kundennr, COALESCE(anrede,'') AS anrede, COALESCE(name,'') AS name,
-                           COALESCE(plz,'') AS plz, COALESCE(strasse,'') AS strasse,
-                           COALESCE(stadt,'') AS stadt, COALESCE(email,'') AS email,
-                           COALESCE(firma,'') AS firma
-                    FROM public.kunden
-                    ORDER BY name
+            with conn.cursor(cursor_factory=dict_cursor_factory) as cur:
+                cur.execute(f"""
+                    SELECT
+                        {cols['kundennr']} AS kundennr,
+                        {cols['name']}     AS name,
+                        {alias_or_empty(cols.get('anrede'),  'anrede')},
+                        {alias_or_empty(cols.get('email'),   'email')},
+                        {alias_or_empty(cols.get('firma'),   'firma')},
+                        {alias_or_empty(cols.get('plz'),     'plz')},
+                        {alias_or_empty(cols.get('strasse'), 'strasse')},
+                        {alias_or_empty(cols.get('stadt'),   'stadt')},
+                        {adresse_expr} AS adresse
+                    FROM kunden
+                    ORDER BY {cols['kundennr']}
                 """)
                 rows = cur.fetchall()
+                if rows and not isinstance(rows[0], dict):
+                    cols_desc = [d[0] for d in cur.description]
+                    rows = [dict(zip(cols_desc, row)) for row in rows]
 
-        self.table.setRowCount(len(rows))
-        for i, r in enumerate(rows):
-            rid = int(r["kundennr"])
-            it_id = QTableWidgetItem(str(rid))
-            it_id.setData(Qt.UserRole, rid)
-            self.table.setItem(i, 0, it_id)
-            self.table.setItem(i, 1, QTableWidgetItem(r["anrede"] or ""))
-            self.table.setItem(i, 2, QTableWidgetItem(r["name"] or ""))
-            self.table.setItem(i, 3, QTableWidgetItem(r["plz"] or ""))
-            self.table.setItem(i, 4, QTableWidgetItem(r["strasse"] or ""))
-            self.table.setItem(i, 5, QTableWidgetItem(r["stadt"] or ""))
-            self.table.setItem(i, 6, QTableWidgetItem(r["email"] or ""))
-            self.table.setItem(i, 7, QTableWidgetItem(r["firma"] or ""))
-        self.table.resizeColumnsToContents()
+            self.table.setRowCount(len(rows))
+            for i, r in enumerate(rows):
+                rid = int(r.get("kundennr", 0) or 0)
+                it_id = QTableWidgetItem(str(rid)); it_id.setData(Qt.UserRole, rid)
+                self.table.setItem(i, 0, it_id)
+                self.table.setItem(i, 1, QTableWidgetItem(r.get("anrede", "") or ""))
+                self.table.setItem(i, 2, QTableWidgetItem(r.get("name", "") or ""))
+                self.table.setItem(i, 3, QTableWidgetItem(r.get("plz", "") or ""))
+                self.table.setItem(i, 4, QTableWidgetItem(r.get("strasse", "") or ""))
+                self.table.setItem(i, 5, QTableWidgetItem(r.get("stadt", "") or ""))
+                self.table.setItem(i, 6, QTableWidgetItem(r.get("email", "") or ""))
+                self.table.setItem(i, 7, QTableWidgetItem(r.get("firma", "") or ""))
+            self.table.resizeColumnsToContents()
+        finally:
+            try:
+                conn.close()
+            except Exception:
+                pass
 
     def _get_selected_id(self):
         row = self.table.currentRow()
@@ -105,11 +178,23 @@ class KundenTab(QWidget):
         if dlg.exec_() == QDialog.Accepted:
             d = dlg.get_daten()
             with get_db() as con:
-                with con.cursor() as cur:
-                    cur.execute("""
-                        INSERT INTO public.kunden (name, plz, strasse, stadt, email, firma, anrede)
-                        VALUES (%s,%s,%s,%s,%s,%s,%s)
-                    """, (d["name"], d["plz"], d["strasse"], d["stadt"], d["email"], d["firma"], d["anrede"]))
+                cols = self._detect_kunden_columns(con)
+                field_map = {
+                    "name": cols.get("name"),
+                    "plz": cols.get("plz"),
+                    "strasse": cols.get("strasse"),
+                    "stadt": cols.get("stadt"),
+                    "email": cols.get("email"),
+                    "firma": cols.get("firma"),
+                    "anrede": cols.get("anrede"),
+                }
+                insert_cols = [dbcol for key, dbcol in field_map.items() if dbcol]
+                insert_vals = [d.get(key, "") for key, dbcol in field_map.items() if dbcol]
+                if insert_cols:
+                    placeholders = ", ".join(["%s"] * len(insert_cols))
+                    sql = f"INSERT INTO kunden ({', '.join(insert_cols)}) VALUES ({placeholders})"
+                    with con.cursor() as cur:
+                        cur.execute(sql, tuple(insert_vals))
                 con.commit()
             self.lade_kunden()
             self.kunde_aktualisiert.emit()
@@ -134,12 +219,23 @@ class KundenTab(QWidget):
         if dlg.exec_() == QDialog.Accepted:
             d = dlg.get_daten()
             with get_db() as con:
-                with con.cursor() as cur:
-                    cur.execute("""
-                        UPDATE public.kunden
-                           SET anrede=%s, name=%s, plz=%s, strasse=%s, stadt=%s, email=%s, firma=%s
-                         WHERE kundennr=%s
-                    """, (d["anrede"], d["name"], d["plz"], d["strasse"], d["stadt"], d["email"], d["firma"], rid))
+                cols = self._detect_kunden_columns(con)
+                field_map = {
+                    "anrede": cols.get("anrede"),
+                    "name": cols.get("name"),
+                    "plz": cols.get("plz"),
+                    "strasse": cols.get("strasse"),
+                    "stadt": cols.get("stadt"),
+                    "email": cols.get("email"),
+                    "firma": cols.get("firma"),
+                }
+                sets, params = [], []
+                for key, dbcol in field_map.items():
+                    if dbcol is not None:
+                        sets.append(f"{dbcol}=%s"); params.append(d.get(key, ""))
+                if sets:
+                    with con.cursor() as cur:
+                        cur.execute(f"UPDATE kunden SET {', '.join(sets)} WHERE {cols['kundennr']}=%s", tuple(params + [rid]))
                 con.commit()
             self.lade_kunden()
             self.kunde_aktualisiert.emit()
@@ -152,8 +248,9 @@ class KundenTab(QWidget):
         if QMessageBox.question(self, "Löschen", "Kunde wirklich löschen?") != QMessageBox.Yes:
             return
         with get_db() as con:
+            cols = self._detect_kunden_columns(con)
             with con.cursor() as cur:
-                cur.execute("DELETE FROM public.kunden WHERE kundennr=%s", (rid,))
+                cur.execute(f"DELETE FROM kunden WHERE {cols['kundennr']}=%s", (rid,))
             con.commit()
         self.lade_kunden()
         self.kunde_aktualisiert.emit()

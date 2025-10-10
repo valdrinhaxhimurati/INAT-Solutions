@@ -2,14 +2,11 @@
 import os, json, csv
 from PyQt5.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QFrame, QLabel,
-    QLineEdit, QSizePolicy, QFileDialog, QScrollArea, QMessageBox, QInputDialog
+    QLineEdit, QSizePolicy, QFileDialog, QScrollArea, QMessageBox, QInputDialog, QDialog
 )
 from PyQt5.QtCore import Qt
-from db_connection import get_db
-from gui.db_settings_dialog import DBSettingsDialog
-from gui.kategorien_dialog import KategorienDialog
-from gui.benutzer_dialog import BenutzerVerwaltenDialog
-from gui.qr_daten_dialog import QRDatenDialog
+from db_connection import get_db, get_remote_status, clear_business_database
+from gui.clear_database_dialog import ClearDatabaseDialog
 
 
 def _load_cfg_with_fallback(path):
@@ -62,23 +59,22 @@ class EinstellungenTab(QWidget):
         title2 = QLabel("Datenbank"); title2.setObjectName("settingsTitle")
         lay2.addWidget(title2); lay2.addSpacing(8)
 
-        # Zeile 1: Label + URL (readonly)
-        row = QHBoxLayout()
-        row.addWidget(QLabel("Aktuelle PostgreSQL-Verbindung:"))
-        self.db_url_label = QLineEdit(); self.db_url_label.setReadOnly(True); self.db_url_label.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
-        row.addWidget(self.db_url_label, 1)
-        lay2.addLayout(row)
+        # Modus-Anzeige (ohne URL)
+        self.db_mode_label = QLabel("Modus:")  # wird in _refresh_db_label gesetzt
+        lay2.addWidget(self.db_mode_label)
 
-        # Zeile 2: Buttons in einer Reihe
-        btn_row = QHBoxLayout()
-        btn_row.addStretch(1)
+        # Buttons linksbündig untereinander
         self.btn_db_settings = QPushButton("Datenbank-Einstellungen…"); self.btn_db_settings.clicked.connect(self.open_db_settings)
         self.export_button = QPushButton("CSV Export"); self.export_button.clicked.connect(self.csv_export_dialog)
         self.import_button = QPushButton("CSV Import"); self.import_button.clicked.connect(self.csv_import_dialog)
-        for b in (self.btn_db_settings, self.export_button, self.import_button):
-            btn_row.addWidget(b)
-        btn_row.addStretch(1)
-        lay2.addLayout(btn_row)
+        self.clear_db_button = QPushButton("Datenbank löschen"); self.clear_db_button.clicked.connect(self._on_clear_database)
+        btn_col = QVBoxLayout()
+        btn_col.setSpacing(8)
+        btn_col.addWidget(self.btn_db_settings, alignment=Qt.AlignLeft)
+        btn_col.addWidget(self.export_button, alignment=Qt.AlignLeft)
+        btn_col.addWidget(self.import_button, alignment=Qt.AlignLeft)
+        btn_col.addWidget(self.clear_db_button, alignment=Qt.AlignLeft)
+        lay2.addLayout(btn_col)
 
         main.addWidget(box2)
 
@@ -89,11 +85,11 @@ class EinstellungenTab(QWidget):
         lay3.addWidget(title3); lay3.addSpacing(8)
 
         self.kategorien_button = QPushButton("Kategorien verwalten")
-        self.kategorien_button.clicked.connect(lambda: KategorienDialog(self).exec_())
+        self.kategorien_button.clicked.connect(self._open_kategorien_dialog)
         self.benutzer_button = QPushButton("Benutzer verwalten")
         self.benutzer_button.clicked.connect(lambda: BenutzerVerwaltenDialog(self._login_db_path(), self).exec_())
         self.qr_button = QPushButton("QR-Rechnungsdaten verwalten")
-        self.qr_button.clicked.connect(lambda: QRDatenDialog(self).exec_())
+        self.qr_button.clicked.connect(self._open_qr_dialog)
         for b in (self.kategorien_button, self.benutzer_button, self.qr_button):
             lay3.addWidget(b)
 
@@ -134,19 +130,28 @@ class EinstellungenTab(QWidget):
 
     # --- DB-Settings ---
     def open_db_settings(self):
+        try:
+            from gui.db_settings_dialog import DBSettingsDialog
+        except Exception as e:
+            QMessageBox.warning(self, "Datenbank-Einstellungen", f"Dialog nicht gefunden:\n{e}")
+            return
         dlg = DBSettingsDialog(self)
-        if dlg.exec_():
+        if dlg.exec_() == QDialog.Accepted:
+            # Anzeige aktualisieren (Modus Lokal/Remote)
             self._refresh_db_label()
 
     def _refresh_db_label(self):
-        p = self._cfg_path()
-        if not os.path.exists(p):
-            self.db_url_label.setText("(keine config.json gefunden)"); return
-        cfg = _load_cfg_with_fallback(p)
-        # Unterstütze alte und neue Keys
-        url = (cfg.get("db_url") or cfg.get("postgres_url") or "(keine Verbindung eingestellt)")
-        self.db_url_label.setText(url)
-        self.db_url_label.setCursorPosition(0)
+        # Status aus der DB-Konfiguration lesen (ohne URL anzuzeigen)
+        is_remote = False
+        try:
+            status = get_remote_status()
+            is_remote = bool(status.get("use_remote", False))
+        except Exception:
+            # Fallback auf config.json
+            p = self._cfg_path()
+            cfg = _load_cfg_with_fallback(p) if os.path.exists(p) else {}
+            is_remote = bool(cfg.get("use_remote")) or bool(cfg.get("db_url") or cfg.get("postgres_url"))
+        self.db_mode_label.setText("Modus: Remote" if is_remote else "Modus: Lokal")
 
     # --- CSV ---
     def csv_export_dialog(self):
@@ -236,3 +241,23 @@ class EinstellungenTab(QWidget):
             return self.login_db_path
         base = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
         return os.path.normpath(os.path.join(base, "db", "users.db"))
+
+    def _on_clear_database(self):
+        dlg = ClearDatabaseDialog(self)
+        dlg.exec_()
+
+    def _open_qr_dialog(self):
+        try:
+            from gui.qr_daten_dialog import QRDatenDialog  # passe den Pfad an, falls abweichend
+        except Exception as e:
+            QMessageBox.warning(self, "QR-Daten", f"QR-Daten-Dialog nicht gefunden:\n{e}")
+            return
+        QRDatenDialog(self).exec_()
+
+    def _open_kategorien_dialog(self):
+        try:
+            from gui.kategorien_dialog import KategorienDialog
+        except Exception as e:
+            QMessageBox.warning(self, "Kategorien", f"Dialog nicht gefunden:\n{e}")
+            return
+        KategorienDialog(self).exec_()

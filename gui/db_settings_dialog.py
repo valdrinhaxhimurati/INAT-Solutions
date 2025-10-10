@@ -1,7 +1,8 @@
 from PyQt5.QtWidgets import (
-    QDialog, QVBoxLayout, QHBoxLayout, QGroupBox, QLabel,
-    QLineEdit, QCheckBox, QPushButton, QMessageBox, QWidget
+    QDialog, QVBoxLayout, QGroupBox, QLabel, QLineEdit, QCheckBox,
+    QPushButton, QWidget, QHBoxLayout, QFormLayout, QMessageBox, QRadioButton, QApplication
 )
+from PyQt5.QtCore import Qt, QProcess
 from gui.utils import create_button_bar
 from db_connection import get_remote_status, test_remote_connection, enable_remote, disable_remote
 
@@ -9,70 +10,81 @@ class DBSettingsDialog(QDialog):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setWindowTitle("Datenbank-Einstellungen")
-        self.setMinimumWidth(520)
 
         status = get_remote_status()
+        self._initial_use_remote = bool(status.get("use_remote", False))
+        self._initial_url = (status.get("db_url") or "").strip()
 
+        # Root-Layout
         root = QVBoxLayout(self)
         root.setContentsMargins(16, 16, 16, 16)
         root.setSpacing(12)
 
+        # GroupBox + FormLayout
         gb = QGroupBox("Datenbank")
-        v = QVBoxLayout(gb)
-        v.setContentsMargins(16, 16, 16, 16)
-        v.setSpacing(12)
+        form = QFormLayout()
+        form.setLabelAlignment(Qt.AlignLeft | Qt.AlignVCenter)
+        form.setFormAlignment(Qt.AlignLeft | Qt.AlignTop)
+        form.setHorizontalSpacing(12)
+        form.setVerticalSpacing(10)
+        gb.setLayout(form)
         root.addWidget(gb)
 
-        # Modus
-        v.addWidget(QLabel("Modus"))
-        self.remote_cb = QCheckBox("Remote-PostgreSQL verwenden")
-        self.remote_cb.setChecked(bool(status.get("use_remote", False)))
-        v.addWidget(self.remote_cb)
+        # Modus: Lokal/Remote
+        self.lbl_modus = QLabel("Modus")
+        mode_field = QWidget()
+        mode_row = QHBoxLayout(mode_field)
+        mode_row.setContentsMargins(0, 0, 0, 0)
+        mode_row.setSpacing(16)
+        self.local_rb = QRadioButton("Lokal")
+        self.remote_rb = QRadioButton("Remote")
+        (self.remote_rb if self._initial_use_remote else self.local_rb).setChecked(True)
+        mode_row.addWidget(self.local_rb)
+        mode_row.addWidget(self.remote_rb)
+        form.addRow(self.lbl_modus, mode_field)
 
-        # Remote-Bereich (wird komplett ein-/ausgeblendet)
-        self.remote_container = QWidget()
-        rc = QVBoxLayout(self.remote_container)
-        rc.setContentsMargins(0, 0, 0, 0)
-        rc.setSpacing(8)
-
-        # URL Zeile: Label + Edit
-        url_row = QHBoxLayout()
+        # URL-Zeile: Label + (LineEdit + Test-Button)
+        self.url_label = QLabel("PostgreSQL-URL")
+        url_field = QWidget()
+        url_row = QHBoxLayout(url_field)
+        url_row.setContentsMargins(0, 0, 0, 0)
         url_row.setSpacing(8)
-        self.db_url_label = QLabel("PostgreSQL-URL")
-        url_row.addWidget(self.db_url_label)
+
         self.db_url_edit = QLineEdit()
         self.db_url_edit.setPlaceholderText("postgresql://user:pass@host:port/dbname")
-        self.db_url_edit.setText(status.get("db_url") or "")
-        url_row.addWidget(self.db_url_edit, 1)
-        rc.addLayout(url_row)
+        self.db_url_edit.setText(self._initial_url)
+        self.db_url_edit.setMinimumWidth(360)
 
-        # Test-Button (links, wie der Rest)
-        test_row = QHBoxLayout()
         self.btn_test = QPushButton("Verbindung testen")
-        test_row.addWidget(self.btn_test)
-        test_row.addStretch(1)
-        rc.addLayout(test_row)
 
-        v.addWidget(self.remote_container)
+        url_row.addWidget(self.db_url_edit, 1)
+        url_row.addWidget(self.btn_test, 0)
+        form.addRow(self.url_label, url_field)
 
-        # OK/Abbrechen (wie im Buchhaltungsdialog via create_button_bar)
+        # OK/Abbrechen
         self.btn_speichern = QPushButton("Speichern")
         self.btn_abbrechen = QPushButton("Abbrechen")
         self.btn_speichern.clicked.connect(self._on_save)
         self.btn_abbrechen.clicked.connect(self.reject)
         root.addLayout(create_button_bar(self.btn_speichern, self.btn_abbrechen))
 
-        # Sichtbarkeit initialisieren
-        self.remote_cb.toggled.connect(self._update_enabled)
-        self._update_enabled(self.remote_cb.isChecked())
-
-        # Aktionen
+        # Events
+        self.local_rb.toggled.connect(self._sync_mode_ui)
+        self.remote_rb.toggled.connect(self._sync_mode_ui)
         self.btn_test.clicked.connect(self._on_test)
 
-    def _update_enabled(self, enabled: bool):
-        self.remote_container.setVisible(enabled)
-        self.db_url_edit.setEnabled(enabled)
-        self.btn_test.setEnabled(enabled)
+        # Initial UI-State
+        self._sync_mode_ui()
+
+        # 15% größer starten
+        self.resize(int(self.sizeHint().width() * 1.15), int(self.sizeHint().height() * 1.15))
+
+    def _sync_mode_ui(self):
+        is_remote = self.remote_rb.isChecked()
+        self.url_label.setVisible(is_remote)
+        self.db_url_edit.parentWidget().setVisible(is_remote)
+        self.db_url_edit.setEnabled(is_remote)
+        self.btn_test.setEnabled(is_remote)
 
     def _on_test(self):
         url = self.db_url_edit.text().strip()
@@ -86,12 +98,14 @@ class DBSettingsDialog(QDialog):
             QMessageBox.critical(self, "Fehler", f"Verbindung fehlgeschlagen:\n{err}")
 
     def _on_save(self):
-        if self.remote_cb.isChecked():
-            url = self.db_url_edit.text().strip()
-            if not url:
+        is_remote = self.remote_rb.isChecked()
+        new_url = self.db_url_edit.text().strip()
+
+        if is_remote:
+            if not new_url:
                 QMessageBox.warning(self, "Fehler", "Bitte eine PostgreSQL-URL eingeben.")
                 return
-            ok, err = test_remote_connection(url)
+            ok, err = test_remote_connection(new_url)
             if not ok:
                 res = QMessageBox.question(
                     self, "Trotzdem speichern?",
@@ -100,9 +114,26 @@ class DBSettingsDialog(QDialog):
                 )
                 if res != QMessageBox.Yes:
                     return
-            enable_remote(url)
+            enable_remote(new_url)
         else:
             disable_remote()
+
+        changed = (is_remote != self._initial_use_remote) or (is_remote and new_url != self._initial_url)
+        if changed:
+            # Neustart vorschlagen und ggf. ausführen
+            res = QMessageBox.question(
+                self,
+                "Neustart erforderlich",
+                "Die Datenbank-Einstellungen wurden geändert. Anwendung jetzt neu starten?",
+                QMessageBox.Yes | QMessageBox.No,
+                QMessageBox.Yes
+            )
+            if res == QMessageBox.Yes:
+                import sys
+                QProcess.startDetached(sys.executable, sys.argv)
+                QApplication.instance().quit()
+                return
+
         self.accept()
 
 from gui.db_settings_dialog import DBSettingsDialog
