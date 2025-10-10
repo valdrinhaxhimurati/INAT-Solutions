@@ -1,80 +1,75 @@
-﻿from PyQt5.QtWidgets import QDialog, QVBoxLayout, QLineEdit, QPushButton, QListWidget, QMessageBox, QLabel, QHBoxLayout
+﻿# -*- coding: utf-8 -*-
+from PyQt5.QtWidgets import (
+    QDialog, QVBoxLayout, QHBoxLayout, QListWidget, QLineEdit,
+    QPushButton, QLabel, QMessageBox
+)
 from login import get_users, add_user, delete_user, init_db
-from db_connection import get_db, dict_cursor_factory
+
 
 class BenutzerVerwaltenDialog(QDialog):
-    def __init__(self, db_path, parent=None):
+    def __init__(self, parent=None):
         super().__init__(parent)
-        self.db_path = db_path
-        
-        init_db(self.db_path)
         self.setWindowTitle("Benutzer verwalten")
-        self.setMinimumWidth(300)
+        self.setMinimumWidth(360)
 
-        layout = QVBoxLayout()
+        # stellt je nach Backend die nötige Tabelle bereit (SQLite oder PostgreSQL)
+        init_db()
 
-        self.user_list = QListWidget()
-        layout.addWidget(QLabel("Benutzerkonten:"))
-        layout.addWidget(self.user_list)
+        # UI
+        lay = QVBoxLayout(self)
+        self.list = QListWidget()
+        lay.addWidget(self.list)
 
-        # Benutzer hinzufügen
-        self.username_input = QLineEdit()
-        self.username_input.setPlaceholderText("Neuer Benutzername")
-        self.password_input = QLineEdit()
-        self.password_input.setPlaceholderText("Passwort")
-        self.password_input.setEchoMode(QLineEdit.Password)
+        row = QHBoxLayout()
+        self.ed_user = QLineEdit(); self.ed_user.setPlaceholderText("Benutzername")
+        self.ed_role = QLineEdit(); self.ed_role.setPlaceholderText("Rolle (optional)")
+        row.addWidget(self.ed_user); row.addWidget(self.ed_role)
+        lay.addLayout(row)
 
-        self.add_btn = QPushButton("Benutzer hinzufügen")
+        row2 = QHBoxLayout()
+        self.btn_add = QPushButton("Hinzufügen")
+        self.btn_del = QPushButton("Löschen")
+        row2.addStretch(1); row2.addWidget(self.btn_del); row2.addWidget(self.btn_add)
+        lay.addLayout(row2)
 
+        self.btn_add.clicked.connect(self._add)
+        self.btn_del.clicked.connect(self._delete)
 
-        self.add_btn.clicked.connect(self.benutzer_hinzufuegen)
+        self._reload()
 
-        layout.addWidget(QLabel("Neuen Benutzer hinzufügen:"))
-        layout.addWidget(self.username_input)
-        layout.addWidget(self.password_input)
-        layout.addWidget(self.add_btn)
+    def _reload(self):
+        self.list.clear()
+        try:
+            rows = get_users()
+            # rows: [(id, benutzername, passwort_hash, rolle), ...]
+            for r in rows:
+                uid, name, _, rolle = r
+                txt = f"{name}  ({rolle})" if rolle else name
+                self.list.addItem(f"{uid} – {txt}")
+        except Exception as e:
+            QMessageBox.critical(self, "Fehler", str(e))
 
-        # Benutzer löschen
-        self.delete_btn = QPushButton("Markierten Benutzer löschen")
-
-
-        self.delete_btn.clicked.connect(self.benutzer_loeschen)
-        layout.addWidget(self.delete_btn)
-
-        self.setLayout(layout)
-        self.liste_aktualisieren()
-
-    def liste_aktualisieren(self):
-        self.user_list.clear()
-        users = get_users(self.db_path)  # Hier db_path übergeben
-        self.user_list.addItems(users)
-
-    def benutzer_hinzufuegen(self):
-        name = self.username_input.text()
-        pw = self.password_input.text()
-
-        if not name or not pw:
-            QMessageBox.warning(self, "Fehler", "Benutzername und Passwort dürfen nicht leer sein.")
+    def _add(self):
+        name = self.ed_user.text().strip()
+        rolle = self.ed_role.text().strip() or None
+        if not name:
+            QMessageBox.warning(self, "Fehler", "Bitte Benutzernamen eingeben.")
             return
+        # Demo: leeres Passwort-Hash – in deiner App sicher bereits vorhanden (Hashing/Setzen woanders)
+        try:
+            add_user(name, "", rolle)
+            self.ed_user.clear(); self.ed_role.clear()
+            self._reload()
+        except Exception as e:
+            QMessageBox.critical(self, "Fehler", str(e))
 
-        success = add_user(self.db_path, name, pw)  # db_path zuerst
-        if success:
-            self.username_input.clear()
-            self.password_input.clear()
-            self.liste_aktualisieren()
-            self.accept()  # Dialog schließen
-        else:
-            QMessageBox.warning(self, "Fehler", "Benutzername existiert bereits.")
-
-    def benutzer_loeschen(self):
-        selected_items = self.user_list.selectedItems()
-        if not selected_items:
+    def _delete(self):
+        item = self.list.currentItem()
+        if not item:
             return
-        name = selected_items[0].text()
-        confirm = QMessageBox.question(self, "Löschen bestätigen", f"Benutzer '{name}' wirklich löschen?")
-        if confirm == QMessageBox.Yes:
-            if delete_user(self.db_path, name):  # db_path zuerst
-                self.liste_aktualisieren()
-            else:
-                QMessageBox.warning(self, "Fehler", "Konnte Benutzer nicht löschen.")
-
+        try:
+            uid = int(item.text().split("–", 1)[0].strip())
+            delete_user(uid)
+            self._reload()
+        except Exception as e:
+            QMessageBox.critical(self, "Fehler", str(e))

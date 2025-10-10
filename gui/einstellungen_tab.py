@@ -1,15 +1,31 @@
 ﻿# -*- coding: utf-8 -*-
-import os, json, csv, shutil
+import os, json, csv
 from PyQt5.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QFrame, QLabel,
     QLineEdit, QSizePolicy, QFileDialog, QScrollArea, QMessageBox, QInputDialog
 )
 from PyQt5.QtCore import Qt
-from db_connection import get_db, dict_cursor_factory
+from db_connection import get_db
 from db_settings_dialog import DBSettingsDialog
 from gui.kategorien_dialog import KategorienDialog
 from gui.benutzer_dialog import BenutzerVerwaltenDialog
 from gui.qr_daten_dialog import QRDatenDialog
+
+
+def _load_cfg_with_fallback(path):
+    for enc in ("utf-8", "cp1252", "latin-1"):
+        try:
+            with open(path, "r", encoding=enc) as f:
+                cfg = json.load(f)
+            if enc != "utf-8":
+                with open(path, "w", encoding="utf-8") as fw:
+                    json.dump(cfg, fw, indent=4, ensure_ascii=False)
+            return cfg
+        except UnicodeDecodeError:
+            continue
+        except Exception:
+            break
+    return {}
 
 
 class EinstellungenTab(QWidget):
@@ -21,90 +37,61 @@ class EinstellungenTab(QWidget):
         main.setSpacing(18)
 
         # --- Firmeninformationen ---
-        firma_box = QFrame()
-        firma_box.setFrameShape(QFrame.StyledPanel)
-        firma_box.setObjectName("settingsBox")
-        firma_box.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Maximum)
-        firma_layout = QVBoxLayout(firma_box)
+        box1 = QFrame(); box1.setFrameShape(QFrame.StyledPanel); box1.setObjectName("settingsBox")
+        box1.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Maximum)
+        lay1 = QVBoxLayout(box1)
 
-        titel = QLabel("Firmeninformationen")
-        titel.setObjectName("settingsTitle")
-        titel.setWordWrap(False)
-        titel.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Fixed)
-        firma_layout.addWidget(titel)
-        firma_layout.addSpacing(8)
+        title1 = QLabel("Firmeninformationen"); title1.setObjectName("settingsTitle")
+        lay1.addWidget(title1); lay1.addSpacing(8)
 
-        self.firmenname_input = QLineEdit()
-        self.firmenname_input.setPlaceholderText("Firmenname (z. B. DeineFirma AG)")
-        self.uid_input = QLineEdit()
-        self.uid_input.setPlaceholderText("UID-Nummer (z. B. CHE-123.456.789 MWST)")
-        firma_layout.addWidget(QLabel("Name der Firma:"))
-        firma_layout.addWidget(self.firmenname_input)
-        firma_layout.addWidget(QLabel("UID-Nummer:"))
-        firma_layout.addWidget(self.uid_input)
+        self.firmenname_input = QLineEdit(); self.firmenname_input.setPlaceholderText("Firmenname")
+        self.uid_input = QLineEdit(); self.uid_input.setPlaceholderText("UID-Nummer")
+        lay1.addWidget(QLabel("Name der Firma:")); lay1.addWidget(self.firmenname_input)
+        lay1.addWidget(QLabel("UID-Nummer:"));    lay1.addWidget(self.uid_input)
 
-        self.speichern_button = QPushButton("Speichern")
-        self.speichern_button.clicked.connect(self.speichere_firmeninfo)
-        firma_layout.addWidget(self.speichern_button)
+        self.btn_save_org = QPushButton("Speichern"); self.btn_save_org.clicked.connect(self._save_org)
+        lay1.addWidget(self.btn_save_org)
 
-        main.addWidget(firma_box)
+        main.addWidget(box1)
 
         # --- Datenbank ---
-        db_box = QFrame()
-        db_box.setFrameShape(QFrame.StyledPanel)
-        db_box.setObjectName("settingsBox")
-        db_box.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Maximum)
-        db_layout = QVBoxLayout(db_box)
+        box2 = QFrame(); box2.setFrameShape(QFrame.StyledPanel); box2.setObjectName("settingsBox")
+        lay2 = QVBoxLayout(box2)
 
-        db_title = QLabel("Datenbank")
-        db_title.setObjectName("settingsTitle")
-        db_layout.addWidget(db_title)
-        db_layout.addSpacing(8)
+        title2 = QLabel("Datenbank"); title2.setObjectName("settingsTitle")
+        lay2.addWidget(title2); lay2.addSpacing(8)
 
-        db_layout.addWidget(QLabel("Aktuelle PostgreSQL-Verbindung:"))
-        self.db_url_label = QLineEdit()
-        self.db_url_label.setReadOnly(True)
-        self.db_url_label.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
-        db_layout.addWidget(self.db_url_label)
+        row = QHBoxLayout()
+        row.addWidget(QLabel("Aktuelle PostgreSQL-Verbindung:"))
+        self.db_url_label = QLineEdit(); self.db_url_label.setReadOnly(True); self.db_url_label.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
+        row.addWidget(self.db_url_label, 1)
+        self.btn_db_settings = QPushButton("Datenbank-Einstellungen…"); self.btn_db_settings.clicked.connect(self.open_db_settings)
+        row.addWidget(self.btn_db_settings)
+        lay2.addLayout(row)
 
-        self.btn_db_settings = QPushButton("Datenbank-Einstellungen…")
-        self.btn_db_settings.clicked.connect(self.open_db_settings)
-        db_layout.addWidget(self.btn_db_settings)
+        # CSV / Backup (einfach)
+        self.export_button = QPushButton("CSV Export"); self.export_button.clicked.connect(self.csv_export_dialog)
+        self.import_button = QPushButton("CSV Import"); self.import_button.clicked.connect(self.csv_import_dialog)
+        lay2.addWidget(self.export_button); lay2.addWidget(self.import_button)
 
-        self.backup_button = QPushButton("Backup erstellen")
-        self.backup_button.clicked.connect(self.backup_database)
-        self.export_button = QPushButton("CSV Export")
-        self.export_button.clicked.connect(self.csv_export_dialog)
-        self.import_button = QPushButton("CSV Import")
-        self.import_button.clicked.connect(self.csv_import_dialog)
-        for b in (self.backup_button, self.export_button, self.import_button):
-            db_layout.addWidget(b)
-
-        main.addWidget(db_box)
+        main.addWidget(box2)
 
         # --- Verwaltung ---
-        verw_box = QFrame()
-        verw_box.setFrameShape(QFrame.StyledPanel)
-        verw_box.setObjectName("settingsBox")
-        verw_box.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Maximum)
-        verw_layout = QVBoxLayout(verw_box)
-
-        verw_titel = QLabel("Verwaltung")
-        verw_titel.setObjectName("settingsTitle")
-        verw_layout.addWidget(verw_titel)
-        verw_layout.addSpacing(8)
+        box3 = QFrame(); box3.setFrameShape(QFrame.StyledPanel); box3.setObjectName("settingsBox")
+        lay3 = QVBoxLayout(box3)
+        title3 = QLabel("Verwaltung"); title3.setObjectName("settingsTitle")
+        lay3.addWidget(title3); lay3.addSpacing(8)
 
         self.kategorien_button = QPushButton("Kategorien verwalten")
         self.kategorien_button.clicked.connect(lambda: KategorienDialog(self).exec_())
         self.benutzer_button = QPushButton("Benutzer verwalten")
-        self.benutzer_button.clicked.connect(lambda: BenutzerVerwaltenDialog(None).exec_())
+        self.benutzer_button.clicked.connect(lambda: BenutzerVerwaltenDialog(self).exec_())
         self.qr_button = QPushButton("QR-Rechnungsdaten verwalten")
         self.qr_button.clicked.connect(lambda: QRDatenDialog(self).exec_())
-
         for b in (self.kategorien_button, self.benutzer_button, self.qr_button):
-            verw_layout.addWidget(b)
+            lay3.addWidget(b)
 
-        main.addWidget(verw_box)
+        main.addWidget(box3)
         main.addStretch(1)
 
         container = QWidget(); container.setLayout(main)
@@ -112,72 +99,49 @@ class EinstellungenTab(QWidget):
         outer = QVBoxLayout(); outer.addWidget(scroll)
         self.setLayout(outer)
 
-        # Initial laden
-        self.lade_config()
-        self.refresh_db_label()
+        # Init laden
+        self._load_config()
+        self._refresh_db_label()
 
-    # --------------------------------------------------
-    # Config laden / speichern
-    # --------------------------------------------------
-    def cfg_path(self):
+    # --- Config ---
+    def _cfg_path(self):
         return os.path.join(os.getcwd(), "config.json")
 
-    def lade_config(self):
-        p = self.cfg_path()
-        if not os.path.exists(p): return
-        with open(p, "r", encoding="utf-8") as f:
-            cfg = json.load(f)
+    def _load_config(self):
+        p = self._cfg_path()
+        if not os.path.exists(p):
+            return
+        cfg = _load_cfg_with_fallback(p)
         self.firmenname_input.setText(cfg.get("firmenname", ""))
         self.uid_input.setText(cfg.get("uid", ""))
 
-    def speichere_firmeninfo(self):
-        p = self.cfg_path()
+    def _save_org(self):
+        p = self._cfg_path()
         cfg = {}
         if os.path.exists(p):
-            with open(p, "r", encoding="utf-8") as f:
-                cfg = json.load(f)
+            cfg = _load_cfg_with_fallback(p)
         cfg["firmenname"] = self.firmenname_input.text().strip()
         cfg["uid"] = self.uid_input.text().strip()
         with open(p, "w", encoding="utf-8") as f:
             json.dump(cfg, f, indent=4, ensure_ascii=False)
         QMessageBox.information(self, "Gespeichert", "Firmeninformationen gespeichert.")
 
-    # --------------------------------------------------
-    # Datenbank-Einstellungen
-    # --------------------------------------------------
+    # --- DB-Settings ---
     def open_db_settings(self):
         dlg = DBSettingsDialog(self)
         if dlg.exec_():
-            self.refresh_db_label()
+            self._refresh_db_label()
 
-    def refresh_db_label(self):
-        p = self.cfg_path()
+    def _refresh_db_label(self):
+        p = self._cfg_path()
         if not os.path.exists(p):
-            self.db_url_label.setText("(keine config.json gefunden)")
-            return
-        with open(p, "r", encoding="utf-8") as f:
-            cfg = json.load(f)
-        url = cfg.get("postgres_url", "")
-        self.db_url_label.setText(url or "(keine Verbindung eingestellt)")
+            self.db_url_label.setText("(keine config.json gefunden)"); return
+        cfg = _load_cfg_with_fallback(p)
+        url = cfg.get("postgres_url", "") or "(keine Verbindung eingestellt)"
+        self.db_url_label.setText(url)
         self.db_url_label.setCursorPosition(0)
 
-    # --------------------------------------------------
-    # Backup / CSV
-    # --------------------------------------------------
-    def backup_database(self):
-        ziel, _ = QFileDialog.getSaveFileName(
-            self, "Backup speichern unter", "backup.sql", "SQL-Dump Dateien (*.sql)"
-        )
-        if not ziel:
-            return
-        try:
-            conn = get_db()
-            with conn.cursor() as cur, open(ziel, "w", encoding="utf-8") as f:
-                cur.copy_expert("COPY (SELECT table_name FROM information_schema.tables WHERE table_schema='public') TO STDOUT", f)
-            QMessageBox.information(self, "Backup", f"Backup gespeichert unter {ziel}")
-        except Exception as e:
-            QMessageBox.critical(self, "Fehler", str(e))
-
+    # --- CSV ---
     def csv_export_dialog(self):
         try:
             conn = get_db()
@@ -192,16 +156,19 @@ class EinstellungenTab(QWidget):
             conn.close()
         except Exception:
             tabellen = []
+
         if not tabellen:
             QMessageBox.warning(self, "Fehler", "Keine Tabellen gefunden!")
             return
+
         tabelle, ok = QInputDialog.getItem(self, "Tabelle wählen", "Welche Tabelle exportieren?", tabellen, 0, False)
         if not ok or not tabelle: return
+
         ziel, _ = QFileDialog.getSaveFileName(self, "CSV speichern unter", f"{tabelle}.csv", "CSV (*.csv)")
         if not ziel: return
+
         try:
-            conn = get_db()
-            cur = conn.cursor()
+            conn = get_db(); cur = conn.cursor()
             cur.execute(f'SELECT * FROM public."{tabelle}"')
             daten = cur.fetchall()
             spalten = [d[0] for d in cur.description]
@@ -214,8 +181,7 @@ class EinstellungenTab(QWidget):
 
     def csv_import_dialog(self):
         try:
-            conn = get_db()
-            cur = conn.cursor()
+            conn = get_db(); cur = conn.cursor()
             cur.execute("""
                 SELECT table_name
                 FROM information_schema.tables
@@ -226,25 +192,29 @@ class EinstellungenTab(QWidget):
             conn.close()
         except Exception:
             tabellen = []
+
         if not tabellen:
             QMessageBox.warning(self, "Fehler", "Keine Tabellen gefunden!")
             return
+
         tabelle, ok = QInputDialog.getItem(self, "Tabelle wählen", "In welche Tabelle importieren?", tabellen, 0, False)
         if not ok or not tabelle: return
+
         pfad, _ = QFileDialog.getOpenFileName(self, "CSV Datei auswählen", "", "CSV (*.csv)")
         if not pfad: return
+
         try:
-            conn = get_db()
-            cur = conn.cursor()
-            cur.execute(f'SELECT column_name FROM information_schema.columns WHERE table_name=%s', (tabelle,))
+            conn = get_db(); cur = conn.cursor()
+            cur.execute("SELECT column_name FROM information_schema.columns WHERE table_schema='public' AND table_name=%s ORDER BY ordinal_position", (tabelle,))
             spalten = [r[0] for r in cur.fetchall()]
+
             with open(pfad, "r", encoding="utf-8") as f:
                 reader = csv.DictReader(f)
                 rows = [tuple(row.get(sp) for sp in spalten) for row in reader]
+
             if rows:
                 placeholders = ",".join(["%s"] * len(spalten))
-                cur.executemany(
-                    f'INSERT INTO public."{tabelle}" ({",".join(spalten)}) VALUES ({placeholders})', rows)
+                cur.executemany(f'INSERT INTO public."{tabelle}" ({",".join(spalten)}) VALUES ({placeholders})', rows)
                 conn.commit()
                 QMessageBox.information(self, "Import", f"{len(rows)} Zeilen importiert.")
             else:

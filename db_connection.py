@@ -1,67 +1,59 @@
 ﻿# -*- coding: utf-8 -*-
-import os, json, sqlite3
+import os, json
 import psycopg2, psycopg2.extras
 
-# Reihenfolge: Arbeitsverzeichnis -> Script-Verzeichnis (für PyInstaller)
+
 CFG_PATHS = [
     os.path.join(os.getcwd(), "config.json"),
     os.path.join(os.path.dirname(__file__), "config.json"),
 ]
 
-# -------------------- Konfig laden --------------------
+
 def _load_cfg() -> dict:
+    """Config robust laden: erst utf-8, dann cp1252/latin-1; bei Nicht-UTF automatisch korrigiert zurückschreiben."""
     for p in CFG_PATHS:
-        if os.path.exists(p):
-            with open(p, "r", encoding="utf-8") as f:
-                return json.load(f)
+        if not os.path.exists(p):
+            continue
+        for enc in ("utf-8", "cp1252", "latin-1"):
+            try:
+                with open(p, "r", encoding=enc) as f:
+                    cfg = json.load(f)
+                if enc != "utf-8":
+                    # gleich nach UTF-8 normalisieren
+                    with open(p, "w", encoding="utf-8") as fw:
+                        json.dump(cfg, fw, indent=4, ensure_ascii=False)
+                return cfg
+            except UnicodeDecodeError:
+                continue
+            except Exception:
+                # defektes JSON etc.
+                break
     return {}
 
-# -------------------- Postgres Verbindung --------------------
+
 def get_db():
     """
     Liefert die Hauptdatenbank-Verbindung (PostgreSQL).
     Erwartet in config.json:
-    {
-        "db_backend": "postgres",
-        "postgres_url": "postgresql://user:pass@host:port/dbname?...",
-        ...
-    }
+      db_backend: "postgres"
+      postgres_url: "postgresql://user:pass@host:port/dbname?...“
     """
     cfg = _load_cfg()
-    pg_url = (cfg.get("postgres_url") or os.environ.get("POSTGRES_URL") or "").strip()
-    if not pg_url:
-        raise RuntimeError("Keine PostgreSQL-URL in config.json gefunden!")
+    url = (cfg.get("postgres_url") or os.environ.get("POSTGRES_URL") or "").strip()
+    if not url:
+        raise RuntimeError("Keine PostgreSQL-URL in config.json gefunden (Schlüssel: 'postgres_url').")
 
-    conn = psycopg2.connect(pg_url)
-    conn.autocommit = True
-    with conn.cursor() as cur:
-        cur.execute("SET search_path TO public")
-    conn.autocommit = False
+    conn = psycopg2.connect(url)
+    # Optional: Schema setzen
+    try:
+        conn.autocommit = True
+        with conn.cursor() as cur:
+            cur.execute("SET search_path TO public")
+    finally:
+        conn.autocommit = False
     return conn
 
+
 def dict_cursor_factory(conn):
-    """liefert passende Dict-Cursor-Fabrik für psycopg2"""
+    """Komfort: psycopg2-RealDictCursor zurückgeben (kompatibel zu vorhandenem Code)."""
     return psycopg2.extras.RealDictCursor
-
-
-# -------------------- Benutzerverwaltung (SQLite) --------------------
-class _SqliteCompatConnection:
-    def __init__(self, inner: sqlite3.Connection):
-        self._inner = inner
-    def cursor(self, *a, **kw): return self._inner.cursor()
-    def __getattr__(self, x): return getattr(self._inner, x)
-    def __enter__(self): return self
-    def __exit__(self, et, ex, tb):
-        try:
-            if et: self._inner.rollback()
-        finally:
-            self._inner.close()
-
-def get_users_db():
-    """Separate SQLite für Benutzerverwaltung"""
-    cfg = _load_cfg()
-    path = cfg.get("users_sqlite_path", os.path.join("db", "users.db"))
-    os.makedirs(os.path.dirname(path), exist_ok=True)
-    con = sqlite3.connect(path)
-    con.row_factory = sqlite3.Row
-    return _SqliteCompatConnection(con)
