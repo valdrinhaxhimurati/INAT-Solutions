@@ -87,7 +87,7 @@ class EinstellungenTab(QWidget):
         self.kategorien_button = QPushButton("Kategorien verwalten")
         self.kategorien_button.clicked.connect(self._open_kategorien_dialog)
         self.benutzer_button = QPushButton("Benutzer verwalten")
-        self.benutzer_button.clicked.connect(lambda: BenutzerVerwaltenDialog(self._login_db_path(), self).exec_())
+        self.benutzer_button.clicked.connect(self._open_benutzer_dialog)
         self.qr_button = QPushButton("QR-Rechnungsdaten verwalten")
         self.qr_button.clicked.connect(self._open_qr_dialog)
         for b in (self.kategorien_button, self.benutzer_button, self.qr_button):
@@ -261,3 +261,15 @@ class EinstellungenTab(QWidget):
             QMessageBox.warning(self, "Kategorien", f"Dialog nicht gefunden:\n{e}")
             return
         KategorienDialog(self).exec_()
+
+    def _open_benutzer_dialog(self):
+        try:
+            from gui.benutzer_verwalten_dialog import BenutzerVerwaltenDialog
+        except Exception:
+            try:
+                from gui.benutzer_dialog import BenutzerVerwaltenDialog
+            except Exception as e:
+                QMessageBox.warning(self, "Benutzer", f"Dialog nicht gefunden:\n{e}")
+                return
+        dlg = BenutzerVerwaltenDialog(self._login_db_path(), self)
+        dlg.exec_()

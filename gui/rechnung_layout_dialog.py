@@ -190,97 +190,57 @@ class RechnungLayoutDialog(QDialog):
     def lade_layout(self):
         conn = get_db()
         try:
-            with conn.cursor(cursor_factory=dict_cursor_factory) as cur:
-                cur.execute("SELECT kopfzeile, einleitung, fusszeile, logo, logo_mime, logo_skala FROM rechnung_layout WHERE id=1")
-                row = cur.fetchone()
-                # Falls kein Dict: anhand der description mappen
-                if row is not None and not isinstance(row, dict):
-                    cols = [d[0] for d in cur.description]
-                    row = dict(zip(cols, row))
-            if row:
-                kopf = row.get("kopfzeile") or ""
-                einl = row.get("einleitung") or ""
-                fuss = row.get("fusszeile") or ""
-                self.text_kopf.setPlainText(kopf)
-                self.text_einleitung.setPlainText(einl)
-                self.text_fuss.setPlainText(fuss)
-
-                # Skalierung
-                try:
-                    self.logo_skala = float(row.get("logo_skala") or 100.0)
-                except Exception:
-                    self.logo_skala = 100.0
-                try:
-                    v = self._snap10(self.logo_skala)
-                    if hasattr(self, "scale_slider"):
-                        self.scale_slider.setValue(v)
-                    if hasattr(self, "scale_spin"):
-                        self.scale_spin.setValue(v)
-                except Exception:
-                    pass
-
-                # Logo
-                self.logo_bytes = row.get("logo")
-                self.logo_mime = row.get("logo_mime")
-                pm = QPixmap()
-                if self.logo_bytes and pm.loadFromData(bytes(self.logo_bytes)):
-                    self.logo_vorschau.setPixmap(pm)
-                else:
-                    self.logo_vorschau.clear()
-                if hasattr(self, "btn_logo_entfernen"):
-                    self.btn_logo_entfernen.setEnabled(bool(self.logo_bytes))
+            is_sqlite = getattr(conn, "is_sqlite", False)
+            cur = conn.cursor() if is_sqlite else conn.cursor(cursor_factory=dict_cursor_factory)
+            cur.execute("SELECT kopfzeile, einleitung, fusszeile, logo, logo_mime, logo_skala FROM rechnung_layout WHERE id=1")
+            row = cur.fetchone()
+            # Zeile robust in Dict mappen (sqlite3.Row, tuple, dict)
+            if row is None:
                 return
-        except Exception as e:
-            # Optional: zum Debuggen anzeigen
-            # QMessageBox.warning(self, "Hinweis", f"Laden fehlgeschlagen:\n{e}")
-            pass
-        finally:
-            try:
-                conn.close()
-            except Exception:
-                pass
-
-        # Fallback JSON (wenn kein DB-Datensatz)
-        if os.path.exists(self.dateipfad):
-            with open(self.dateipfad, "r", encoding="utf-8") as f:
-                data = json.load(f)
-            self.text_kopf.setPlainText(data.get("kopfzeile", ""))
-            self.text_einleitung.setPlainText(data.get("einleitung", ""))
-            self.text_fuss.setPlainText(data.get("fusszeile", ""))
-            self.logo_skala = data.get("logo_skala", 100)
-            logo_pfad = data.get("logo_pfad", "")
-            if logo_pfad:
-                app_root = os.path.dirname(os.path.abspath(sys.argv[0]))
-                abs_logo_pfad = os.path.join(app_root, logo_pfad)
-                if os.path.exists(abs_logo_pfad):
-                    with open(abs_logo_pfad, "rb") as lf:
-                        self.logo_bytes = lf.read()
-                    self.logo_mime = mimetypes.guess_type(abs_logo_pfad)[0] or "application/octet-stream"
-                    pm = QPixmap()
-                    if pm.loadFromData(self.logo_bytes):
-                        self.logo_vorschau.setPixmap(pm)
-                    else:
-                        self.logo_vorschau.clear()
-                else:
-                    self.logo_bytes = None
-                    self.logo_mime = None
-                    self.logo_vorschau.clear()
+            if isinstance(row, dict):
+                data = row
             else:
-                self.logo_bytes = None
-                self.logo_mime = None
+                cols = [d[0] for d in cur.description]
+                try:
+                    data = {k: row[k] if hasattr(row, "__getitem__") else None for k in cols}
+                except Exception:
+                    data = dict(zip(cols, row))
+
+            self.text_kopf.setPlainText((data.get("kopfzeile") or ""))
+            self.text_einleitung.setPlainText((data.get("einleitung") or ""))
+            self.text_fuss.setPlainText((data.get("fusszeile") or ""))
+
+            try:
+                self.logo_skala = float(data.get("logo_skala") or 100.0)
+            except Exception:
+                self.logo_skala = 100.0
+            v = int(round(self.logo_skala / 10.0) * 10)
+            if hasattr(self, "scale_slider"): self.scale_slider.setValue(v)
+            if hasattr(self, "scale_spin"): self.scale_spin.setValue(v)
+
+            self.logo_bytes = data.get("logo")
+            self.logo_mime = data.get("logo_mime")
+            pm = QPixmap()
+            if self.logo_bytes and pm.loadFromData(bytes(self.logo_bytes)):
+                self.logo_vorschau.setPixmap(pm)
+            else:
                 self.logo_vorschau.clear()
+            if hasattr(self, "btn_logo_entfernen"):
+                self.btn_logo_entfernen.setEnabled(bool(self.logo_bytes))
+        finally:
+            try: conn.close()
+            except Exception: pass
 
     def speichern(self):
-        # Werte vorbereiten
         kopf = self.text_kopf.toPlainText()
         einl = self.text_einleitung.toPlainText()
         fuss = self.text_fuss.toPlainText()
-        scale = float(self._snap10(self.scale_spin.value() if hasattr(self, "scale_spin") else (self.logo_skala or 100.0)))
+        scale = float(int(round((self.scale_spin.value() if hasattr(self, "scale_spin") else (self.logo_skala or 100.0)) / 10.0) * 10))
 
         conn = get_db()
         try:
-            logo_param = self.logo_bytes
             is_sqlite = getattr(conn, "is_sqlite", False)
+            logo_param = self.logo_bytes
             if not is_sqlite and logo_param is not None:
                 try:
                     import psycopg2  # type: ignore
@@ -289,8 +249,38 @@ class RechnungLayoutDialog(QDialog):
                     logo_param = bytes(logo_param)
 
             with conn.cursor() as cur:
-                # Robust: UPSERT, bei Engines ohne ON CONFLICT (sehr alt) Fallback auf UPDATE+INSERT
-                try:
+                if is_sqlite:
+                    # Tabelle sicherstellen
+                    cur.execute("""
+                        CREATE TABLE IF NOT EXISTS rechnung_layout (
+                            id INTEGER PRIMARY KEY,
+                            kopfzeile   TEXT,
+                            einleitung  TEXT,
+                            fusszeile   TEXT,
+                            logo        BLOB,
+                            logo_mime   TEXT,
+                            logo_skala  REAL
+                        )
+                    """)
+                    # Einfach und robust in SQLite
+                    cur.execute("""
+                        INSERT OR REPLACE INTO rechnung_layout
+                            (id, kopfzeile, einleitung, fusszeile, logo, logo_mime, logo_skala)
+                        VALUES (?, ?, ?, ?, ?, ?, ?)
+                    """, (1, kopf, einl, fuss, logo_param, self.logo_mime, scale))
+                else:
+                    # PostgreSQL unverändert
+                    cur.execute("""
+                        CREATE TABLE IF NOT EXISTS rechnung_layout (
+                            id INTEGER PRIMARY KEY,
+                            kopfzeile   TEXT,
+                            einleitung  TEXT,
+                            fusszeile   TEXT,
+                            logo        BYTEA,
+                            logo_mime   TEXT,
+                            logo_skala  REAL
+                        )
+                    """)
                     cur.execute("""
                         INSERT INTO rechnung_layout (id, kopfzeile, einleitung, fusszeile, logo, logo_mime, logo_skala)
                         VALUES (1, %s, %s, %s, %s, %s, %s)
@@ -302,27 +292,13 @@ class RechnungLayoutDialog(QDialog):
                             logo_mime=EXCLUDED.logo_mime,
                             logo_skala=EXCLUDED.logo_skala
                     """, (kopf, einl, fuss, logo_param, self.logo_mime, scale))
-                except Exception:
-                    # Fallback
-                    cur.execute("""
-                        UPDATE rechnung_layout
-                           SET kopfzeile=%s, einleitung=%s, fusszeile=%s, logo=%s, logo_mime=%s, logo_skala=%s
-                         WHERE id=1
-                    """, (kopf, einl, fuss, logo_param, self.logo_mime, scale))
-                    if getattr(cur, "rowcount", 0) == 0:
-                        cur.execute("""
-                            INSERT INTO rechnung_layout (id, kopfzeile, einleitung, fusszeile, logo, logo_mime, logo_skala)
-                            VALUES (1, %s, %s, %s, %s, %s, %s)
-                        """, (kopf, einl, fuss, logo_param, self.logo_mime, scale))
             conn.commit()
         except Exception as e:
             QMessageBox.critical(self, "Fehler", f"Speichern fehlgeschlagen:\n{e}")
             return
         finally:
-            try:
-                conn.close()
-            except Exception:
-                pass
+            try: conn.close()
+            except Exception: pass
 
         QMessageBox.information(self, "Gespeichert", "Rechnungslayout wurde gespeichert.")
         self.accept()
