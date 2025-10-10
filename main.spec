@@ -11,25 +11,22 @@ a = Analysis(
         ('style.qss', '.'),
         ('config.json', '.'),
         ('schema.sql', '.'),
-        ('gui/*', 'gui'),
-        ('swissqr/*', 'swissqr'),
-        ('rechnungen/*', 'rechnungen'),
-        ('version.py', '.'),
-        ('favicon.ico', '.'),
-        ('INAT SOLUTIONS.png', '.'),
+        ('config\\rechnung_layout.json', 'config'),
+        ('INAT SOLUTIONS.png', '.'),   # Splash/Logo
+        ('favicon.ico', '.'),          # App-Icon (falls vorhanden)
     ],
     hiddenimports=[
         'PyQt5.sip',
         'PyQt5.QtPrintSupport',
         'reportlab.lib.utils',
         'reportlab.pdfgen',
+        'reportlab.graphics.renderPM',
+        'PIL.Image',
+        'psycopg2', 'psycopg2._psycopg',  # nur relevant, wenn PG genutzt wird
     ],
     hookspath=[],
     runtime_hooks=[],
     excludes=[],
-    win_no_prefer_redirects=False,
-    win_private_assemblies=False,
-    cipher=block_cipher,
     noarchive=False,
 )
 
@@ -46,7 +43,7 @@ exe = EXE(
     strip=False,
     upx=True,
     console=False,
-    icon='favicon.ico',
+    icon='favicon.ico',  # falls Datei fehlt, entferne diese Zeile oder füge die Datei hinzu
 )
 
 coll = COLLECT(

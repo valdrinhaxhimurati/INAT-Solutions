@@ -26,11 +26,10 @@ def resource_path(relative_path):
 
 
 class MainWindow(QMainWindow):
-    def __init__(self, benutzername=None):
+    def __init__(self, benutzername: str = "", login_db_path: str = None):
         super().__init__()
-        
-        from main import LOGIN_DB_PATH
-        
+        self.benutzername = benutzername
+        self._login_db_path = login_db_path
         self.setWindowTitle("Deine Anwendung")
         self.resize(1920, 1080)
         self.benutzername = benutzername or "Unbekannt"
