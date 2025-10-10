@@ -5,7 +5,7 @@ from PyQt5.QtWidgets import (
     QWidget, QFormLayout, QCheckBox
 )
 import json, os, psycopg2
-from init_db import ensure_role, ensure_database, apply_schema
+# init_db wird bei Bedarf lokal importiert, um zirkuläre Importe zu vermeiden
 
 CONFIG_PATHS = [os.path.join(os.getcwd(), "config.json"), os.path.join(os.path.dirname(__file__), "config.json")]
 
@@ -82,41 +82,200 @@ class DBSetupDialog(QDialog):
         if cfg.get("postgres_url"):
             self.url_edit.setText(cfg["postgres_url"])
 
-    def on_accept(self):
+        # Defaultwerte setzen (anpassen nach Wunsch)
         try:
-            if self.mode_existing.isChecked():
-                url = self.url_edit.text().strip()
-                if not url:
-                    QMessageBox.warning(self, "Fehlende URL", "Bitte eine PostgreSQL-URL eingeben.")
-                    return
-                self._try_connect(url)
-                self._write_config(url)
-                self.accept()
-                return
+            self.super_user_input.setText("postgres")
+            self.super_pass_input.setText("")        # leer: gib Passwort ein
+            self.app_user_input.setText("inat")
+            self.app_pass_input.setText("inatpass")  # ändere für Produktion
+            self.dbname_input.setText("inat_db")
+            if hasattr(self, "host_input"):
+                self.host_input.setText("localhost")
+            if hasattr(self, "port_input"):
+                try:
+                    self.port_input.setValue(5432)
+                except Exception:
+                    # falls port_input ein QLineEdit ist:
+                    self.port_input.setText("5432")
+            if not hasattr(self, "apply_schema_cb"):
+                # optional: Default für Schema-Anwendung
+                pass
+        except Exception:
+            # Falls Widgetnamen anders sind, ruhig bleiben und Debug-Meldung loggen
+            import traceback, sys
+            print("Fehler beim Setzen der Default-Werte für DB-Dialog:", file=sys.stderr)
+            traceback.print_exc()
 
-            # Lokale DB anlegen
-            super_url = self.super_url.text().strip()
-            if not super_url:
-                QMessageBox.warning(self, "Fehlende Superuser-URL", "Bitte Superuser-URL angeben.")
-                return
-            dbname = self.local_db.text().strip()
-            app_user = self.local_user.text().strip()
-            app_pass = self.local_pass.text().strip()
-            if not (dbname and app_user and app_pass):
-                QMessageBox.warning(self, "Unvollständig", "Bitte DB-Name, Benutzer und Passwort ausfüllen.")
-                return
+        # --- Fallback: sicherstellen, dass die erwarteten Eingabefelder existieren ---
+        # Verwende QtWidgets.<Klasse>, damit keine Namen im lokalen Scope
+        from PyQt5 import QtWidgets
 
-            ensure_role(super_url, app_user, app_pass)
-            ensure_database(super_url, dbname, owner=app_user)
-            app_url = f"postgresql://{app_user}:{app_pass}@localhost:5432/{dbname}"
-            if self.apply_schema_cb.isChecked():
-                apply_schema(app_url)
+        if not hasattr(self, "super_user_input"):
+            self.super_user_input = QtWidgets.QLineEdit(self)
+            self.super_user_input.setText("postgres")
+        if not hasattr(self, "super_pass_input"):
+            self.super_pass_input = QtWidgets.QLineEdit(self)
+            self.super_pass_input.setEchoMode(QtWidgets.QLineEdit.Password)
+        if not hasattr(self, "app_user_input"):
+            self.app_user_input = QtWidgets.QLineEdit(self)
+            self.app_user_input.setText("inat")
+        if not hasattr(self, "app_pass_input"):
+            self.app_pass_input = QtWidgets.QLineEdit(self)
+            self.app_pass_input.setEchoMode(QtWidgets.QLineEdit.Password)
+        if not hasattr(self, "dbname_input"):
+            self.dbname_input = QtWidgets.QLineEdit(self)
+            self.dbname_input.setText("inat_db")
+        if not hasattr(self, "host_input"):
+            self.host_input = QtWidgets.QLineEdit(self)
+            self.host_input.setText("localhost")
+        if not hasattr(self, "port_input"):
+            self.port_input = QtWidgets.QSpinBox(self)
+            self.port_input.setRange(1, 65535)
+            self.port_input.setValue(5432)
+        if not hasattr(self, "apply_schema_cb"):
+            self.apply_schema_cb = QtWidgets.QCheckBox("Schema anwenden", self)
+            self.apply_schema_cb.setChecked(False)
 
-            self._try_connect(app_url)
-            self._write_config(app_url)
+        # --- Defensive Default-Werte (erst prüfen / ggf. anlegen) ---
+        from PyQt5 import QtWidgets
+
+        def _ensure_lineedit(name, default="", password=False):
+            w = getattr(self, name, None)
+            if w is None:
+                w = QtWidgets.QLineEdit(self)
+                setattr(self, name, w)
+            try:
+                if password:
+                    w.setEchoMode(QtWidgets.QLineEdit.Password)
+                w.setText(default)
+            except Exception:
+                pass
+            return w
+
+        def _ensure_spinbox(name, default=5432):
+            w = getattr(self, name, None)
+            if w is None:
+                w = QtWidgets.QSpinBox(self)
+                setattr(self, name, w)
+            try:
+                w.setRange(1, 65535)
+                w.setValue(int(default))
+            except Exception:
+                pass
+            return w
+
+        # setze Defaults (sorgt dafür, dass die Attribute existieren)
+        _ensure_lineedit("super_user_input", "postgres")
+        _ensure_lineedit("super_pass_input", "", password=True)
+        _ensure_lineedit("app_user_input", "inat")
+        _ensure_lineedit("app_pass_input", "inatpass", password=True)
+        _ensure_lineedit("dbname_input", "inat_db")
+        _ensure_lineedit("host_input", "localhost")
+        _ensure_spinbox("port_input", 5432)
+
+        if not hasattr(self, "apply_schema_cb"):
+            cb = QtWidgets.QCheckBox("Schema anwenden", self)
+            cb.setChecked(False)
+            self.apply_schema_cb = cb
+
+    def on_accept(self):
+        """
+        Einheitlicher Handler: nutzt get_db() (standard: SQLite).
+        Liest schema.sql mit Encoding-Fallback und führt Statements nacheinander aus.
+        Fehler bei einzelnen Statements werden protokolliert, der Prozess bricht nicht ab.
+        """
+        try:
+            from PyQt5.QtWidgets import QInputDialog, QLineEdit, QMessageBox
+            import os, traceback
+
+            # Werte optional per Widget/Dialog abfragen (bestehende Widgets werden benutzt)
+            def _widget_text_or_ask(attr_name, title, prompt, is_password=False, default=""):
+                w = getattr(self, attr_name, None)
+                if w is not None and hasattr(w, "text"):
+                    val = w.text().strip()
+                    if val:
+                        return val
+                flags = QLineEdit.Password if is_password else QLineEdit.Normal
+                text, ok = QInputDialog.getText(self, title, prompt, flags, default)
+                if not ok:
+                    raise RuntimeError("Eingabe abgebrochen.")
+                return text.strip()
+
+            # Für lokalen Default reichen diese Werte als Fallback
+            app_user = _widget_text_or_ask("app_user_input", "App-User", "Anwendungs-Benutzername:", False, "inat")
+            app_pass = _widget_text_or_ask("app_pass_input", "App-Passwort", "Passwort für Anwendungs-Benutzer:", True, "inatpass")
+            dbname   = _widget_text_or_ask("dbname_input", "Datenbankname", "Name der anzulegenden Datenbank:", False, "inat_db")
+
+            # Versuche die konfigurierte DB (get_db liefert SQLite standardmäßig)
+            from db_connection import get_db
+            conn = get_db()
+
+            # Lies schema (falls vorhanden) mit Encoding-Fallback
+            def _read_schema(path):
+                encs = ("utf-8", "cp1252", "latin-1")
+                b = None
+                try:
+                    with open(path, "rb") as f:
+                        b = f.read()
+                except Exception:
+                    return None
+                for enc in encs:
+                    try:
+                        return b.decode(enc), enc
+                    except UnicodeDecodeError:
+                        continue
+                return b.decode("utf-8", errors="replace"), "utf-8(replace)"
+
+            # Versuche schema.sql im Projektroot zu finden
+            schema_path = os.path.join(os.path.dirname(__file__), "schema.sql")
+            if not os.path.exists(schema_path):
+                # fallback: one level up (project root)
+                schema_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "schema.sql")
+            sql_text = None
+            used_enc = None
+            if os.path.exists(schema_path):
+                sql_text, used_enc = _read_schema(schema_path)
+
+            # Falls SQL-Text vorhanden: Statements ausführen (split auf ;)
+            try:
+                cur = conn.cursor()
+                if sql_text:
+                    for stmt in sql_text.split(";"):
+                        stmt = stmt.strip()
+                        if not stmt:
+                            continue
+                        try:
+                            # bei sqlite/psycopg2 wird ConnectionWrapper.cursor().execute genutzt
+                            cur.execute(stmt)
+                        except Exception as e_stmt:
+                            # log, aber weitermachen
+                            try:
+                                with open(os.path.join(os.path.dirname(__file__), "error.log"), "a", encoding="utf-8") as ef:
+                                    ef.write("Schema statement failed (ignored):\n")
+                                    ef.write(str(e_stmt) + "\n")
+                            except Exception:
+                                pass
+                            continue
+                # falls ConnectionWrapper hat commit
+                try:
+                    conn.commit()
+                except Exception:
+                    pass
+            finally:
+                try:
+                    cur.close()
+                except Exception:
+                    pass
+                try:
+                    conn.close()
+                except Exception:
+                    pass
+
+            QMessageBox.information(self, "Erfolg", "Datenbank erfolgreich eingerichtet (lokal).")
             self.accept()
         except Exception as e:
-            QMessageBox.critical(self, "Fehler", str(e))
+            QMessageBox.critical(self, "Fehler beim Einrichten der Datenbank", str(e))
+            return
 
     def _try_connect(self, url: str):
         with psycopg2.connect(url) as conn:

@@ -6,7 +6,7 @@ from PyQt5.QtWidgets import (
 )
 from PyQt5.QtCore import Qt
 from db_connection import get_db
-from db_settings_dialog import DBSettingsDialog
+from gui.db_settings_dialog import DBSettingsDialog
 from gui.kategorien_dialog import KategorienDialog
 from gui.benutzer_dialog import BenutzerVerwaltenDialog
 from gui.qr_daten_dialog import QRDatenDialog
@@ -29,8 +29,9 @@ def _load_cfg_with_fallback(path):
 
 
 class EinstellungenTab(QWidget):
-    def __init__(self, parent=None):
+    def __init__(self, parent=None, login_db_path=None):
         super().__init__(parent)
+        self.login_db_path = login_db_path
 
         main = QVBoxLayout()
         main.setContentsMargins(30, 30, 30, 30)
@@ -61,18 +62,23 @@ class EinstellungenTab(QWidget):
         title2 = QLabel("Datenbank"); title2.setObjectName("settingsTitle")
         lay2.addWidget(title2); lay2.addSpacing(8)
 
+        # Zeile 1: Label + URL (readonly)
         row = QHBoxLayout()
         row.addWidget(QLabel("Aktuelle PostgreSQL-Verbindung:"))
         self.db_url_label = QLineEdit(); self.db_url_label.setReadOnly(True); self.db_url_label.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
         row.addWidget(self.db_url_label, 1)
-        self.btn_db_settings = QPushButton("Datenbank-Einstellungen…"); self.btn_db_settings.clicked.connect(self.open_db_settings)
-        row.addWidget(self.btn_db_settings)
         lay2.addLayout(row)
 
-        # CSV / Backup (einfach)
+        # Zeile 2: Buttons in einer Reihe
+        btn_row = QHBoxLayout()
+        btn_row.addStretch(1)
+        self.btn_db_settings = QPushButton("Datenbank-Einstellungen…"); self.btn_db_settings.clicked.connect(self.open_db_settings)
         self.export_button = QPushButton("CSV Export"); self.export_button.clicked.connect(self.csv_export_dialog)
         self.import_button = QPushButton("CSV Import"); self.import_button.clicked.connect(self.csv_import_dialog)
-        lay2.addWidget(self.export_button); lay2.addWidget(self.import_button)
+        for b in (self.btn_db_settings, self.export_button, self.import_button):
+            btn_row.addWidget(b)
+        btn_row.addStretch(1)
+        lay2.addLayout(btn_row)
 
         main.addWidget(box2)
 
@@ -85,7 +91,7 @@ class EinstellungenTab(QWidget):
         self.kategorien_button = QPushButton("Kategorien verwalten")
         self.kategorien_button.clicked.connect(lambda: KategorienDialog(self).exec_())
         self.benutzer_button = QPushButton("Benutzer verwalten")
-        self.benutzer_button.clicked.connect(lambda: BenutzerVerwaltenDialog(self).exec_())
+        self.benutzer_button.clicked.connect(lambda: BenutzerVerwaltenDialog(self._login_db_path(), self).exec_())
         self.qr_button = QPushButton("QR-Rechnungsdaten verwalten")
         self.qr_button.clicked.connect(lambda: QRDatenDialog(self).exec_())
         for b in (self.kategorien_button, self.benutzer_button, self.qr_button):
@@ -137,7 +143,8 @@ class EinstellungenTab(QWidget):
         if not os.path.exists(p):
             self.db_url_label.setText("(keine config.json gefunden)"); return
         cfg = _load_cfg_with_fallback(p)
-        url = cfg.get("postgres_url", "") or "(keine Verbindung eingestellt)"
+        # Unterstütze alte und neue Keys
+        url = (cfg.get("db_url") or cfg.get("postgres_url") or "(keine Verbindung eingestellt)")
         self.db_url_label.setText(url)
         self.db_url_label.setCursorPosition(0)
 
@@ -222,3 +229,10 @@ class EinstellungenTab(QWidget):
             conn.close()
         except Exception as e:
             QMessageBox.critical(self, "Fehler", str(e))
+
+    def _login_db_path(self) -> str:
+        # Verwende den vom Login mitgegebenen Pfad, sonst Standard db/users.db
+        if self.login_db_path:
+            return self.login_db_path
+        base = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+        return os.path.normpath(os.path.join(base, "db", "users.db"))

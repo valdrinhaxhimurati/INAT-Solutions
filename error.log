@@ -1,8 +1,93 @@
 Fehler beim Start der Anwendung:
 
 Traceback (most recent call last):
-  File "c:\Users\V.Haxhimurati\Documents\GitHub Repository\INAT-Solutions\main.py", line 258, in <module>
-    from db_setup_dialog import DBSetupDialog
-  File "c:\Users\V.Haxhimurati\Documents\GitHub Repository\INAT-Solutions\db_setup_dialog.py", line 8, in <module>
-    from init_db import ensure_role, ensure_database, apply_schema
-ImportError: cannot import name 'ensure_role' from 'init_db' (c:\Users\V.Haxhimurati\Documents\GitHub Repository\INAT-Solutions\init_db.py)
+  File "c:\Users\V.Haxhimurati\Documents\GitHub Repository\INAT-Solutions\main.py", line 261, in <module>
+    conn = get_db()
+  File "c:\Users\V.Haxhimurati\Documents\GitHub Repository\INAT-Solutions\db_connection.py", line 46, in get_db
+    conn = psycopg2.connect(url)
+  File "C:\Users\V.Haxhimurati\AppData\Local\Programs\Python\Python313\Lib\site-packages\psycopg2\__init__.py", line 135, in connect
+    conn = _connect(dsn, connection_factory=connection_factory, **kwasync)
+psycopg2.OperationalError: connection to server at "inatsolutionsdb2025-inat2025.b.aivencloud.com" (164.92.159.55), port 23057 failed: timeout expired
+
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "c:\Users\V.Haxhimurati\Documents\GitHub Repository\INAT-Solutions\main.py", line 265, in <module>
+    dlg = DBSetupDialog()
+  File "c:\Users\V.Haxhimurati\Documents\GitHub Repository\INAT-Solutions\db_setup_dialog.py", line 39, in __init__
+    self.url_edit = QLineEdit()
+                    ^^^^^^^^^
+UnboundLocalError: cannot access local variable 'QLineEdit' where it is not associated with a value
+DBSetupDialog:on_accept - trying connect with:
+ host='localhost' port=5432
+ user='inat' db='inat_db'
+ app_pass repr='inatpass'
+UnicodeDecodeError during connect:
+UnicodeDecodeError('utf-8', b'connection to server at "localhost" (::1), port 5432 failed: FATAL:  Passwort-Authentifizierung f\xfcr Benutzer \xbbinat\xab fehlgeschlagen\n', 97, 98, 'invalid start byte')
+Traceback (most recent call last):
+  File "c:\Users\V.Haxhimurati\Documents\GitHub Repository\INAT-Solutions\main.py", line 261, in <module>
+    conn = get_db()
+  File "c:\Users\V.Haxhimurati\Documents\GitHub Repository\INAT-Solutions\db_connection.py", line 46, in get_db
+    conn = psycopg2.connect(url)
+  File "C:\Users\V.Haxhimurati\AppData\Local\Programs\Python\Python313\Lib\site-packages\psycopg2\__init__.py", line 135, in connect
+    conn = _connect(dsn, connection_factory=connection_factory, **kwasync)
+psycopg2.OperationalError: connection to server at "inatsolutionsdb2025-inat2025.b.aivencloud.com" (164.92.159.55), port 23057 failed: timeout expired
+
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "c:\Users\V.Haxhimurati\Documents\GitHub Repository\INAT-Solutions\db_setup_dialog.py", line 253, in on_accept
+    conn = psycopg2.connect(host=host, port=port, user=app_user, password=app_pass, dbname=dbname)
+  File "C:\Users\V.Haxhimurati\AppData\Local\Programs\Python\Python313\Lib\site-packages\psycopg2\__init__.py", line 135, in connect
+    conn = _connect(dsn, connection_factory=connection_factory, **kwasync)
+UnicodeDecodeError: 'utf-8' codec can't decode byte 0xfc in position 97: invalid start byte
+DBSetupDialog:on_accept - trying connect with:
+ host='localhost' port=5432
+ user='inat' db='inat_db'
+ app_pass repr='inatpass'
+UnicodeDecodeError during connect:
+UnicodeDecodeError('utf-8', b'connection to server at "localhost" (::1), port 5432 failed: FATAL:  Passwort-Authentifizierung f\xfcr Benutzer \xbbinat\xab fehlgeschlagen\n', 97, 98, 'invalid start byte')
+Traceback (most recent call last):
+  File "C:\Users\V.Haxhimurati\Documents\GitHub Repository\INAT-Solutions\main.py", line 261, in <module>
+    conn = get_db()
+  File "C:\Users\V.Haxhimurati\Documents\GitHub Repository\INAT-Solutions\db_connection.py", line 46, in get_db
+    conn = psycopg2.connect(url)
+  File "C:\Users\V.Haxhimurati\AppData\Local\Programs\Python\Python313\Lib\site-packages\psycopg2\__init__.py", line 135, in connect
+    conn = _connect(dsn, connection_factory=connection_factory, **kwasync)
+psycopg2.OperationalError: connection to server at "inatsolutionsdb2025-inat2025.b.aivencloud.com" (164.92.159.55), port 23057 failed: timeout expired
+
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "C:\Users\V.Haxhimurati\Documents\GitHub Repository\INAT-Solutions\db_setup_dialog.py", line 253, in on_accept
+    conn = psycopg2.connect(host=host, port=port, user=app_user, password=app_pass, dbname=dbname)
+  File "C:\Users\V.Haxhimurati\AppData\Local\Programs\Python\Python313\Lib\site-packages\psycopg2\__init__.py", line 135, in connect
+    conn = _connect(dsn, connection_factory=connection_factory, **kwasync)
+UnicodeDecodeError: 'utf-8' codec can't decode byte 0xfc in position 97: invalid start byte
+DBSetupDialog:on_accept - trying connect with:
+ host='localhost' port=5432
+ user='inat' db='inat_db'
+ app_pass repr='inatpass'
+UnicodeDecodeError during connect:
+UnicodeDecodeError('utf-8', b'connection to server at "localhost" (::1), port 5432 failed: FATAL:  Passwort-Authentifizierung f\xfcr Benutzer \xbbinat\xab fehlgeschlagen\n', 97, 98, 'invalid start byte')
+Traceback (most recent call last):
+  File "C:\Users\V.Haxhimurati\Documents\GitHub Repository\INAT-Solutions\main.py", line 261, in <module>
+    conn = get_db()
+  File "C:\Users\V.Haxhimurati\Documents\GitHub Repository\INAT-Solutions\db_connection.py", line 46, in get_db
+    conn = psycopg2.connect(url)
+  File "C:\Users\V.Haxhimurati\AppData\Local\Programs\Python\Python313\Lib\site-packages\psycopg2\__init__.py", line 135, in connect
+    conn = _connect(dsn, connection_factory=connection_factory, **kwasync)
+psycopg2.OperationalError: connection to server at "inatsolutionsdb2025-inat2025.b.aivencloud.com" (164.92.159.55), port 23057 failed: timeout expired
+
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "C:\Users\V.Haxhimurati\Documents\GitHub Repository\INAT-Solutions\db_setup_dialog.py", line 253, in on_accept
+    conn = psycopg2.connect(host=host, port=port, user=app_user, password=app_pass, dbname=dbname)
+  File "C:\Users\V.Haxhimurati\AppData\Local\Programs\Python\Python313\Lib\site-packages\psycopg2\__init__.py", line 135, in connect
+    conn = _connect(dsn, connection_factory=connection_factory, **kwasync)
+UnicodeDecodeError: 'utf-8' codec can't decode byte 0xfc in position 97: invalid start byte

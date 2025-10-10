@@ -4,6 +4,7 @@ from typing import Optional
 import os
 import psycopg2
 from psycopg2 import sql
+import traceback
 
 # --- Dein bisheriges Default-Schema bleibt erhalten (rückwärtskompatibel) ---
 DEFAULT_SCHEMA_SQL = """
@@ -27,24 +28,65 @@ CREATE TABLE IF NOT EXISTS rechnungen (
 # ------------------------------------------------------------
 # robustes Lesen von Textdateien (UTF-8, Fallbacks, Auto-Normalisierung)
 # ------------------------------------------------------------
-def _read_text_with_fallback(path: str) -> str:
-    for enc in ("utf-8", "cp1252", "latin-1"):
+def _read_text_with_fallback(path):
+    """Versuche UTF-8, dann cp1252, dann latin-1. Liefert str oder wirft Exception."""
+    encodings = ("utf-8", "cp1252", "latin-1")
+    last_exc = None
+    for enc in encodings:
         try:
             with open(path, "r", encoding=enc) as f:
-                txt = f.read()
-            # Wenn die Datei nicht UTF-8 war, direkt auf UTF-8 zurückschreiben (einmalige Reparatur)
-            if enc != "utf-8":
-                try:
-                    with open(path, "w", encoding="utf-8") as fw:
-                        fw.write(txt)
-                except Exception:
-                    pass
-            return txt
-        except UnicodeDecodeError:
+                return f.read()
+        except UnicodeDecodeError as e:
+            last_exc = e
             continue
-    # Letzter Notbehelf – verliert nie
-    with open(path, "rb") as fb:
-        return fb.read().decode("latin-1", errors="replace")
+    # wenn alle fehlschlagen, nochmal mit replace, damit nichts mehr crasht
+    try:
+        with open(path, "r", encoding="utf-8", errors="replace") as f:
+            return f.read()
+    except Exception:
+        raise last_exc or UnicodeDecodeError("unknown", b"", 0, 1, "cannot decode")
+
+def _read_schema(path):
+    # Versuche UTF-8, fallback cp1252 (Windows dumps)
+    try:
+        with open(path, "r", encoding="utf-8") as f:
+            return f.read()
+    except UnicodeDecodeError:
+        with open(path, "r", encoding="cp1252") as f:
+            return f.read()
+
+def _detect_and_decode(path):
+    """
+    Liest Datei als Bytes und versucht mehrere Decodings.
+    Gibt (text, encoding) zurück oder wirft Exception.
+    """
+    encodings = ("utf-8", "cp1252", "latin-1")
+    b = open(path, "rb").read()
+    last_exc = None
+    for enc in encodings:
+        try:
+            text = b.decode(enc)
+            # Protokollieren, welche Kodierung gewählt wurde
+            try:
+                with open(os.path.join(os.path.dirname(__file__), "error.log"), "a", encoding="utf-8") as ef:
+                    ef.write(f"[init_db] decode {path} with {enc}\n")
+            except Exception:
+                pass
+            return text, enc
+        except UnicodeDecodeError as e:
+            last_exc = e
+            continue
+    # letzter Versuch: utf-8 mit replace, damit nichts mehr abstürzt
+    try:
+        text = b.decode("utf-8", errors="replace")
+        try:
+            with open(os.path.join(os.path.dirname(__file__), "error.log"), "a", encoding="utf-8") as ef:
+                ef.write(f"[init_db] decode {path} with utf-8 (replace)\n")
+        except Exception:
+            pass
+        return text, "utf-8(replace)"
+    except Exception:
+        raise last_exc or UnicodeDecodeError("unknown", b, 0, 1, "cannot decode")
 
 # ------------------------------------------------------------
 # Rolle & Datenbank idempotent anlegen (sicher gequotet)
@@ -146,3 +188,53 @@ def apply_schema(pg_app_url: str, schema_sql: str = DEFAULT_SCHEMA_SQL):
             for stmt in statements:
                 cur.execute(stmt)
         conn.commit()
+
+def apply_schema(app_url, schema_path=None):
+    """
+    Liest schema.sql robust (Encoding-Fallback) und versucht, Statements auszuführen.
+    Fehler bei einzelnen Statements werden protokolliert und übersprungen.
+    """
+    try:
+        import psycopg2
+    except Exception:
+        raise RuntimeError("psycopg2 erforderlich, um apply_schema auszuführen.")
+
+    if schema_path is None:
+        schema_path = os.path.join(os.path.dirname(__file__), "schema.sql")
+    if not os.path.exists(schema_path):
+        return
+
+    try:
+        sql_text, used_enc = _detect_and_decode(schema_path)
+    except Exception as e:
+        # Protokollieren und neu werfen, damit Aufrufer die Ursache sieht
+        with open(os.path.join(os.path.dirname(__file__), "error.log"), "a", encoding="utf-8") as ef:
+            ef.write("[init_db] Fehler beim Lesen von schema: " + repr(e) + "\n")
+            ef.write(traceback.format_exc() + "\n")
+        raise
+
+    conn = psycopg2.connect(app_url)
+    conn.autocommit = True
+    cur = conn.cursor()
+    try:
+        # Einfaches Split; komplexe Dumps ggf. mit psql importieren
+        for stmt in sql_text.split(";"):
+            stmt = stmt.strip()
+            if not stmt:
+                continue
+            try:
+                cur.execute(stmt)
+            except Exception as e:
+                # Fehler protokollieren, aber nicht abbrechen
+                try:
+                    with open(os.path.join(os.path.dirname(__file__), "error.log"), "a", encoding="utf-8") as ef:
+                        ef.write(f"[init_db] Fehler beim Ausführen eines Statements (ignored): {e}\n")
+                except Exception:
+                    pass
+                continue
+    finally:
+        try:
+            cur.close()
+            conn.close()
+        except Exception:
+            pass

@@ -227,3 +227,80 @@ QCalendarWidget QToolButton {
     qproperty-iconSize: 12px 12px;
     font-size: 9pt;
 }
+
+/* --- DB Settings Card --- */
+QGroupBox#dbSettings {
+    margin-top: 18px;
+    border: 1px solid #3c3f41;        /* Rahmen */
+    border-radius: 8px;
+    background: #2b2d30;              /* Card-Background (Dark) */
+}
+QGroupBox#dbSettings::title {
+    subcontrol-origin: margin;
+    left: 10px;
+    padding: 0 6px;
+    color: #d7d7d7;
+    background: transparent;
+    font-weight: 600;
+}
+
+/* Label/Checkbox im Card */
+QGroupBox#dbSettings QLabel {
+    color: #d7d7d7;
+}
+QCheckBox#dbRemoteCheck {
+    color: #d7d7d7;
+    font-weight: 500;
+}
+
+/* URL Eingabe */
+QLineEdit#dbUrlEdit {
+    color: #eaeaea;
+    background: #1f2124;
+    border: 1px solid #3c3f41;
+    border-radius: 6px;
+    padding: 6px 8px;
+    selection-background-color: #3b6ea5;
+}
+QLineEdit#dbUrlEdit:disabled {
+    color: #9a9a9a;
+    background: #232528;
+    border-color: #333;
+}
+
+/* Buttons: primary / secondary Variants */
+QPushButton[type="primary"] {
+    color: #ffffff;
+    background: #3b6ea5;              /* Akzent */
+    border: 1px solid #3b6ea5;
+    border-radius: 6px;
+    padding: 6px 12px;
+    font-weight: 600;
+}
+QPushButton[type="primary"]:hover {
+    background: #4a7fba;
+    border-color: #4a7fba;
+}
+QPushButton[type="primary"]:pressed {
+    background: #345f8a;
+    border-color: #345f8a;
+}
+
+QPushButton[type="secondary"] {
+    color: #d7d7d7;
+    background: #1f2124;
+    border: 1px solid #3c3f41;
+    border-radius: 6px;
+    padding: 6px 12px;
+}
+QPushButton[type="secondary"]:hover {
+    background: #26292c;
+}
+QPushButton[type="secondary"]:pressed {
+    background: #1b1d20;
+}
+
+/* Spacing im Card */
+QGroupBox#dbSettings > * {
+    margin: 0;
+}
