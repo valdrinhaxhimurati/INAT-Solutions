@@ -1,7 +1,8 @@
 Fehler beim Start der Anwendung:
 
 Traceback (most recent call last):
-  File "c:\Users\V.Haxhimurati\Documents\TEST\main.py", line 300, in <module>
-    migration_ausfuehren(db_pfad)
-    ^^^^^^^^^^^^^^^^^^^^
-NameError: name 'migration_ausfuehren' is not defined
+  File "c:\Users\V.Haxhimurati\Documents\GitHub Repository\INAT-Solutions\main.py", line 258, in <module>
+    from db_setup_dialog import DBSetupDialog
+  File "c:\Users\V.Haxhimurati\Documents\GitHub Repository\INAT-Solutions\db_setup_dialog.py", line 8, in <module>
+    from init_db import ensure_role, ensure_database, apply_schema
+ImportError: cannot import name 'ensure_role' from 'init_db' (c:\Users\V.Haxhimurati\Documents\GitHub Repository\INAT-Solutions\init_db.py)
