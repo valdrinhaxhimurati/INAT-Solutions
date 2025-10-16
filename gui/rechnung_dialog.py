@@ -4,9 +4,12 @@ from PyQt5.QtWidgets import (
     QTextEdit, QPushButton, QComboBox, QDateEdit, QMessageBox, QTableWidget,
     QTableWidgetItem, QDoubleSpinBox, QSizePolicy
 )
-from db_connection import get_db, dict_cursor_factory
 from PyQt5.QtCore import Qt, QDate
+from db_connection import get_db
+from reportlab.lib.utils import ImageReader
+from io import BytesIO
 import json
+import os, sys
 
 # Optional: „Aus Lager“-Dialog; wenn nicht vorhanden, bleibt der Button deaktiviert.
 try:
@@ -34,6 +37,50 @@ def _fmt_money(x):
         return f"{float(x):.2f}"
     except Exception:
         return "0.00"
+
+
+def _is_frozen():
+    return getattr(sys, "frozen", False)
+
+def _app_base_dir():
+    return os.path.dirname(sys.executable) if _is_frozen() else os.path.dirname(os.path.abspath(sys.argv[0]))
+
+def _resource_path(p: str) -> str:
+    if not p:
+        return ""
+    return p if os.path.isabs(p) else os.path.join(_app_base_dir(), p)
+
+def _fetch_logo_blob():
+    con = get_db()
+    with con.cursor() as cur:
+        cur.execute("SELECT logo FROM rechnung_layout WHERE id=%s LIMIT 1", [1])
+        row = cur.fetchone()
+        if not row:
+            return None
+        try:
+            v = row["logo"] if isinstance(row, dict) else row[0]
+        except Exception:
+            try:
+                v = row["logo"]
+            except Exception:
+                v = None
+        if isinstance(v, memoryview):
+            v = v.tobytes()
+        return v if isinstance(v, (bytes, bytearray)) and len(v) > 0 else None
+
+def _draw_header_with_logo(self, canvas, layout_cfg: dict):
+    blob = _fetch_logo_blob()
+    if not blob:
+        return
+    img = ImageReader(BytesIO(blob))
+    x = float(layout_cfg.get("logo_x", 40))
+    y = float(layout_cfg.get("logo_y", 760))
+    w = float(layout_cfg.get("logo_width", 120))
+    h = float(layout_cfg.get("logo_height", 0))
+    if h <= 0:
+        iw, ih = img.getSize()
+        h = w * (ih / iw if iw else 1.0)
+    canvas.drawImage(img, x, y, width=w, height=h, mask="auto")
 
 
 class RechnungDialog(QDialog):
@@ -449,19 +496,4 @@ class RechnungDialog(QDialog):
                 "gesamt": _to_float(self.le_total.text(), 0.0)
             }
         }
-
-
-class RechnungLayoutDialog(QDialog):
-    def __init__(self, parent: QWidget = None):
-        super().__init__(parent)
-        self.setWindowTitle("Rechnungslayout bearbeiten (Platzhalter)")
-        self.resize(400, 200)
-        lay = QVBoxLayout(self)
-        lay.addWidget(QLabel(
-            "Dieses Dialogfenster ist ein Platzhalter.\n"
-            "Falls du ein echtes Layout-UI brauchst, sag Bescheid."
-        ))
-        btn = QPushButton("Schließen")
-        btn.clicked.connect(self.reject)
-        lay.addWidget(btn)
 
