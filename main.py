@@ -13,7 +13,7 @@ from PyQt5.QtGui import QIcon
 
 import resources_rc
 from gui.benutzer_dialog import BenutzerVerwaltenDialog
-from login import init_db as init_login_db, LoginDialog
+from login import init_login_db, LoginDialog
 
 try:
     from db_setup_dialog import DBSetupDialog

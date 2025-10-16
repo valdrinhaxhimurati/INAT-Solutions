@@ -1,4 +1,6 @@
-﻿import sqlite3
+﻿import os
+import sys
+import sqlite3
 import bcrypt
 from PyQt5.QtWidgets import (
     QDialog, QVBoxLayout, QLabel, QLineEdit,
@@ -7,10 +9,6 @@ from PyQt5.QtWidgets import (
 from PyQt5.QtCore import Qt
 from PyQt5.QtGui import QIcon
 
-import sys
-import os
-
-
 def resource_path(relative_path):
     try:
         base_path = sys._MEIPASS
@@ -18,48 +16,44 @@ def resource_path(relative_path):
         base_path = os.path.abspath(".")
     return os.path.join(base_path, relative_path)
 
-def init_db(db_path):
-    conn = sqlite3.connect(db_path)
-    cursor = conn.cursor()
-    cursor.execute('''
-        CREATE TABLE IF NOT EXISTS users (
-            id SERIAL PRIMARY KEY,
-            username TEXT UNIQUE NOT NULL,
-            password_hash BLOB NOT NULL
-        )
-    ''')
-    conn.commit()
-    conn.close()
+def _app_dir():
+    return os.path.dirname(sys.executable) if getattr(sys, "frozen", False) else os.path.dirname(os.path.abspath(sys.argv[0]))
 
-def get_users(db_path):
-    conn = sqlite3.connect(db_path)
-    cursor = conn.cursor()
-    cursor.execute("SELECT username FROM users")
-    users = [row[0] for row in cursor.fetchall()]
-    conn.close()
-    return users
+def _db_dir():
+    d = os.path.join(_app_dir(), "db")
+    os.makedirs(d, exist_ok=True)
+    return d
 
-def add_user(db_path, username, password):
-    conn = sqlite3.connect(db_path)
-    cursor = conn.cursor()
-    cursor.execute("SELECT id FROM users WHERE username = %s", (username,))
-    if cursor.fetchone():
-        conn.close()
-        return False
-    hash_pw = bcrypt.hashpw(password.encode(), bcrypt.gensalt())
-    cursor.execute("INSERT INTO users (username, password_hash) VALUES (%s, %s)", (username, hash_pw))
-    conn.commit()
-    conn.close()
-    return True
+LOGIN_DB_PATH = os.path.join(_db_dir(), "users.db")
 
-def delete_user(db_path, username):
-    conn = sqlite3.connect(db_path)
-    cursor = conn.cursor()
-    cursor.execute("DELETE FROM users WHERE username = %s", (username,))
-    conn.commit()
-    deleted = cursor.rowcount
-    conn.close()
-    return deleted > 0
+_SCHEMA = """
+PRAGMA journal_mode=WAL;
+CREATE TABLE IF NOT EXISTS users (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  username TEXT UNIQUE NOT NULL,
+  password_hash TEXT NOT NULL,
+  role TEXT DEFAULT 'user',
+  active INTEGER DEFAULT 1,
+  created_at TEXT DEFAULT CURRENT_TIMESTAMP
+);
+"""
+
+def init_login_db(path: str) -> None:
+    con = sqlite3.connect(path)
+    try:
+        con.executescript(_SCHEMA)
+        con.commit()
+    finally:
+        con.close()
+
+# beim Import sicherstellen
+init_login_db(LOGIN_DB_PATH)
+
+def get_login_db_path() -> str:
+    return LOGIN_DB_PATH
+
+def get_conn():
+    return sqlite3.connect(LOGIN_DB_PATH)
 
 class LoginDialog(QDialog):
     def __init__(self, db_path, parent=None):
@@ -129,3 +123,38 @@ class LoginDialog(QDialog):
             self.accept()
         else:
             QMessageBox.warning(self, "Fehler", "Benutzername oder Passwort falsch")
+
+# SQLite-Initfunktion (falls nicht vorhanden) und Legacy-Alias bereitstellen
+try:
+    init_login_db  # type: ignore[name-defined]
+except NameError:
+    import os, sys, sqlite3
+    def _app_dir():
+        return os.path.dirname(sys.executable) if getattr(sys, "frozen", False) else os.path.dirname(os.path.abspath(sys.argv[0]))
+    def _db_dir():
+        d = os.path.join(_app_dir(), "db"); os.makedirs(d, exist_ok=True); return d
+    LOGIN_DB_PATH = os.path.join(_db_dir(), "users.db")
+    _SCHEMA = """
+    PRAGMA journal_mode=WAL;
+    CREATE TABLE IF NOT EXISTS users (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      username TEXT UNIQUE NOT NULL,
+      password_hash TEXT NOT NULL,
+      role TEXT DEFAULT 'user',
+      active INTEGER DEFAULT 1,
+      created_at TEXT DEFAULT CURRENT_TIMESTAMP
+    );
+    """
+    def init_login_db(path: str = None):
+        if path is None:
+            path = LOGIN_DB_PATH
+        con = sqlite3.connect(path)
+        try:
+            con.executescript(_SCHEMA)
+            con.commit()
+        finally:
+            con.close()
+
+# Legacy-Name, den main.py erwartet
+def init_db(path: str = None):
+    return init_login_db(path)

@@ -7,6 +7,7 @@ from PyQt5.QtWidgets import (
 from PyQt5.QtCore import Qt
 from db_connection import get_db, get_remote_status, clear_business_database
 from gui.clear_database_dialog import ClearDatabaseDialog
+from login import LOGIN_DB_PATH
 
 
 def _load_cfg_with_fallback(path):
@@ -263,16 +264,6 @@ class EinstellungenTab(QWidget):
         KategorienDialog(self).exec_()
 
     def _open_benutzer_dialog(self):
-        dlg_class = None
-        try:
-            mod = importlib.import_module("gui.benutzer_verwalten_dialog")
-            dlg_class = getattr(mod, "BenutzerVerwaltenDialog")
-        except Exception:
-            try:
-                mod = importlib.import_module("gui.benutzer_dialog")
-                dlg_class = getattr(mod, "BenutzerVerwaltenDialog")
-            except Exception as e:
-                QMessageBox.warning(self, "Benutzer", f"Dialog nicht gefunden:\n{e}")
-                return
-        dlg = dlg_class(self._login_db_path(), self)
+        from gui.benutzer_dialog import BenutzerVerwaltenDialog
+        dlg = BenutzerVerwaltenDialog(LOGIN_DB_PATH, self)
         dlg.exec_()

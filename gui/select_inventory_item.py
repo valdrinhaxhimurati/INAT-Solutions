@@ -2,8 +2,14 @@
 
 from PyQt5 import QtWidgets, QtCore
 from db_connection import get_db, dict_cursor_factory
+import sqlite3
 
 INVENTORY_TABLE = "artikellager"  # fester Tabellenname
+
+
+def _is_sqlite(con) -> bool:
+    base = getattr(con, "_con", con)  # unwrap evtl. Wrapper
+    return isinstance(base, sqlite3.Connection)
 
 
 class SelectInventoryItemDialog(QtWidgets.QDialog):
@@ -79,7 +85,7 @@ class SelectInventoryItemDialog(QtWidgets.QDialog):
                 where.append("COALESCE(bestand,0) > 0")
             where_sql = f"WHERE {' AND '.join(where)}" if where else ""
 
-            # Preis existiert nicht -> alias als 0.00
+            # Dialektfrei: kein "public.", kein "::numeric"
             sql = f"""
                 SELECT
                     artikel_id,
@@ -87,19 +93,35 @@ class SelectInventoryItemDialog(QtWidgets.QDialog):
                     COALESCE(bezeichnung,'')   AS bezeichnung,
                     COALESCE(bestand,0)        AS bestand,
                     COALESCE(lagerort,'')      AS lagerort,
-                    0.0::numeric               AS preis
-                FROM public.{INVENTORY_TABLE}
+                    0.0                        AS preis
+                FROM {INVENTORY_TABLE}
                 {where_sql}
                 ORDER BY bezeichnung ASC
                 LIMIT 200
             """
+            # SQLite nutzt "?"-Platzhalter; PostgreSQL "%s"
+            if _is_sqlite(con):
+                sql = sql.replace("%s", "?")
+
             try:
                 cur.execute(sql, args)
-                rows = cur.fetchall()   # Liste von Dicts
-                # Sicherstellen, dass alle Keys existieren
+                rows = cur.fetchall()
+                # Rows -> Dicts normalisieren (sqlite3.Row, tuples, dicts)
+                desc = [d[0] for d in cur.description] if getattr(cur, "description", None) else None
+                norm = []
                 for r in rows:
-                    r.setdefault("preis", 0)
-                return rows
+                    if isinstance(r, dict):
+                        d = r
+                    elif isinstance(r, sqlite3.Row):
+                        d = {k: r[k] for k in r.keys()}
+                    elif desc is not None:
+                        d = dict(zip(desc, r))
+                    else:
+                        d = {}
+                    if d.get("preis") is None:
+                        d["preis"] = 0
+                    norm.append(d)
+                return norm
             except Exception:
                 con.rollback()
                 raise

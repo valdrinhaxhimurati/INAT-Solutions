@@ -1,9 +1,10 @@
 ('C:\\Users\\V.Haxhimurati\\Documents\\GitHub '
- 'Repository\\INAT-Solutions\\build\\main\\INAT_Solutions.exe',
+ 'Repository\\INAT-Solutions\\build\\main\\INAT Solutions.exe',
  False,
  False,
  True,
- 'C:\\Users\\V.Haxhimurati\\AppData\\Local\\Programs\\Python\\Python313\\Lib\\site-packages\\PyInstaller\\bootloader\\images\\icon-windowed.ico',
+ ['C:\\Users\\V.Haxhimurati\\Documents\\GitHub '
+  'Repository\\INAT-Solutions\\favicon.ico'],
  None,
  False,
  False,
@@ -31,7 +32,7 @@
  None,
  None,
  'C:\\Users\\V.Haxhimurati\\Documents\\GitHub '
- 'Repository\\INAT-Solutions\\build\\main\\INAT_Solutions.pkg',
+ 'Repository\\INAT-Solutions\\build\\main\\INAT Solutions.pkg',
  [('pyi-contents-directory _internal', '', 'OPTION'),
   ('PYZ-00.pyz',
    'C:\\Users\\V.Haxhimurati\\Documents\\GitHub '
@@ -64,14 +65,14 @@
    'C:\\Users\\V.Haxhimurati\\Documents\\GitHub '
    'Repository\\INAT-Solutions\\pyi_rescopy.py',
    'PYSOURCE'),
-  ('pyi_rth_inspect',
-   'C:\\Users\\V.Haxhimurati\\AppData\\Local\\Programs\\Python\\Python313\\Lib\\site-packages\\PyInstaller\\hooks\\rthooks\\pyi_rth_inspect.py',
-   'PYSOURCE'),
   ('pyi_rth_pkgutil',
    'C:\\Users\\V.Haxhimurati\\AppData\\Local\\Programs\\Python\\Python313\\Lib\\site-packages\\PyInstaller\\hooks\\rthooks\\pyi_rth_pkgutil.py',
    'PYSOURCE'),
   ('pyi_rth_multiprocessing',
    'C:\\Users\\V.Haxhimurati\\AppData\\Local\\Programs\\Python\\Python313\\Lib\\site-packages\\PyInstaller\\hooks\\rthooks\\pyi_rth_multiprocessing.py',
+   'PYSOURCE'),
+  ('pyi_rth_inspect',
+   'C:\\Users\\V.Haxhimurati\\AppData\\Local\\Programs\\Python\\Python313\\Lib\\site-packages\\PyInstaller\\hooks\\rthooks\\pyi_rth_inspect.py',
    'PYSOURCE'),
   ('pyi_rth_setuptools',
    'C:\\Users\\V.Haxhimurati\\AppData\\Local\\Programs\\Python\\Python313\\Lib\\site-packages\\PyInstaller\\hooks\\rthooks\\pyi_rth_setuptools.py',
@@ -89,7 +90,7 @@
  [],
  False,
  False,
- 1760631962,
+ 1760632445,
  [('runw.exe',
    'C:\\Users\\V.Haxhimurati\\AppData\\Local\\Programs\\Python\\Python313\\Lib\\site-packages\\PyInstaller\\bootloader\\Windows-64bit-intel\\runw.exe',
    'EXECUTABLE')],

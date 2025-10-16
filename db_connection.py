@@ -39,6 +39,25 @@ def _adapt_sql_for_sqlite(sql: str) -> str:
     sql = _RE_SQLITE_PLACEHOLDER.sub('?', sql)
     return sql
 
+import re, sqlite3
+
+def _is_sqlite(conn) -> bool:
+    return isinstance(getattr(conn, "_con", conn), sqlite3.Connection)
+
+# Dialekterkennung und -Normalisierung nur für SQLite
+def _is_sqlite_cursor(cur) -> bool:
+    try:
+        return cur.__class__.__module__.split('.', 1)[0] == 'sqlite3'
+    except Exception:
+        return False
+
+def _normalize_sql_for_sqlite(sql: str) -> str:
+    # Entfernt Postgres-Details
+    sql = re.sub(r"::[A-Za-z_][A-Za-z0-9_]*", "", sql)  # ::int, ::numeric, ::text ...
+    sql = sql.replace(" ILIKE ", " LIKE ")
+    sql = sql.replace("public.", "")
+    return sql
+
 # --- Wrappers ------------------------------------------------------------
 class CursorWrapper:
     def __init__(self, cur, is_sqlite: bool):
@@ -46,29 +65,17 @@ class CursorWrapper:
         self._is_sqlite = is_sqlite
 
     def execute(self, sql, params=None):
-        if self._is_sqlite:
-            # named params: %(name)s -> ? und dict -> tuple in Reihenfolge
-            if isinstance(params, dict):
-                keys = _RE_NAMED.findall(sql)
-                sql = _RE_SCHEMA_QUAL.sub('', sql)
-                sql = _RE_NAMED.sub('?', sql)
-                params = tuple(params[k] for k in keys)
-            else:
-                sql = _adapt_sql_for_sqlite(sql)
-        if params is None:
-            return self._cur.execute(sql)
-        return self._cur.execute(sql, params)
+        if _is_sqlite_cursor(self._cur):
+            sql = _normalize_sql_for_sqlite(sql)
+            if params is not None:
+                sql = sql.replace("%s", "?")  # Platzhalter an SQLite anpassen
+        return self._cur.execute(sql, params or ())
+
 
     def executemany(self, sql, seq_of_params):
-        if self._is_sqlite:
-            if seq_of_params and isinstance(next(iter(seq_of_params)), dict):
-                keys = _RE_NAMED.findall(sql)
-                sql = _RE_SCHEMA_QUAL.sub('', sql)
-                sql = _RE_NAMED.sub('?', sql)
-                seq_of_params = [tuple(p[k] for k in keys) for p in seq_of_params]
-            else:
-                sql = _adapt_sql_for_sqlite(sql)
-        return self._cur.executemany(sql, seq_of_params)
+        if _is_sqlite_cursor(self._cur):
+            sql = _normalize_sql_for_sqlite(sql).replace("%s", "?")
+        return self._cur.executemany(sql, seq_of_params or [])
 
     def fetchall(self):
         return self._cur.fetchall()

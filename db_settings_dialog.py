@@ -5,7 +5,7 @@ from PyQt5.QtWidgets import (
 )
 from PyQt5.QtCore import Qt
 from urllib.parse import quote
-import json, os, re, psycopg2
+import json, os, re, psycopg2, sys, sqlite3
 
 
 CONFIG_PATHS = [
@@ -179,3 +179,49 @@ class DBSettingsDialog(QDialog):
         _save_cfg(cfg, path)
         QMessageBox.information(self, "Gespeichert", "Einstellungen gespeichert.")
         self.accept()
+
+
+# bevorzugt: ./db/users.db neben der EXE; Fallback: %APPDATA%\INAT Solutions\users.db
+def _app_dir():
+    return os.path.dirname(sys.executable) if getattr(sys, "frozen", False) else os.path.dirname(os.path.abspath(sys.argv[0]))
+
+
+def _appdata_dir():
+    return os.path.join(os.environ.get("APPDATA", _app_dir()), "INAT Solutions")
+
+
+def _resolve_login_db_path() -> str:
+    db_dir = os.path.join(_app_dir(), "db")
+    try:
+        os.makedirs(db_dir, exist_ok=True)
+        return os.path.join(db_dir, "users.db")
+    except Exception:
+        os.makedirs(_appdata_dir(), exist_ok=True)
+        return os.path.join(_appdata_dir(), "users.db")
+
+
+_SCHEMA = """
+PRAGMA journal_mode=WAL;
+CREATE TABLE IF NOT EXISTS users (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  username TEXT UNIQUE NOT NULL,
+  password_hash TEXT NOT NULL,
+  role TEXT DEFAULT 'user',
+  active INTEGER DEFAULT 1,
+  created_at TEXT DEFAULT CURRENT_TIMESTAMP
+);
+"""
+
+
+def init_login_db(path: str) -> None:
+    con = sqlite3.connect(path)
+    try:
+        con.executescript(_SCHEMA)
+        con.commit()
+    finally:
+        con.close()
+
+
+# Globale Variable: überall gleich verwenden
+LOGIN_DB_PATH = _resolve_login_db_path()
+init_login_db(LOGIN_DB_PATH)
