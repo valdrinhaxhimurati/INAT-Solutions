@@ -3,8 +3,7 @@
  False,
  False,
  True,
- ['C:\\Users\\V.Haxhimurati\\Documents\\GitHub '
-  'Repository\\INAT-Solutions\\favicon.ico'],
+ 'C:\\Users\\V.Haxhimurati\\AppData\\Local\\Programs\\Python\\Python313\\Lib\\site-packages\\PyInstaller\\bootloader\\images\\icon-windowed.ico',
  None,
  False,
  False,
@@ -86,7 +85,7 @@
  [],
  False,
  False,
- 1760629768,
+ 1760631002,
  [('runw.exe',
    'C:\\Users\\V.Haxhimurati\\AppData\\Local\\Programs\\Python\\Python313\\Lib\\site-packages\\PyInstaller\\bootloader\\Windows-64bit-intel\\runw.exe',
    'EXECUTABLE')],
