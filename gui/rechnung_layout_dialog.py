@@ -1,11 +1,11 @@
 ﻿# datei: gui/rechnung_layout_dialog.py
 from PyQt5.QtWidgets import QDialog, QVBoxLayout, QLabel, QTextEdit, QPushButton, QHBoxLayout, QMessageBox, QFileDialog, QSlider, QSpinBox
-from PyQt5.QtGui import QPixmap
 from PyQt5.QtCore import Qt
 import mimetypes
 
 from db_connection import get_db, dict_cursor_factory
-from settings_store import get_logo_qpixmap, save_logo_from_file
+from settings_store import get_json, set_json, save_logo_from_file, get_blob
+from PyQt5.QtGui import QPixmap
 
 
 def _row_val(row, key, default=None):
@@ -112,10 +112,15 @@ class RechnungLayoutDialog(QDialog):
         self._init_db_table()
         self.lade_layout()
 
-        # Beim Start vorhandenes Logo aus DB anzeigen
-        pm = get_logo_qpixmap()
-        if pm and hasattr(self, "logo_label"):
-            self.logo_label.setPixmap(pm.scaled(200, 200, aspectRatioMode=Qt.KeepAspectRatio, transformMode=Qt.SmoothTransformation))
+        # Beim Start: Logo-Vorschau aus DB setzen (falls vorhanden)
+        try:
+            data, _ = get_blob("invoice_logo")
+            if data:
+                pm = QPixmap()
+                if pm.loadFromData(data):
+                    self.logo_vorschau.setPixmap(pm)
+        except Exception:
+            pass
 
     def _init_db_table(self):
         conn = get_db()
@@ -242,6 +247,22 @@ class RechnungLayoutDialog(QDialog):
             try: conn.close()
             except Exception: pass
 
+    def _lade_layout_from_db(self):
+        layout = get_json("rechnung_layout")
+        if layout is None:
+            # einmalig aus Datei importieren (falls vorhanden)
+            from settings_store import import_json_if_missing
+            layout = import_json_if_missing("rechnung_layout", "config/rechnung_layout.json") or {}
+        # Widgets füllen (Namen anpassen!)
+        if hasattr(self, "text_kopf"): self.text_kopf.setPlainText(layout.get("kopfzeile", ""))
+        if hasattr(self, "text_einleitung"): self.text_einleitung.setPlainText(layout.get("einleitung", ""))
+        if hasattr(self, "text_fuss"): self.text_fuss.setPlainText(layout.get("fusszeile", ""))
+        # Logo-Vorschau aus DB
+        data, _ = get_blob("invoice_logo")
+        if data and hasattr(self, "logo_vorschau"):
+            pm = QPixmap(); 
+            if pm.loadFromData(data): self.logo_vorschau.setPixmap(pm)
+
     def speichern(self):
         kopf = self.text_kopf.toPlainText()
         einl = self.text_einleitung.toPlainText()
@@ -317,24 +338,14 @@ class RechnungLayoutDialog(QDialog):
         self.accept()
 
     def logo_auswaehlen(self):
-        dateipfad, _ = QFileDialog.getOpenFileName(self, "Logo auswählen", "", "Bilder (*.png *.jpg *.jpeg *.bmp)")
-        if not dateipfad:
-            return
-        self.logo_mime = mimetypes.guess_type(dateipfad)[0] or "application/octet-stream"
-        try:
-            with open(dateipfad, "rb") as f:
-                self.logo_bytes = f.read()
-        except Exception as e:
-            QMessageBox.critical(self, "Fehler", f"Logo konnte nicht gelesen werden:\n{e}")
-            return
-        pm = QPixmap()
-        if pm.loadFromData(self.logo_bytes):
-            self.logo_vorschau.setPixmap(pm)
-            self.btn_logo_entfernen.setEnabled(True)
-        else:
-            QMessageBox.warning(self, "Warnung", "Bild konnte nicht geladen werden.")
-            self.logo_vorschau.clear()
-            self.btn_logo_entfernen.setEnabled(False)
+        pfad, _ = QFileDialog.getOpenFileName(self, "Logo auswählen", "", "Bilder (*.png *.jpg *.jpeg *.bmp)")
+        if not pfad: return
+        save_logo_from_file(pfad)
+        # Vorschau aktualisieren
+        data, _ = get_blob("invoice_logo")
+        if data and hasattr(self, "logo_vorschau"):
+            pm = QPixmap(); 
+            if pm.loadFromData(data): self.logo_vorschau.setPixmap(pm)
 
     def logo_entfernen(self):
         # Logo aus UI und Pending-Status entfernen (DB-Clear passiert beim Speichern)

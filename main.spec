@@ -58,5 +58,5 @@ coll = COLLECT(
     strip=False,
     upx=True,
     upx_exclude=[],
-    name='INAT_Solutions'
+    name='INAT Solutions'
 )

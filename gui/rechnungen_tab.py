@@ -13,6 +13,7 @@ from gui.rechnung_layout_dialog import RechnungLayoutDialog
 from reportlab.lib.pagesizes import A4
 from reportlab.pdfgen import canvas
 from invoice_assets import get_invoice_logo_imagereader
+from settings_store import get_json, import_json_if_missing
 from reportlab.lib.units import mm
 from reportlab.lib import colors
 from reportlab.platypus import Table, TableStyle
@@ -777,10 +778,12 @@ class RechnungenTab(QWidget):
     def zeichne_swiss_qr(self, canvas_obj, rechnung, betrag):
         """Generiert einen Swiss QR-Code und platziert ihn im PDF (via qrbill)."""
         try:
-            with open("config/qr_daten.json", "r", encoding="utf-8") as f:
-                qr_data = json.load(f)
-            creditor = qr_data["creditor"]
-            iban = qr_data["iban"]
+            qr_data = _get_qr_daten()
+            creditor = qr_data.get("creditor") or {
+                'name': "Deine Firma GmbH", 'street': "Musterstrasse 1",
+                'pcode': "8000", 'city': "Zürich", 'country': "CH",
+            }
+            iban = qr_data.get("iban") or "CH5800791123000889012"
             currency = qr_data.get("currency", "CHF")
         except Exception as e:
             creditor = {
@@ -857,3 +860,9 @@ class RechnungenTab(QWidget):
                 c.drawImage(file_path, x, y, width=w, height=h, preserveAspectRatio=True, mask='auto')
         except Exception as e:
             print("Logo-Zeichnung fehlgeschlagen:", e)
+
+def _get_qr_daten():
+    qr = get_json("qr_daten")
+    if qr is None:
+        qr = import_json_if_missing("qr_daten", "config/qr_daten.json") or {}
+    return qr
