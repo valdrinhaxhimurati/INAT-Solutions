@@ -12,29 +12,21 @@ a = Analysis(
         ('INAT SOLUTIONS.png', '.'),
         ('config.json', '.'),
         ('schema.sql', '.'),
-        ('config\\rechnung_layout.json', 'config'),
+        # Entferne diese Zeile, falls Datei/Ordner nicht existiert:
+        # ('config\\rechnung_layout.json', 'config'),
         ('icons', 'icons'),
-        ('gui', 'gui'),
+        ('gui', 'gui'),           # optional; kann bleiben
         ('db', 'db'),
         ('rechnungen', 'rechnungen'),
         ('swissqr', 'swissqr'),
+        # Falls du buchhaltung.csv zur Laufzeit lädst:
+        # ('buchhaltung.csv', '.'),
     ],
     hiddenimports=[
-        'PyQt5.sip',
-        'PyQt5.QtPrintSupport',
-        'PyQt5.QtSvg',
-        'PyQt5.QtGui',
-        'PyQt5.QtCore',
-        'PyQt5.QtWidgets',
-        'reportlab.pdfgen',
-        'reportlab.lib.utils',
-        'reportlab.graphics.renderPM',
-        'reportlab.graphics.renderPDF',
-        'svglib.svglib',
-        'PIL.Image',
-        'packaging',
-        'swissqr',
-        # 'psycopg2', 'psycopg2._psycopg',
+        'PyQt5.sip','PyQt5.QtPrintSupport','PyQt5.QtSvg','PyQt5.QtGui','PyQt5.QtCore','PyQt5.QtWidgets',
+        'reportlab.pdfgen','reportlab.lib.utils','reportlab.graphics.renderPM','reportlab.graphics.renderPDF',
+        'svglib.svglib','PIL.Image','packaging','swissqr',
+        'cairosvg','lxml',
     ],
     hookspath=[],
     runtime_hooks=[],
@@ -55,7 +47,7 @@ exe = EXE(
     strip=False,
     upx=True,
     console=False,
-    icon='icons/app.ico',  # oder 'favicon.ico', falls vorhanden
+    icon='favicon.ico',
 )
 
 coll = COLLECT(
