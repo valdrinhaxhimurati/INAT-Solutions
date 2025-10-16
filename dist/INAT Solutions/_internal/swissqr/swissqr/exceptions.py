@@ -1,2 +1,0 @@
-class StandardViolation(Exception):
-    pass

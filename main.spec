@@ -6,14 +6,15 @@ block_cipher = None
 a = Analysis(
     ['main.py'],
     pathex=['.'],
-    binaries=[],
+    binaries=[],  # PyInstaller sammelt benötigte Qt-DLLs selbst
     datas=[
-        ('style.qss', '.'),
-        ('config.json', '.'),
-        ('schema.sql', '.'),
+        ('style.qss', '.'),                       # Stylesheet neben EXE
+        ('INAT SOLUTIONS.png', '.'),              # Splash-Bild neben EXE
+        ('config.json', '.'),                     # Default-Konfig
+        ('schema.sql', '.'),                      # DB-Schema
         ('config\\rechnung_layout.json', 'config'),
-        ('INAT SOLUTIONS.png', '.'),   # Splash/Logo
-        ('favicon.ico', '.'),          # App-Icon (falls vorhanden)
+        # Optional: nur eintragen, wenn vorhanden
+        # ('favicon.ico', '.'),
     ],
     hiddenimports=[
         'PyQt5.sip',
@@ -22,7 +23,10 @@ a = Analysis(
         'reportlab.pdfgen',
         'reportlab.graphics.renderPM',
         'PIL.Image',
-        'psycopg2', 'psycopg2._psycopg',  # nur relevant, wenn PG genutzt wird
+        'packaging',
+        'swissqr',
+        # Falls du PG nutzt und installiert hast:
+        # 'psycopg2', 'psycopg2._psycopg',
     ],
     hookspath=[],
     runtime_hooks=[],
@@ -43,7 +47,7 @@ exe = EXE(
     strip=False,
     upx=True,
     console=False,
-    icon='favicon.ico',  # falls Datei fehlt, entferne diese Zeile oder füge die Datei hinzu
+    # icon='favicon.ico',  # aktivieren, wenn die Datei existiert
 )
 
 coll = COLLECT(

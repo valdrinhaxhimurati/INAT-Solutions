@@ -2252,10 +2252,6 @@
   ('lzma',
    'C:\\Users\\V.Haxhimurati\\AppData\\Local\\Programs\\Python\\Python313\\Lib\\lzma.py',
    'PYMODULE'),
-  ('main',
-   'C:\\Users\\V.Haxhimurati\\Documents\\GitHub '
-   'Repository\\INAT-Solutions\\main.py',
-   'PYMODULE'),
   ('mimetypes',
    'C:\\Users\\V.Haxhimurati\\AppData\\Local\\Programs\\Python\\Python313\\Lib\\mimetypes.py',
    'PYMODULE'),
