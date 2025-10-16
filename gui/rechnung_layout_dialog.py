@@ -2,11 +2,10 @@
 from PyQt5.QtWidgets import QDialog, QVBoxLayout, QLabel, QTextEdit, QPushButton, QHBoxLayout, QMessageBox, QFileDialog, QSlider, QSpinBox
 from PyQt5.QtGui import QPixmap
 from PyQt5.QtCore import Qt
-from db_connection import get_db, dict_cursor_factory
-import json
-import os
-import sys
 import mimetypes
+
+from db_connection import get_db, dict_cursor_factory
+from settings_store import get_logo_qpixmap, save_logo_from_file
 
 
 def _row_val(row, key, default=None):
@@ -20,8 +19,8 @@ def _row_val(row, key, default=None):
 
 
 class RechnungLayoutDialog(QDialog):
-    def __init__(self, parent=None):
-        super().__init__(parent)
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
         self.setWindowTitle("Rechnungslayout bearbeiten")
         self.setMinimumSize(600, 500)
 
@@ -113,11 +112,18 @@ class RechnungLayoutDialog(QDialog):
         self._init_db_table()
         self.lade_layout()
 
+        # Beim Start vorhandenes Logo aus DB anzeigen
+        pm = get_logo_qpixmap()
+        if pm and hasattr(self, "logo_label"):
+            self.logo_label.setPixmap(pm.scaled(200, 200, aspectRatioMode=Qt.KeepAspectRatio, transformMode=Qt.SmoothTransformation))
+
     def _init_db_table(self):
         conn = get_db()
         try:
-            with conn.cursor() as cur:
-                if getattr(conn, "is_sqlite", False):
+            is_sqlite = getattr(conn, "is_sqlite", False)
+            if is_sqlite:
+                cur = conn.cursor()
+                try:
                     cur.execute("""
                         CREATE TABLE IF NOT EXISTS rechnung_layout (
                             id INTEGER PRIMARY KEY,
@@ -129,7 +135,15 @@ class RechnungLayoutDialog(QDialog):
                             logo_skala  REAL
                         )
                     """)
-                else:
+                    cur.execute("""
+                        INSERT OR IGNORE INTO rechnung_layout (id, kopfzeile, einleitung, fusszeile, logo, logo_mime, logo_skala)
+                        VALUES (1, ?, ?, ?, ?, ?, ?)
+                    """, ("", "", "", None, None, 100.0))
+                finally:
+                    try: cur.close()
+                    except Exception: pass
+            else:
+                with conn.cursor() as cur:
                     cur.execute("""
                         CREATE TABLE IF NOT EXISTS rechnung_layout (
                             id INTEGER PRIMARY KEY,
@@ -141,18 +155,15 @@ class RechnungLayoutDialog(QDialog):
                             logo_skala  REAL
                         )
                     """)
-                # Eintrag id=1 sicherstellen (ON CONFLICT ist in SQLite und PG verfügbar)
-                cur.execute("""
-                    INSERT INTO rechnung_layout (id, kopfzeile, einleitung, fusszeile, logo, logo_mime, logo_skala)
-                    VALUES (1, %s, %s, %s, %s, %s, %s)
-                    ON CONFLICT (id) DO NOTHING
-                """, ("", "", "", None, None, 100.0))
+                    cur.execute("""
+                        INSERT INTO rechnung_layout (id, kopfzeile, einleitung, fusszeile, logo, logo_mime, logo_skala)
+                        VALUES (1, %s, %s, %s, %s, %s, %s)
+                        ON CONFLICT (id) DO NOTHING
+                    """, ("", "", "", None, None, 100.0))
             conn.commit()
         finally:
-            try:
-                conn.close()
-            except Exception:
-                pass
+            try: conn.close()
+            except Exception: pass
 
     # --- Helpers für 10%-Schritte ---
     def _snap10(self, v: float) -> int:
@@ -248,9 +259,9 @@ class RechnungLayoutDialog(QDialog):
                 except Exception:
                     logo_param = bytes(logo_param)
 
-            with conn.cursor() as cur:
-                if is_sqlite:
-                    # Tabelle sicherstellen
+            if is_sqlite:
+                cur = conn.cursor()
+                try:
                     cur.execute("""
                         CREATE TABLE IF NOT EXISTS rechnung_layout (
                             id INTEGER PRIMARY KEY,
@@ -262,14 +273,16 @@ class RechnungLayoutDialog(QDialog):
                             logo_skala  REAL
                         )
                     """)
-                    # Einfach und robust in SQLite
                     cur.execute("""
                         INSERT OR REPLACE INTO rechnung_layout
                             (id, kopfzeile, einleitung, fusszeile, logo, logo_mime, logo_skala)
                         VALUES (?, ?, ?, ?, ?, ?, ?)
                     """, (1, kopf, einl, fuss, logo_param, self.logo_mime, scale))
-                else:
-                    # PostgreSQL unverändert
+                finally:
+                    try: cur.close()
+                    except Exception: pass
+            else:
+                with conn.cursor() as cur:
                     cur.execute("""
                         CREATE TABLE IF NOT EXISTS rechnung_layout (
                             id INTEGER PRIMARY KEY,
@@ -305,22 +318,23 @@ class RechnungLayoutDialog(QDialog):
 
     def logo_auswaehlen(self):
         dateipfad, _ = QFileDialog.getOpenFileName(self, "Logo auswählen", "", "Bilder (*.png *.jpg *.jpeg *.bmp)")
-        if dateipfad:
-            self.logo_mime = mimetypes.guess_type(dateipfad)[0] or "application/octet-stream"
-            try:
-                with open(dateipfad, "rb") as f:
-                    self.logo_bytes = f.read()
-            except Exception as e:
-                QMessageBox.critical(self, "Fehler", f"Logo konnte nicht gelesen werden:\n{e}")
-                return
-            pm = QPixmap()
-            if pm.loadFromData(self.logo_bytes):
-                self.logo_vorschau.setPixmap(pm)
-                self.btn_logo_entfernen.setEnabled(True)
-            else:
-                QMessageBox.warning(self, "Warnung", "Bild konnte nicht geladen werden.")
-                self.logo_vorschau.clear()
-                self.btn_logo_entfernen.setEnabled(False)
+        if not dateipfad:
+            return
+        self.logo_mime = mimetypes.guess_type(dateipfad)[0] or "application/octet-stream"
+        try:
+            with open(dateipfad, "rb") as f:
+                self.logo_bytes = f.read()
+        except Exception as e:
+            QMessageBox.critical(self, "Fehler", f"Logo konnte nicht gelesen werden:\n{e}")
+            return
+        pm = QPixmap()
+        if pm.loadFromData(self.logo_bytes):
+            self.logo_vorschau.setPixmap(pm)
+            self.btn_logo_entfernen.setEnabled(True)
+        else:
+            QMessageBox.warning(self, "Warnung", "Bild konnte nicht geladen werden.")
+            self.logo_vorschau.clear()
+            self.btn_logo_entfernen.setEnabled(False)
 
     def logo_entfernen(self):
         # Logo aus UI und Pending-Status entfernen (DB-Clear passiert beim Speichern)

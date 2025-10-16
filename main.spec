@@ -6,26 +6,34 @@ block_cipher = None
 a = Analysis(
     ['main.py'],
     pathex=['.'],
-    binaries=[],  # PyInstaller sammelt benötigte Qt-DLLs selbst
+    binaries=[],
     datas=[
-        ('style.qss', '.'),                       # Stylesheet neben EXE
-        ('INAT SOLUTIONS.png', '.'),              # Splash-Bild neben EXE
-        ('config.json', '.'),                     # Default-Konfig
-        ('schema.sql', '.'),                      # DB-Schema
+        ('style.qss', '.'),
+        ('INAT SOLUTIONS.png', '.'),
+        ('config.json', '.'),
+        ('schema.sql', '.'),
         ('config\\rechnung_layout.json', 'config'),
-        # Optional: nur eintragen, wenn vorhanden
-        # ('favicon.ico', '.'),
+        ('icons', 'icons'),
+        ('gui', 'gui'),
+        ('db', 'db'),
+        ('rechnungen', 'rechnungen'),
+        ('swissqr', 'swissqr'),
     ],
     hiddenimports=[
         'PyQt5.sip',
         'PyQt5.QtPrintSupport',
-        'reportlab.lib.utils',
+        'PyQt5.QtSvg',
+        'PyQt5.QtGui',
+        'PyQt5.QtCore',
+        'PyQt5.QtWidgets',
         'reportlab.pdfgen',
+        'reportlab.lib.utils',
         'reportlab.graphics.renderPM',
+        'reportlab.graphics.renderPDF',
+        'svglib.svglib',
         'PIL.Image',
         'packaging',
         'swissqr',
-        # Falls du PG nutzt und installiert hast:
         # 'psycopg2', 'psycopg2._psycopg',
     ],
     hookspath=[],
@@ -41,13 +49,13 @@ exe = EXE(
     a.scripts,
     [],
     exclude_binaries=True,
-    name='INAT Solutions',
+    name='INAT_Solutions',
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,
     upx=True,
     console=False,
-    # icon='favicon.ico',  # aktivieren, wenn die Datei existiert
+    icon='icons/app.ico',  # oder 'favicon.ico', falls vorhanden
 )
 
 coll = COLLECT(
@@ -58,5 +66,5 @@ coll = COLLECT(
     strip=False,
     upx=True,
     upx_exclude=[],
-    name='INAT Solutions'
+    name='INAT_Solutions'
 )

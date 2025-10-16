@@ -12,6 +12,7 @@ from gui.rechnung_dialog import RechnungDialog
 from gui.rechnung_layout_dialog import RechnungLayoutDialog
 from reportlab.lib.pagesizes import A4
 from reportlab.pdfgen import canvas
+from invoice_assets import get_invoice_logo_imagereader
 from reportlab.lib.units import mm
 from reportlab.lib import colors
 from reportlab.platypus import Table, TableStyle
@@ -842,3 +843,17 @@ class RechnungenTab(QWidget):
             os.remove(tmp_svg_path)
         except Exception:
             pass
+
+    def draw_logo_from_db_or_path(c, x, y, w, h, file_path=None):
+        """
+        Zeichnet das Logo an (x,y) mit Breite w und Höhe h.
+        Nimmt zuerst das Logo aus der DB, sonst (Fallback) den übergebenen Dateipfad.
+        """
+        img = get_invoice_logo_imagereader()
+        try:
+            if img is not None:
+                c.drawImage(img, x, y, width=w, height=h, preserveAspectRatio=True, mask='auto')
+            elif file_path:
+                c.drawImage(file_path, x, y, width=w, height=h, preserveAspectRatio=True, mask='auto')
+        except Exception as e:
+            print("Logo-Zeichnung fehlgeschlagen:", e)

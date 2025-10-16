@@ -61,3 +61,13 @@ CREATE TABLE IF NOT EXISTS public.reifenlager (
   ausgelagert_am TEXT,
   bemerkung      TEXT
 );
+
+-- App-weite Einstellungen (Key-Value, inkl. BLOBs wie Logo)
+CREATE TABLE IF NOT EXISTS app_settings (
+  key TEXT PRIMARY KEY,
+  value_bytes BLOB,
+  value_text TEXT,
+  mime TEXT,
+  updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+-- Für PostgreSQL wird BYTEA statt BLOB verwendet (siehe settings_store.py).
