@@ -17,20 +17,21 @@ datas_list = list(filter(None, [
     maybe('schema.sql', '.'),
     maybe(os.path.join('config','rechnung_layout.json'), os.path.join('config')),
     # maybe(os.path.join('config','qr_daten.json'), os.path.join('config')),
+    maybe('favicon.ico', '.'),   # <- .ico mitnehmen (liegt im Projekt-Root)
 ]))
 
 a = Analysis(
     ['main.py'],
     pathex=['.'],
-    binaries=[],               # keine DLLs manuell – PyInstaller sammelt Qt selbst ein
+    binaries=[],
     datas=datas_list,
     hiddenimports=[
-        'PyQt5.sip','PyQt5.QtPrintSupport','PyQt5.QtSvg','PyQt5.QtGui','PyQt5.QtCore','PyQt5.QtWidgets',
-        'reportlab.pdfgen','reportlab.lib.utils','reportlab.graphics.renderPM','reportlab.graphics.renderPDF',
-        'svglib.svglib','PIL.Image','packaging','swissqr','cairosvg','lxml'
+        'PyQt5.sip','PyQt5.QtPrintSupport',
+        'reportlab.lib.utils','reportlab.pdfgen','reportlab.graphics.renderPM',
+        'PIL.Image','packaging','swissqr'
     ],
     hookspath=[],
-    runtime_hooks=[here('pyi_rescopy.py')],   # <- unser Kopier-Hook
+    runtime_hooks=[here('pyi_rescopy.py')],
     excludes=[],
     noarchive=False,
 )
@@ -38,17 +39,14 @@ a = Analysis(
 pyz = PYZ(a.pure, a.zipped_data, cipher=block_cipher)
 
 exe = EXE(
-    pyz,
-    a.scripts,
-    [],
+    pyz, a.scripts, [],
     exclude_binaries=True,
-    name='INAT_Solutions',      # ohne Leerzeichen
+    name='INAT Solutions',
     debug=False,
-    bootloader_ignore_signals=False,
     strip=False,
     upx=True,
     console=False,
-    # icon='favicon.ico',        # nur wenn vorhanden
+    icon='favicon.ico',          # <- EXE-Icon
 )
 
 coll = COLLECT(

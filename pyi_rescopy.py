@@ -36,8 +36,7 @@ def main():
         "config.json",
         "schema.sql",
         "config/rechnung_layout.json",
-        # "config/qr_daten.json",  # falls vorhanden
-        # "favicon.ico",
+        "favicon.ico",            # <- hinzugefügt
     ]
     for rel in needed:
         _copy_first_found(rel, dest_root)
