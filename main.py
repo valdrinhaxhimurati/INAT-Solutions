@@ -14,6 +14,22 @@ from PyQt5.QtGui import QIcon
 import resources_rc
 from gui.benutzer_dialog import BenutzerVerwaltenDialog
 from login import init_login_db, LoginDialog
+from migration import ensure_database
+from paths import logs_dir
+import logging, traceback
+
+LOG_FILE = logs_dir() / "error.log"
+logging.basicConfig(filename=str(LOG_FILE), level=logging.INFO,
+                    format="%(asctime)s %(levelname)s %(message)s")
+
+try:
+    ensure_database()
+except Exception:
+    try:
+        with open(LOG_FILE, "a", encoding="utf-8") as f:
+            traceback.print_exc(file=f)
+    finally:
+        raise
 
 try:
     from db_setup_dialog import DBSetupDialog
@@ -210,7 +226,12 @@ if __name__ == "__main__":
         sys.exit(code)
     except Exception:
         try:
-            with open(os.path.join(APPDATA_DIR, "error.log"), "w", encoding="utf-8") as f:
+            # Logging-Datei in einen beschreibbaren Ordner
+            LOG_FILE = logs_dir() / "error.log"
+            logging.basicConfig(filename=str(LOG_FILE), level=logging.INFO,
+                                format="%(asctime)s %(levelname)s %(message)s")
+
+            with open(LOG_FILE, "a", encoding="utf-8") as f:
                 f.write("Fehler beim Start der Anwendung:\n\n")
                 f.write(traceback.format_exc())
         except Exception:

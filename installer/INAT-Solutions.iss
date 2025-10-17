@@ -5,175 +5,150 @@
 #define MySourceDir "..\dist\INAT Solutions"
 #define MyAssetsDir ".\assets"
 
-#define BrandPrimary   "#4a6fa5"
-#define TextPrimary    "#333333"
-#define TextSecondary  "#666666"
-
 [Setup]
-AppId={{1A0AB0E2-8A5D-4B38-8C2C-1C2F91C1D8E3}
 AppName={#MyAppName}
 AppVersion={#MyAppVersion}
-AppPublisher={#MyAppPublisher}
-DefaultDirName={localappdata}\{#MyAppName}
-DefaultGroupName={#MyAppName}
-OutputDir=output
-OutputBaseFilename=INAT-Solutions-Setup-{#MyAppVersion}
-SetupIconFile={#MySourceDir}\favicon.ico
-UninstallDisplayIcon={app}\{#MyAppExeName}
-Compression=lzma2/ultra
-SolidCompression=yes
-WizardStyle=modern
-WizardResizable=yes
-WizardSizePercent=120
-ArchitecturesInstallIn64BitMode=x64
-PrivilegesRequired=lowest
-UsePreviousAppDir=yes
+DefaultDirName={autopf}\{#MyAppName}     // Program Files
+PrivilegesRequired=admin                 // nötig für Program Files
+ArchitecturesAllowed=x64                 // nur 64‑Bit Windows
+ArchitecturesInstallIn64BitMode=x64      // echte 64‑Bit-Installation
+DisableDirPage=no                        // Nutzer darf Pfad ändern (oder yes, um zu erzwingen)
 SetupLogging=yes
-WizardImageFile={#MyAssetsDir}\wizard-large.bmp
-WizardSmallImageFile={#MyAssetsDir}\wizard-small.bmp
-DisableWelcomePage=no
+DisableProgramGroupPage=yes
+ShowLanguageDialog=yes
+SetupIconFile={#MyAssetsDir}\app.ico
+UninstallDisplayIcon={app}\{#MyAppExeName}
 
 [Languages]
 Name: "de"; MessagesFile: "compiler:Languages\German.isl"
 Name: "en"; MessagesFile: "compiler:Default.isl"
 
+[Dirs]
+; Zentraler Datenordner (schreibbar, leer starten)
+Name: "{commonappdata}\INAT Solutions\data"; Permissions: users-modify; Flags: uninsalwaysuninstall
+Name: "{commonappdata}\INAT Solutions\logs"; Permissions: users-modify; Flags: uninsalwaysuninstall
+
 [Files]
-Source: "{#MySourceDir}\*"; DestDir: "{app}"; Flags: recursesubdirs createallsubdirs ignoreversion
-Source: "{#MyAssetsDir}\header.bmp"; Flags: dontcopy
-Source: "{#MyAssetsDir}\welcome-logo.bmp"; Flags: dontcopy
+; App-Binaries, aber KEINE DBs/Einstellungen mitliefern
+Source: "{#MySourceDir}\*"; DestDir: "{app}"; Flags: recursesubdirs createallsubdirs ignoreversion; \
+  Excludes: "*.db;*.sqlite;*.mdb;*.ldf;*.ndf;*.log;*.json;*.yml;*.yaml;*.ini"
 
-[Tasks]
-Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; Flags: unchecked
+; Optional: leere Default-Config (falls App sie erwartet)
+; Source: ".\installer\assets\empty.json"; DestDir: "{commonappdata}\{#MyAppName}\data"; DestName: "config.json"; Flags: ignoreversion overwritereadonly
+Source: "{#MyAssetsDir}\splash-de.bmp"; Flags: dontcopy
+Source: "{#MyAssetsDir}\splash-en.bmp"; Flags: dontcopy
 
-[Icons]
-Name: "{group}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"
-Name: "{autodesktop}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; Tasks: desktopicon
+[InstallDelete]
+; Vor Installation alles Alte entfernen (DBs/Einstellungen)
+Type: files; Name: "{app}\*.db"
+Type: files; Name: "{app}\*.sqlite"
+Type: files; Name: "{app}\*.json"
+Type: files; Name: "{app}\*.ini"
+Type: files; Name: "{commonappdata}\{#MyAppName}\data\*.*"
+Type: files; Name: "{localappdata}\{#MyAppName}\data\*.*"
+Type: files; Name: "{userappdata}\{#MyAppName}\data\*.*"
 
-[Run]
-Filename: "{app}\{#MyAppExeName}"; Description: "{cm:LaunchProgram,{#StringChange(MyAppName, '&', '&&')}}"; Flags: nowait postinstall skipifsilent
+[UninstallDelete]
+; Beim Deinstallieren Datenordner komplett entfernen
+Type: filesandordirs; Name: "{commonappdata}\{#MyAppName}"
+Type: filesandordirs; Name: "{localappdata}\{#MyAppName}"
+Type: filesandordirs; Name: "{userappdata}\{#MyAppName}"
 
 [Code]
+#ifdef UNICODE
+  #define AW "W"
+#else
+  #define AW "A"
+#endif
+
+const
+  GWL_EXSTYLE   = -20;
+  WS_EX_LAYERED = $00080000;
+  LWA_ALPHA     = $00000002;
+
+function GetWindowLong(hWnd: HWND; nIndex: Integer): Longint;
+  external 'GetWindowLong{#AW}@user32.dll stdcall';
+function SetWindowLong(hWnd: HWND; nIndex: Integer; dwNewLong: Longint): Longint;
+  external 'SetWindowLong{#AW}@user32.dll stdcall';
+function SetLayeredWindowAttributes(hWnd: HWND; crKey: Longint; bAlpha: Byte; dwFlags: Longint): Boolean;
+  external 'SetLayeredWindowAttributes@user32.dll stdcall';
+function GetSystemMetrics(nIndex: Integer): Integer;
+  external 'GetSystemMetrics@user32.dll stdcall';
+
 var
-  HeaderPanel: TPanel;
-  HeaderImg: TBitmapImage;
-  WelcomeLogoImg: TBitmapImage;
-  WelcomeTitleLabel, WelcomeSubLabel: TLabel;
+  SplashForm: TSetupForm;
+  SplashImg: TBitmapImage;
 
-function HexToInt(S: string): Integer; begin Result := StrToIntDef('$' + S, 0); end;
-function MakeColor(R, G, B: Integer): TColor; begin Result := (R) or (G shl 8) or (B shl 16); end;
-function HexToTColor(Hex: string): TColor;
-var R, G, B: Integer;
+procedure FadeOutSplash;
+var i: Integer;
 begin
-  if (Length(Hex) = 7) and (Hex[1] = '#') then begin
-    R := HexToInt(Copy(Hex, 2, 2)); G := HexToInt(Copy(Hex, 4, 2)); B := HexToInt(Copy(Hex, 6, 2));
-    Result := MakeColor(R, G, B);
-  end else Result := clBtnFace;
+  if not Assigned(SplashForm) then Exit;
+  for i := 255 downto 0 do begin
+    if (i mod 13) = 0 then begin
+      SetWindowLong(SplashForm.Handle, GWL_EXSTYLE, GetWindowLong(SplashForm.Handle, GWL_EXSTYLE) or WS_EX_LAYERED);
+      SetLayeredWindowAttributes(SplashForm.Handle, 0, i, LWA_ALPHA);
+      Sleep(25);
+    end;
+  end;
 end;
 
-procedure CreateHeader;
+procedure CloseSplash;
 begin
-  HeaderPanel := TPanel.Create(WizardForm);
-  HeaderPanel.Parent := WizardForm;
-  HeaderPanel.SetBounds(0, 0, WizardForm.ClientWidth, ScaleY(70));
-  HeaderPanel.BevelOuter := bvNone;
-  HeaderPanel.Color := clWhite;
-  HeaderPanel.Anchors := [akLeft, akTop, akRight];
-
-  HeaderImg := TBitmapImage.Create(WizardForm);
-  HeaderImg.Parent := HeaderPanel;
-  try
-    ExtractTemporaryFile('header.bmp');
-    HeaderImg.Bitmap.LoadFromFile(ExpandConstant('{tmp}\header.bmp'));
-    HeaderImg.Left := 0; HeaderImg.Top := 0;
-    HeaderImg.Width := HeaderPanel.Width;
-    HeaderImg.Height := HeaderPanel.Height;
-    HeaderImg.Stretch := True;
-    HeaderImg.Anchors := [akLeft, akTop, akRight];
-  except end;
+  if Assigned(SplashForm) then begin
+    FadeOutSplash;
+    SplashForm.Close;
+    SplashForm.Free;
+    SplashForm := nil;
+  end;
 end;
 
-procedure CreateWelcomePage;
+procedure ShowSplash;
 var
-  cText, cTextSub: TColor;
+  SplashFile, SplashPath: string;
+  Bmp: TBitmap; W, H, SW, SH: Integer;
 begin
-  cText := HexToTColor('{#TextPrimary}');
-  cTextSub := HexToTColor('{#TextSecondary}');
+  if ActiveLanguage = 'de' then SplashFile := 'splash-de.bmp' else SplashFile := 'splash-en.bmp';
+  ExtractTemporaryFile(SplashFile);
+  SplashPath := ExpandConstant('{tmp}\' + SplashFile);
 
-  WizardForm.WelcomeLabel1.Visible := False;
-  WizardForm.WelcomeLabel2.Visible := False;
-
-  { Text links }
-  WelcomeTitleLabel := TLabel.Create(WizardForm);
-  WelcomeTitleLabel.Parent := WizardForm.WelcomePage;
-  WelcomeTitleLabel.Caption := 'Willkommen bei' + #13#10 + '{#MyAppName}';
-  WelcomeTitleLabel.Font.Name := 'Segoe UI';
-  WelcomeTitleLabel.Font.Size := 22;
-  WelcomeTitleLabel.Font.Style := [fsBold];
-  WelcomeTitleLabel.Font.Color := cText;
-  WelcomeTitleLabel.Left := ScaleX(40);
-  WelcomeTitleLabel.Top := ScaleY(100);
-  WelcomeTitleLabel.AutoSize := True;
-
-  WelcomeSubLabel := TLabel.Create(WizardForm);
-  WelcomeSubLabel.Parent := WizardForm.WelcomePage;
-  WelcomeSubLabel.Caption := 'Dieses Setup führt Sie durch die Installation.' + #13#10 + 'Klicken Sie auf „Weiter", um fortzufahren.';
-  WelcomeSubLabel.Font.Name := 'Segoe UI';
-  WelcomeSubLabel.Font.Size := 10;
-  WelcomeSubLabel.Font.Color := cTextSub;
-  WelcomeSubLabel.Left := ScaleX(40);
-  WelcomeSubLabel.Top := WelcomeTitleLabel.Top + WelcomeTitleLabel.Height + ScaleY(24);
-  WelcomeSubLabel.AutoSize := True;
-
-  { Logo rechts }
-  WelcomeLogoImg := TBitmapImage.Create(WizardForm);
-  WelcomeLogoImg.Parent := WizardForm.WelcomePage;
+  Bmp := TBitmap.Create;
   try
-    ExtractTemporaryFile('welcome-logo.bmp');
-    WelcomeLogoImg.Bitmap.LoadFromFile(ExpandConstant('{tmp}\welcome-logo.bmp'));
-    WelcomeLogoImg.Left := WizardForm.WelcomePage.Width - ScaleX(300) - ScaleX(40);
-    WelcomeLogoImg.Top := ScaleY(80);
-    WelcomeLogoImg.Width := ScaleX(300);
-    WelcomeLogoImg.Height := ScaleY(300);
-    WelcomeLogoImg.Stretch := True;
-    WelcomeLogoImg.Anchors := [akTop, akRight];
-  except end;
+    Bmp.LoadFromFile(SplashPath);
+    W := Bmp.Width; H := Bmp.Height;
+  finally
+    Bmp.Free;
+  end;
+
+  SW := GetSystemMetrics(0); SH := GetSystemMetrics(1);
+
+  SplashForm := CreateCustomForm;
+  SplashForm.BorderStyle := bsNone;
+  SplashForm.Color := clWhite;
+  SplashForm.SetBounds((SW - W) div 2, (SH - H) div 2, W, H);
+
+  SetWindowLong(SplashForm.Handle, GWL_EXSTYLE, GetWindowLong(SplashForm.Handle, GWL_EXSTYLE) or WS_EX_LAYERED);
+  SetLayeredWindowAttributes(SplashForm.Handle, 0, 255, LWA_ALPHA);
+
+  SplashImg := TBitmapImage.Create(SplashForm);
+  SplashImg.Parent := SplashForm;
+  SplashImg.SetBounds(0, 0, W, H);
+  SplashImg.Stretch := False;
+  SplashImg.Bitmap.LoadFromFile(SplashPath);
+
+  SplashForm.Show;
+  SplashForm.Refresh;
+  Sleep(5000);
+  CloseSplash;
 end;
 
-procedure AdjustPagePositions;
+function InitializeSetup: Boolean;
 begin
-  WizardForm.InnerPage.Top := HeaderPanel.Height + ScaleY(12);
-  WizardForm.InnerPage.Height := WizardForm.InnerPage.Height - HeaderPanel.Height - ScaleY(12);
-end;
-
-procedure ApplyBranding;
-var cText, cTextSub: TColor;
-begin
-  cText := HexToTColor('{#TextPrimary}');
-  cTextSub := HexToTColor('{#TextSecondary}');
-
-  WizardForm.Color := clWhite;
-  WizardForm.Bevel.Visible := False;
-
-  CreateHeader;
-  CreateWelcomePage;
-  AdjustPagePositions;
-
-  WizardForm.PageNameLabel.Font.Name := 'Segoe UI';
-  WizardForm.PageNameLabel.Font.Size := 14;
-  WizardForm.PageNameLabel.Font.Style := [fsBold];
-  WizardForm.PageNameLabel.Font.Color := cText;
-
-  WizardForm.PageDescriptionLabel.Font.Name := 'Segoe UI';
-  WizardForm.PageDescriptionLabel.Font.Size := 9;
-  WizardForm.PageDescriptionLabel.Font.Color := cTextSub;
-
-  WizardForm.NextButton.Font.Name := 'Segoe UI';
-  WizardForm.NextButton.Font.Style := [fsBold];
-  WizardForm.BackButton.Font.Name := 'Segoe UI';
-  WizardForm.CancelButton.Font.Name := 'Segoe UI';
+  ExtractTemporaryFile('splash-de.bmp');
+  ExtractTemporaryFile('splash-en.bmp');
+  Result := True;
 end;
 
 procedure InitializeWizard;
 begin
-  ApplyBranding;
+  ShowSplash;  // Splash nach Sprachauswahl anzeigen (sprachspezifischer Text)
 end;
