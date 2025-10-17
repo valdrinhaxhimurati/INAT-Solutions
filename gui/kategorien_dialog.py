@@ -3,6 +3,7 @@
     QListWidget, QHBoxLayout, QMessageBox, QLabel,
     QSpacerItem, QSizePolicy
 )
+from paths import data_dir
 import json, os
 from db_connection import get_db, dict_cursor_factory
 class KategorienDialog(QDialog):
@@ -54,13 +55,13 @@ class KategorienDialog(QDialog):
         self.lade_kategorien()
 
     def lade_kategorien(self):
-        if not os.path.exists("config/einstellungen.json"):
+        einstellungen_path = str(data_dir() / "einstellungen.json")
+        if not os.path.exists(einstellungen_path):
             self.kategorien = []
         else:
-            with open("config/einstellungen.json", "r") as f:
+            with open(einstellungen_path, "r") as f:
                 daten = json.load(f)
                 self.kategorien = daten.get("buchhaltungs_kategorien", [])
-
         self.aktualisiere_liste()
 
     def aktualisiere_liste(self):
@@ -87,18 +88,16 @@ class KategorienDialog(QDialog):
             self.speichern()
 
     def speichern(self):
-        if not os.path.exists("config"):
-            os.makedirs("config")
-
+        einstellungen_path = str(data_dir() / "einstellungen.json")
+        if not os.path.exists(data_dir()):
+            os.makedirs(data_dir())
         try:
-            with open("config/einstellungen.json", "r") as f:
+            with open(einstellungen_path, "r") as f:
                 daten = json.load(f)
         except FileNotFoundError:
             daten = {}
-
         daten["buchhaltungs_kategorien"] = self.kategorien
-
-        with open("config/einstellungen.json", "w") as f:
+        with open(einstellungen_path, "w") as f:
             json.dump(daten, f, indent=4)
 
 

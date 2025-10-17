@@ -2,10 +2,10 @@
     QDialog, QVBoxLayout, QLabel, QLineEdit, QPushButton, QMessageBox
 )
 from db_connection import get_db, dict_cursor_factory
-import json
-import os
+from paths import data_dir
+import json, os
 
-CONFIG_PFAD = os.path.join("config", "qr_daten.json")
+CONFIG_PFAD = str(data_dir() / "qr_daten.json")
 
 
 class QRDatenDialog(QDialog):

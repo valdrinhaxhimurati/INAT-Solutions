@@ -9,22 +9,14 @@ from PyQt5.QtWidgets import (
 from PyQt5.QtCore import Qt
 from PyQt5.QtGui import QIcon
 
+from paths import data_dir, users_db_path  # NEU: Fallback auf ProgramData
+
 def resource_path(relative_path):
     try:
         base_path = sys._MEIPASS
     except AttributeError:
         base_path = os.path.abspath(".")
     return os.path.join(base_path, relative_path)
-
-def _app_dir():
-    return os.path.dirname(sys.executable) if getattr(sys, "frozen", False) else os.path.dirname(os.path.abspath(sys.argv[0]))
-
-def _db_dir():
-    d = os.path.join(_app_dir(), "db")
-    os.makedirs(d, exist_ok=True)
-    return d
-
-LOGIN_DB_PATH = os.path.join(_db_dir(), "users.db")
 
 _SCHEMA = """
 PRAGMA journal_mode=WAL;
@@ -38,7 +30,12 @@ CREATE TABLE IF NOT EXISTS users (
 );
 """
 
-def init_login_db(path: str) -> None:
+LOGIN_DB_PATH = str(users_db_path())
+
+def init_login_db(path: str | None = None) -> None:
+    if path is None:
+        path = LOGIN_DB_PATH
+    os.makedirs(os.path.dirname(path), exist_ok=True)
     con = sqlite3.connect(path)
     try:
         con.executescript(_SCHEMA)
@@ -46,14 +43,8 @@ def init_login_db(path: str) -> None:
     finally:
         con.close()
 
-# beim Import sicherstellen
-init_login_db(LOGIN_DB_PATH)
-
-def get_login_db_path() -> str:
-    return LOGIN_DB_PATH
-
-def get_conn():
-    return sqlite3.connect(LOGIN_DB_PATH)
+def get_conn(db_path: str):
+    return sqlite3.connect(db_path)
 
 class LoginDialog(QDialog):
     def __init__(self, db_path, parent=None):
@@ -108,53 +99,26 @@ class LoginDialog(QDialog):
         self.btn_login.clicked.connect(self.check_login)
 
     def check_login(self):
-        username = self.input_user.text()
+        username = self.input_user.text().strip()
         password = self.input_pass.text()
 
         conn = sqlite3.connect(self.db_path)
-        cursor = conn.cursor()
-        cursor.execute("SELECT password_hash FROM users WHERE username = ?", (username,))
-        result = cursor.fetchone()
-        conn.close()
-
-        if result and bcrypt.checkpw(password.encode(), result[0]):
-            self.logged_in_user = username
-            self.login_ok = True
-            self.accept()
-        else:
-            QMessageBox.warning(self, "Fehler", "Benutzername oder Passwort falsch")
-
-# SQLite-Initfunktion (falls nicht vorhanden) und Legacy-Alias bereitstellen
-try:
-    init_login_db  # type: ignore[name-defined]
-except NameError:
-    import os, sys, sqlite3
-    def _app_dir():
-        return os.path.dirname(sys.executable) if getattr(sys, "frozen", False) else os.path.dirname(os.path.abspath(sys.argv[0]))
-    def _db_dir():
-        d = os.path.join(_app_dir(), "db"); os.makedirs(d, exist_ok=True); return d
-    LOGIN_DB_PATH = os.path.join(_db_dir(), "users.db")
-    _SCHEMA = """
-    PRAGMA journal_mode=WAL;
-    CREATE TABLE IF NOT EXISTS users (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      username TEXT UNIQUE NOT NULL,
-      password_hash TEXT NOT NULL,
-      role TEXT DEFAULT 'user',
-      active INTEGER DEFAULT 1,
-      created_at TEXT DEFAULT CURRENT_TIMESTAMP
-    );
-    """
-    def init_login_db(path: str = None):
-        if path is None:
-            path = LOGIN_DB_PATH
-        con = sqlite3.connect(path)
         try:
-            con.executescript(_SCHEMA)
-            con.commit()
+            cursor = conn.cursor()
+            cursor.execute("SELECT password_hash FROM users WHERE username = ?", (username,))
+            row = cursor.fetchone()
         finally:
-            con.close()
+            conn.close()
 
-# Legacy-Name, den main.py erwartet
-def init_db(path: str = None):
-    return init_login_db(path)
+        if row:
+            stored = row[0]
+            # Sicherstellen, dass bytes an bcrypt gehen
+            if isinstance(stored, str):
+                stored = stored.encode("utf-8")
+            if bcrypt.checkpw(password.encode("utf-8"), stored):
+                self.logged_in_user = username
+                self.login_ok = True
+                self.accept()
+                return
+
+        QMessageBox.warning(self, "Fehler", "Benutzername oder Passwort falsch")

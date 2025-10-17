@@ -6,10 +6,13 @@ from PyQt5.QtWidgets import (
 from db_connection import connect_sqlite_at
 from PyQt5.QtWidgets import QLineEdit
 import bcrypt
+from paths import users_db_path
 
 USERS_TABLE = "users"
 
-def _conn(db_path: str):
+def _conn(db_path: str = None):
+    if db_path is None:
+        db_path = str(users_db_path())
     return connect_sqlite_at(db_path)
 
 def _has_column(conn, table: str, col: str) -> bool:

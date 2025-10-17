@@ -17,6 +17,7 @@ from PyQt5.QtGui import QDesktopServices
 import glob
 import shutil
 from PyQt5.QtWidgets import QHeaderView
+from paths import local_db_path, data_dir
 
 import pandas as pd
 
@@ -589,7 +590,9 @@ class BuchhaltungTab(QWidget):
             return
 
         # 4) Zielordner und -datei bestimmen
-        ordner_ziel = os.path.join("rechnungen", jahr)
+        # ALT: ordner_ziel = os.path.join("rechnungen", jahr)
+        # NEU: Zielordner unter ProgramData/data/rechnungen/Jahr
+        ordner_ziel = str(data_dir() / "rechnungen" / jahr)
         os.makedirs(ordner_ziel, exist_ok=True)
 
         dateiname_orig = os.path.basename(pfad_src)
@@ -612,7 +615,9 @@ class BuchhaltungTab(QWidget):
 
         eintrag_id = int(self.table.item(row, 0).text())
         # nach allen PDFs suchen, die mit "<ID>_" anfangen
-        pattern = os.path.join("rechnungen", "*", f"{eintrag_id}_*.pdf")
+        # ALT: pattern = os.path.join("rechnungen", "*", f"{eintrag_id}_*.pdf")
+        # NEU:
+        pattern = str(data_dir() / "rechnungen" / "*" / f"{eintrag_id}_*.pdf")
         treffer = glob.glob(pattern)
         if not treffer:
             QMessageBox.information(self, "Keine Rechnung", "Für diesen Eintrag wurde keine Rechnung gefunden.")
@@ -633,7 +638,7 @@ class BuchhaltungTab(QWidget):
 
         eintrag_id = int(self.table.item(row, 0).text())
         # Suche alle zugehörigen PDFs
-        pattern = os.path.join("rechnungen", "*", f"{eintrag_id}_*.pdf")
+        pattern = str(data_dir() / "rechnungen" / "*" / f"{eintrag_id}_*.pdf")
         files = glob.glob(pattern)
         if not files:
             QMessageBox.information(self, "Keine Rechnung", "Für diesen Eintrag wurde keine Rechnung gefunden.")
@@ -670,7 +675,9 @@ class BuchhaltungTab(QWidget):
         excel_path, _ = QFileDialog.getOpenFileName(self, "Excel auswählen", "", "Excel-Dateien (*.xlsx *.xls)")
         if not excel_path:
             return
-        db_path = "db/datenbank.sqlite"
+        # ALT: db_path = "db/datenbank.sqlite"
+        # NEU: Immer zentralen Pfad verwenden
+        db_path = str(local_db_path())
         df = pd.read_excel(excel_path, sheet_name=0, header=None)
 
         # Finde erste Zeile mit Zahl in Spalte 0

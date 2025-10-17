@@ -3,7 +3,6 @@ import json, os, subprocess, sys, shlex
 
 def write_config_json(target_dir, pg_params):
     cfg = {
-        "db_pfad": "db/users.db",
         "pg": {
             "host": pg_params["host"],
             "port": int(pg_params["port"]),

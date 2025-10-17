@@ -6,11 +6,11 @@ from PyQt5.QtWidgets import (
 from PyQt5.QtCore import Qt
 from urllib.parse import quote
 import json, os, re, psycopg2, sys, sqlite3
+from paths import data_dir
 
 
 CONFIG_PATHS = [
-    os.path.join(os.getcwd(), "config.json"),
-    os.path.join(os.path.dirname(__file__), "config.json"),
+    str(data_dir() / "config.json"),
 ]
 
 
@@ -169,59 +169,19 @@ class DBSettingsDialog(QDialog):
 
     def _save(self):
         url = self._current_url()
-        if not url:
+        if not url and not self.radio_local.isChecked():
             QMessageBox.warning(self, "Fehler", "Bitte vollständige Daten eingeben.")
             return
         cfg, path = _load_cfg_with_fallback()
-        cfg["db_backend"]  = "postgres"
-        cfg["postgres_url"] = url
-        cfg["pg_mode"]     = "local" if self.radio_local.isChecked() else "remote"
+        if self.radio_local.isChecked():
+            # SQLite-Modus aktivieren
+            cfg["db_backend"] = "sqlite"
+            cfg.pop("postgres_url", None)
+            cfg["pg_mode"] = "local"
+        else:
+            cfg["db_backend"] = "postgres"
+            cfg["postgres_url"] = url
+            cfg["pg_mode"] = "remote"
         _save_cfg(cfg, path)
         QMessageBox.information(self, "Gespeichert", "Einstellungen gespeichert.")
         self.accept()
-
-
-# bevorzugt: ./db/users.db neben der EXE; Fallback: %APPDATA%\INAT Solutions\users.db
-def _app_dir():
-    return os.path.dirname(sys.executable) if getattr(sys, "frozen", False) else os.path.dirname(os.path.abspath(sys.argv[0]))
-
-
-def _appdata_dir():
-    return os.path.join(os.environ.get("APPDATA", _app_dir()), "INAT Solutions")
-
-
-def _resolve_login_db_path() -> str:
-    db_dir = os.path.join(_app_dir(), "db")
-    try:
-        os.makedirs(db_dir, exist_ok=True)
-        return os.path.join(db_dir, "users.db")
-    except Exception:
-        os.makedirs(_appdata_dir(), exist_ok=True)
-        return os.path.join(_appdata_dir(), "users.db")
-
-
-_SCHEMA = """
-PRAGMA journal_mode=WAL;
-CREATE TABLE IF NOT EXISTS users (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
-  username TEXT UNIQUE NOT NULL,
-  password_hash TEXT NOT NULL,
-  role TEXT DEFAULT 'user',
-  active INTEGER DEFAULT 1,
-  created_at TEXT DEFAULT CURRENT_TIMESTAMP
-);
-"""
-
-
-def init_login_db(path: str) -> None:
-    con = sqlite3.connect(path)
-    try:
-        con.executescript(_SCHEMA)
-        con.commit()
-    finally:
-        con.close()
-
-
-# Globale Variable: überall gleich verwenden
-LOGIN_DB_PATH = _resolve_login_db_path()
-init_login_db(LOGIN_DB_PATH)

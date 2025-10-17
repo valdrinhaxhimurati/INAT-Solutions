@@ -1,5 +1,6 @@
 # Kopiert Ressourcen aus _internal neben die EXE, damit QSS/Logos gefunden werden.
 import os, shutil, sys
+from paths import data_dir
 
 def _cand_paths():
     bases = []
@@ -33,10 +34,10 @@ def main():
     needed = [
         "style.qss",
         "INAT SOLUTIONS.png",
-        "config.json",
-        "schema.sql",
+        str(data_dir() / "config.json"),
+        str(data_dir() / "schema.sql"),
         "config/rechnung_layout.json",
-        "favicon.ico",            # <- hinzugefügt
+        "favicon.ico",
     ]
     for rel in needed:
         _copy_first_found(rel, dest_root)

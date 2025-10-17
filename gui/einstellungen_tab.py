@@ -7,7 +7,10 @@ from PyQt5.QtWidgets import (
 from PyQt5.QtCore import Qt
 from db_connection import get_db, get_remote_status, clear_business_database
 from gui.clear_database_dialog import ClearDatabaseDialog
-from login import LOGIN_DB_PATH
+from paths import data_dir
+
+# Standardpfad für die Benutzer-DB (Dev: .var, Build: ProgramData)
+USERS_DB_PATH = str(data_dir() / "users.db")
 
 
 def _load_cfg_with_fallback(path):
@@ -108,7 +111,9 @@ class EinstellungenTab(QWidget):
 
     # --- Config ---
     def _cfg_path(self):
-        return os.path.join(os.getcwd(), "config.json")
+        # ALT: return os.path.join(os.getcwd(), "config.json")
+        # NEU:
+        return str(data_dir() / "config.json")
 
     def _load_config(self):
         p = self._cfg_path()
@@ -237,11 +242,10 @@ class EinstellungenTab(QWidget):
             QMessageBox.critical(self, "Fehler", str(e))
 
     def _login_db_path(self) -> str:
-        # Verwende den vom Login mitgegebenen Pfad, sonst Standard db/users.db
+        # Verwende den vom Login mitgegebenen Pfad, sonst Standardpfad
         if self.login_db_path:
             return self.login_db_path
-        base = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
-        return os.path.normpath(os.path.join(base, "db", "users.db"))
+        return USERS_DB_PATH
 
     def _on_clear_database(self):
         dlg = ClearDatabaseDialog(self)
@@ -265,5 +269,5 @@ class EinstellungenTab(QWidget):
 
     def _open_benutzer_dialog(self):
         from gui.benutzer_dialog import BenutzerVerwaltenDialog
-        dlg = BenutzerVerwaltenDialog(LOGIN_DB_PATH, self)
+        dlg = BenutzerVerwaltenDialog(self.login_db_path or USERS_DB_PATH, self)
         dlg.exec_()

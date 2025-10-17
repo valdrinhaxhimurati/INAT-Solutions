@@ -1,8 +1,9 @@
 ﻿# gui/db_conn.py
 import os, json, psycopg2
+from paths import data_dir
 
 def _cfg_path():
-    return os.path.join(os.path.abspath("."), "config.json")
+    return str(data_dir().parent / "config.json")
 
 def _load_cfg():
     with open(_cfg_path(), "r", encoding="utf-8") as f:

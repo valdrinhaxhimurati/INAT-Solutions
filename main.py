@@ -15,52 +15,14 @@ import resources_rc
 from gui.benutzer_dialog import BenutzerVerwaltenDialog
 from login import init_login_db, LoginDialog
 from migration import ensure_database
-from paths import logs_dir
-import logging, traceback
+from paths import logs_dir, data_dir, users_db_path, local_db_path
 
-LOG_FILE = logs_dir() / "error.log"
-logging.basicConfig(filename=str(LOG_FILE), level=logging.INFO,
-                    format="%(asctime)s %(levelname)s %(message)s")
-
-try:
-    ensure_database()
-except Exception:
-    try:
-        with open(LOG_FILE, "a", encoding="utf-8") as f:
-            traceback.print_exc(file=f)
-    finally:
-        raise
-
-try:
-    from db_setup_dialog import DBSetupDialog
-except Exception:
-    DBSetupDialog = None
-
-from db_connection import get_db
-
-try:
-    from version import __version__
-except Exception:
-    __version__ = "0.0.0"
-
-def app_base_dir() -> str:
-    if getattr(sys, "frozen", False):
-        return os.path.dirname(sys.executable)
-    return os.path.dirname(os.path.abspath(__file__))
-
-def resource_path(*parts) -> str:
-    return os.path.join(app_base_dir(), *parts)
-
-APPDATA_DIR = os.path.join(os.environ.get("APPDATA", app_base_dir()), "INAT Solutions")
-os.makedirs(APPDATA_DIR, exist_ok=True)
-
-CONFIG_PATH_DEFAULT = resource_path("config.json")
-CONFIG_PATH = os.path.join(APPDATA_DIR, "config.json")
-LOGIN_DB_PATH = os.path.join(APPDATA_DIR, "users.db")
-DEFAULT_DB_PATH = os.path.join(APPDATA_DIR, "datenbank.sqlite")
+CONFIG_PATH = str(data_dir() / "config.json")
+LOGIN_DB_PATH = str(users_db_path())
+DEFAULT_DB_PATH = str(local_db_path())
 
 def lade_stylesheet(filename="style.qss") -> str:
-    p = resource_path(filename)
+    p = os.path.join(data_dir().parent, filename)
     try:
         with open(p, "r", encoding="utf-8") as f:
             return f.read()
@@ -71,7 +33,7 @@ def benutzer_existieren(db_path: str) -> bool:
     try:
         conn = sqlite3.connect(db_path)
         cur = conn.cursor()
-        cur.execute("CREATE TABLE IF NOT EXISTS users (username TEXT PRIMARY KEY, password TEXT)")
+        # KEIN CREATE TABLE hier (sonst falsches Schema)!
         cur.execute("SELECT COUNT(*) FROM users")
         cnt = cur.fetchone()[0]
         conn.close()
@@ -151,30 +113,25 @@ def run():
     # Update-Check NACH Erzeugen der QApplication
     sync_from_local()
 
-    # DB-Verbindung sicherstellen
+    # DB-Verbindung sicherstellen (Postgres falls konfiguriert, sonst automatisch SQLite)
     try:
         conn = get_db()
         conn.close()
-    except Exception:
-        if DBSetupDialog is None:
-            QMessageBox.critical(None, "Abbruch", "Keine Datenbankverbindung konfiguriert.")
-            return 1
-        dlg = DBSetupDialog()
-        if dlg.exec_() != QDialog.Accepted:
-            QMessageBox.critical(None, "Abbruch", "Keine Datenbankverbindung konfiguriert.")
-            return 1
+    except Exception as e:
+        QMessageBox.critical(None, "Abbruch", f"Datenbankverbindung fehlgeschlagen: {e}")
+        return 1
 
     # Login-DB initialisieren
     init_login_db(LOGIN_DB_PATH)
 
-    # Benutzer sicherstellen
+    # Benutzer sicherstellen (dein Flow bleibt)
     while not benutzer_existieren(LOGIN_DB_PATH):
         QMessageBox.information(None, "Benutzer anlegen", "Es sind noch keine Benutzer vorhanden. Bitte jetzt anlegen.")
         dlg = BenutzerVerwaltenDialog(LOGIN_DB_PATH)
         if dlg.exec_() != QDialog.Accepted:
             return 0
 
-    # Login
+    # Danach sofort Login-Dialog
     login = LoginDialog(LOGIN_DB_PATH)
     rc = login.exec_()
     if rc != QDialog.Accepted and not getattr(login, "login_ok", False):

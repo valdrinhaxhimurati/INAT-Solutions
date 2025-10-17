@@ -5,10 +5,10 @@ import json
 import sqlite3
 import traceback
 from typing import Iterable, List
+import psycopg2
+from paths import data_dir, local_db_path
 
-ROOT = os.path.dirname(__file__)
-CONFIG_PATH = os.path.join(ROOT, "config.json")
-_SQLITE_PATH = os.path.join(ROOT, "db", "datenbank.sqlite")
+CONFIG_PATH = str(data_dir() / "config.json")
 
 # --- Config helpers -------------------------------------------------------
 def _read_config():
@@ -196,39 +196,48 @@ class ConnectionWrapper:
 
 # --- DB connect / policy -------------------------------------------------
 def _sqlite_connect(path=None):
-    os.makedirs(os.path.dirname(_SQLITE_PATH), exist_ok=True)
-    conn = sqlite3.connect(path or _SQLITE_PATH)
-    conn.row_factory = sqlite3.Row   # Dict-Zugriff: r["spalte"]
+    db_path = str(local_db_path())
+    os.makedirs(os.path.dirname(db_path), exist_ok=True)
+    conn = sqlite3.connect(db_path)
+    conn.row_factory = sqlite3.Row
     return ConnectionWrapper(conn, is_sqlite=True)
+
+def get_configured_url() -> str | None:
+    """
+    Lies config.json und gib die PostgreSQL-URL zurück.
+    Unterstützt neue (db_backend/postgres_url) und alte Keys (use_remote/db_url).
+    """
+    cfg = _read_config() or {}
+    # Neu
+    if str(cfg.get("db_backend", "")).lower() == "postgres" and cfg.get("postgres_url"):
+        return cfg.get("postgres_url")
+    # Legacy
+    if cfg.get("use_remote") and cfg.get("db_url"):
+        return cfg.get("db_url")
+    return None
 
 def _try_postgres_connect(dsn):
     import psycopg2
-    conn = psycopg2.connect(dsn)
+    conn = psycopg2.connect(dsn, connect_timeout=8)
     return ConnectionWrapper(conn, is_sqlite=False)
 
-def get_db():
-    """
-    Liefert ConnectionWrapper:
-     - Standard: lokale SQLite
-     - falls in config.json use_remote True und db_url gesetzt -> versucht Postgres, sonst SQLite
-    """
-    cfg = _read_config()
-    use_remote = cfg.get("use_remote", False)
-    remote_url = cfg.get("db_url") or os.environ.get("INAT_DB_URL")
+def _open_sqlite():
+    # Nutzt deine lokale App-DB unter ProgramData
+    db_path = str(local_db_path())
+    os.makedirs(os.path.dirname(db_path), exist_ok=True)
+    conn = sqlite3.connect(db_path)
+    return ConnectionWrapper(conn, is_sqlite=True)
 
-    if use_remote and remote_url:
+def get_db():
+    url = get_configured_url()
+    if url:
         try:
-            return _try_postgres_connect(remote_url)
+            return _try_postgres_connect(url)
         except Exception:
-            # Fallback auf SQLite und Logging
-            try:
-                with open(os.path.join(ROOT, "error.log"), "a", encoding="utf-8") as ef:
-                    ef.write("Postgres connect failed, falling back to SQLite:\n")
-                    ef.write(traceback.format_exc())
-            except Exception:
-                pass
-            return _sqlite_connect()
-    return _sqlite_connect()
+            # Bei Fehler still auf SQLite zurückfallen
+            return _open_sqlite()
+    # Keine URL konfiguriert -> SQLite
+    return _open_sqlite()
 
 def get_local_db():
     """
@@ -237,8 +246,7 @@ def get_local_db():
     return _sqlite_connect()
 
 def get_local_db_path():
-    """Gibt den Pfad zur lokalen SQLite-DB zurück (die auch get_local_db nutzt)."""
-    return _SQLITE_PATH
+    return str(local_db_path())
 
 # --- Settings helpers ----------------------------------------------------
 def enable_remote(db_url):
