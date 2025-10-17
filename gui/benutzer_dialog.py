@@ -229,6 +229,8 @@ class BenutzerVerwaltenDialog(QDialog):
             conn.commit(); conn.close()
             self.ed_user.clear(); self.ed_role.clear()
             self._reload()
+            # Füge hinzu: Schließe den Dialog automatisch nach dem Hinzufügen
+            self.accept()
         except Exception as e:
             QMessageBox.critical(self, "Fehler", str(e))
 

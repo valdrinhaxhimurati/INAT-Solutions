@@ -6,6 +6,8 @@ import shutil
 import subprocess
 import tempfile
 import traceback
+import logging
+from db_connection import get_db
 
 from PyQt5.QtWidgets import QApplication, QMessageBox, QFileDialog, QDialog, QProgressDialog
 from PyQt5.QtCore import Qt
@@ -16,13 +18,21 @@ from gui.benutzer_dialog import BenutzerVerwaltenDialog
 from login import init_login_db, LoginDialog
 from migration import ensure_database
 from paths import logs_dir, data_dir, users_db_path, local_db_path
+from version import __version__
+
+def resource_path(relative_path):
+    try:
+        base_path = sys._MEIPASS
+    except AttributeError:
+        base_path = os.path.abspath(".")
+    return os.path.join(base_path, relative_path)
 
 CONFIG_PATH = str(data_dir() / "config.json")
 LOGIN_DB_PATH = str(users_db_path())
 DEFAULT_DB_PATH = str(local_db_path())
 
 def lade_stylesheet(filename="style.qss") -> str:
-    p = os.path.join(data_dir().parent, filename)
+    p = resource_path(filename)
     try:
         with open(p, "r", encoding="utf-8") as f:
             return f.read()
@@ -124,12 +134,15 @@ def run():
     # Login-DB initialisieren
     init_login_db(LOGIN_DB_PATH)
 
-    # Benutzer sicherstellen (dein Flow bleibt)
+    # Benutzer sicherstellen
     while not benutzer_existieren(LOGIN_DB_PATH):
         QMessageBox.information(None, "Benutzer anlegen", "Es sind noch keine Benutzer vorhanden. Bitte jetzt anlegen.")
         dlg = BenutzerVerwaltenDialog(LOGIN_DB_PATH)
-        if dlg.exec_() != QDialog.Accepted:
-            return 0
+        dlg.exec_()
+        # Nach dem Dialog prüfe erneut, ob Benutzer existieren
+        # Wenn ja, verlasse die Schleife; wenn nicht, zeige den Dialog erneut
+        if benutzer_existieren(LOGIN_DB_PATH):
+            break
 
     # Danach sofort Login-Dialog
     login = LoginDialog(LOGIN_DB_PATH)
@@ -154,24 +167,22 @@ def run():
 
     def open_main():
         mw = MainWindow(benutzername=user, login_db_path=LOGIN_DB_PATH)
-        app._main_window = mw  # Referenz halten
-        mw.show()
+        app._main_window = mw
+        mw.showMaximized()  # Öffne das Fenster maximiert
         if splash:
             try:
-                splash.finish(mw)  # schließt Splash, sobald MainWindow aktiv ist
+                splash.finish(mw)
             except Exception:
                 try: splash.close()
                 except Exception: pass
 
-    # Öffne das MainWindow erst nach dem Splash
     if splash is not None and hasattr(splash, "finished"):
         splash.finished.connect(open_main)
     else:
-        # Fallback: öffne nach kurzer Verzögerung (z. B. 1200 ms)
         from PyQt5.QtCore import QTimer
         QTimer.singleShot(1200, open_main)
 
-    app._splash = splash  # Referenz halten
+    app._splash = splash
     return app.exec_()
 
 if __name__ == "__main__":
@@ -183,16 +194,14 @@ if __name__ == "__main__":
         sys.exit(code)
     except Exception:
         try:
-            # Logging-Datei in einen beschreibbaren Ordner
             LOG_FILE = logs_dir() / "error.log"
             logging.basicConfig(filename=str(LOG_FILE), level=logging.INFO,
-                                format="%(asctime)s %(levelname)s %(message)s")
-
+                                format="%(asctime)s %(levelname)s %(message)s", force=True)
             with open(LOG_FILE, "a", encoding="utf-8") as f:
                 f.write("Fehler beim Start der Anwendung:\n\n")
                 f.write(traceback.format_exc())
         except Exception:
             pass
-        print("Ein Fehler ist aufgetreten. Details wurden in 'error.log' gespeichert.")
+        print(f"Ein Fehler ist aufgetreten. Details wurden in '{LOG_FILE}' gespeichert.")
         sys.exit(1)
 
