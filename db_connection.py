@@ -434,3 +434,69 @@ def clear_selected_tables(tables: Iterable[str]) -> None:
     finally:
         try: conn.close()
         except Exception: pass
+
+import json
+
+# Helper für config.json (DB-Backend, postgres_url, etc.)
+def get_config_value(key: str) -> str | None:
+    conn = get_db()
+    cur = conn.cursor()
+    cur.execute("SELECT value FROM config WHERE key = ?", (key,))
+    row = cur.fetchone()
+    conn.close()
+    return row[0] if row else None
+
+def set_config_value(key: str, value: str):
+    conn = get_db()
+    cur = conn.cursor()
+    cur.execute("INSERT OR REPLACE INTO config (key, value) VALUES (?, ?)", (key, value))
+    conn.commit()
+    conn.close()
+
+# Helper für rechnung_layout.json
+def get_rechnung_layout() -> dict:
+    conn = get_db()
+    cur = conn.cursor()
+    cur.execute("SELECT layout_data FROM rechnung_layout WHERE id = 1")
+    row = cur.fetchone()
+    conn.close()
+    return json.loads(row[0]) if row and row[0] else {}
+
+def set_rechnung_layout(data: dict):
+    conn = get_db()
+    cur = conn.cursor()
+    cur.execute("INSERT OR REPLACE INTO rechnung_layout (id, layout_data) VALUES (1, ?)", (json.dumps(data),))
+    conn.commit()
+    conn.close()
+
+# Helper für einstellungen.json
+def get_einstellungen() -> dict:
+    conn = get_db()
+    cur = conn.cursor()
+    cur.execute("SELECT data FROM einstellungen WHERE id = 1")
+    row = cur.fetchone()
+    conn.close()
+    return json.loads(row[0]) if row and row[0] else {}
+
+def set_einstellungen(data: dict):
+    conn = get_db()
+    cur = conn.cursor()
+    cur.execute("INSERT OR REPLACE INTO einstellungen (id, data) VALUES (1, ?)", (json.dumps(data),))
+    conn.commit()
+    conn.close()
+
+# Helper für qr_daten.json
+def get_qr_daten() -> dict:
+    conn = get_db()
+    cur = conn.cursor()
+    cur.execute("SELECT data FROM qr_daten WHERE id = 1")
+    row = cur.fetchone()
+    conn.close()
+    return json.loads(row[0]) if row and row[0] else {}
+
+def set_qr_daten(data: dict):
+    conn = get_db()
+    cur = conn.cursor()
+    cur.execute("INSERT OR REPLACE INTO qr_daten (id, data) VALUES (1, ?)", (json.dumps(data),))
+    conn.commit()
+    conn.close()

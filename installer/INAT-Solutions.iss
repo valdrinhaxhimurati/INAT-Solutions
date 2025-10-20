@@ -8,16 +8,17 @@
 [Setup]
 AppName={#MyAppName}
 AppVersion={#MyAppVersion}
-DefaultDirName={autopf}\{#MyAppName}     // Program Files
-PrivilegesRequired=admin                 // nötig für Program Files
-ArchitecturesAllowed=x64                 // nur 64‑Bit Windows
-ArchitecturesInstallIn64BitMode=x64      // echte 64‑Bit-Installation
-DisableDirPage=no                        // Nutzer darf Pfad ändern (oder yes, um zu erzwingen)
+DefaultDirName={commonappdata}\{#MyAppName}  
+PrivilegesRequired=admin                    
+ArchitecturesAllowed=x64
+ArchitecturesInstallIn64BitMode=x64
+DisableDirPage=no
 SetupLogging=yes
 DisableProgramGroupPage=yes
 ShowLanguageDialog=yes
 SetupIconFile={#MyAssetsDir}\app.ico
 UninstallDisplayIcon={app}\{#MyAppExeName}
+OutputBaseFilename=INAT Solutions Setup  
 
 [Languages]
 Name: "de"; MessagesFile: "compiler:Languages\German.isl"
@@ -53,6 +54,12 @@ Type: files; Name: "{userappdata}\{#MyAppName}\data\*.*"
 Type: filesandordirs; Name: "{commonappdata}\{#MyAppName}"
 Type: filesandordirs; Name: "{localappdata}\{#MyAppName}"
 Type: filesandordirs; Name: "{userappdata}\{#MyAppName}"
+
+[Tasks]
+Name: "desktopicon"; Description: "Desktop-Verknüpfung erstellen"; GroupDescription: "Zusätzliche Symbole:"; Flags: unchecked
+
+[Icons]
+Name: "{commondesktop}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; Tasks: desktopicon
 
 [Code]
 #ifdef UNICODE

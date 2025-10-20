@@ -1063,10 +1063,6 @@
    'C:\\Users\\V.Haxhimurati\\Documents\\GitHub '
    'Repository\\INAT-Solutions\\db_connection.py',
    'PYMODULE'),
-  ('db_setup_dialog',
-   'C:\\Users\\V.Haxhimurati\\Documents\\GitHub '
-   'Repository\\INAT-Solutions\\db_setup_dialog.py',
-   'PYMODULE'),
   ('decimal',
    'C:\\Users\\V.Haxhimurati\\AppData\\Local\\Programs\\Python\\Python313\\Lib\\decimal.py',
    'PYMODULE'),

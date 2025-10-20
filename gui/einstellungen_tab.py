@@ -5,7 +5,7 @@ from PyQt5.QtWidgets import (
     QLineEdit, QSizePolicy, QFileDialog, QScrollArea, QMessageBox, QInputDialog, QDialog
 )
 from PyQt5.QtCore import Qt
-from db_connection import get_db, get_remote_status, clear_business_database
+from db_connection import get_db, get_remote_status, clear_business_database, get_config_value, set_config_value
 from gui.clear_database_dialog import ClearDatabaseDialog
 from paths import data_dir
 
@@ -116,22 +116,12 @@ class EinstellungenTab(QWidget):
         return str(data_dir() / "config.json")
 
     def _load_config(self):
-        p = self._cfg_path()
-        if not os.path.exists(p):
-            return
-        cfg = _load_cfg_with_fallback(p)
-        self.firmenname_input.setText(cfg.get("firmenname", ""))
-        self.uid_input.setText(cfg.get("uid", ""))
+        self.firmenname_input.setText(get_config_value("firmenname") or "")
+        self.uid_input.setText(get_config_value("uid") or "")
 
     def _save_org(self):
-        p = self._cfg_path()
-        cfg = {}
-        if os.path.exists(p):
-            cfg = _load_cfg_with_fallback(p)
-        cfg["firmenname"] = self.firmenname_input.text().strip()
-        cfg["uid"] = self.uid_input.text().strip()
-        with open(p, "w", encoding="utf-8") as f:
-            json.dump(cfg, f, indent=4, ensure_ascii=False)
+        set_config_value("firmenname", self.firmenname_input.text().strip())
+        set_config_value("uid", self.uid_input.text().strip())
         QMessageBox.information(self, "Gespeichert", "Firmeninformationen gespeichert.")
 
     # --- DB-Settings ---

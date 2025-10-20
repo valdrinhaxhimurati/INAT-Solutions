@@ -1,7 +1,7 @@
 ﻿from PyQt5.QtWidgets import (
     QDialog, QVBoxLayout, QLabel, QLineEdit, QPushButton, QMessageBox
 )
-from db_connection import get_db, dict_cursor_factory
+from db_connection import get_qr_daten, set_qr_daten
 from paths import data_dir
 import json, os
 
@@ -43,49 +43,22 @@ class QRDatenDialog(QDialog):
         self.load_data()
 
     def load_data(self):
-        if os.path.exists(CONFIG_PFAD):
-            try:
-                with open(CONFIG_PFAD, "r", encoding="utf-8") as f:
-                    config = json.load(f)
-                    creditor = config.get("creditor", {})
-                    self.inputs["name"].setText(creditor.get("name", ""))
-                    self.inputs["street"].setText(creditor.get("street", ""))
-                    self.inputs["pcode"].setText(creditor.get("pcode", ""))
-                    self.inputs["city"].setText(creditor.get("city", ""))
-                    self.inputs["country"].setText(creditor.get("country", ""))
-                    self.inputs["iban"].setText(config.get("iban", ""))
-                    self.inputs["currency"].setText(config.get("currency", "CHF"))
-                    self.inputs["reference"].setText(config.get("reference", ""))
-                    self.inputs["unstructured_message"].setText(config.get("unstructured_message", ""))
-            except (json.JSONDecodeError, IOError):
-                pass
+        try:
+            config = get_qr_daten()
+            creditor = config.get("creditor", {})
+            self.inputs["name"].setText(creditor.get("name", ""))
+            self.inputs["street"].setText(creditor.get("street", ""))
+            self.inputs["pcode"].setText(creditor.get("pcode", ""))
+            self.inputs["city"].setText(creditor.get("city", ""))
+            self.inputs["country"].setText(creditor.get("country", ""))
+            self.inputs["iban"].setText(config.get("iban", ""))
+            self.inputs["currency"].setText(config.get("currency", "CHF"))
+            self.inputs["reference"].setText(config.get("reference", ""))
+            self.inputs["unstructured_message"].setText(config.get("unstructured_message", ""))
+        except Exception:
+            pass
 
     def save_data(self):
-        # Pflichtfelder prüfen
-        fehlende_felder = []
-        if not self.inputs["name"].text().strip():
-            fehlende_felder.append("Empfängername")
-        if not self.inputs["street"].text().strip():
-            fehlende_felder.append("Straße")
-        if not self.inputs["pcode"].text().strip():
-            fehlende_felder.append("PLZ")
-        if not self.inputs["city"].text().strip():
-            fehlende_felder.append("Ort")
-        if not self.inputs["country"].text().strip():
-            fehlende_felder.append("Land")
-        if not self.inputs["iban"].text().strip():
-            fehlende_felder.append("IBAN")
-
-        if fehlende_felder:
-            QMessageBox.warning(
-                self,
-                "Pflichtfelder fehlen",
-                "Bitte füllen Sie folgende Felder aus:\n\n" + "\n".join(fehlende_felder)
-            )
-            return  # Nicht speichern!
-        
-        os.makedirs(os.path.dirname(CONFIG_PFAD), exist_ok=True)
-
         daten = {
             "creditor": {
                 "name": self.inputs["name"].text().strip(),
@@ -100,12 +73,11 @@ class QRDatenDialog(QDialog):
             "unstructured_message": self.inputs["unstructured_message"].text().strip(),
             "amount": 0
         }
-
-
-        with open(CONFIG_PFAD, "w", encoding="utf-8") as f:
-            json.dump(daten, f, indent=4)
-
-        QMessageBox.information(self, "Gespeichert", "QR-Rechnungsdaten wurden gespeichert.")
-        self.accept()
+        try:
+            set_qr_daten(daten)
+            QMessageBox.information(self, "Gespeichert", "QR-Rechnungsdaten wurden gespeichert.")
+            self.accept()
+        except Exception as e:
+            QMessageBox.critical(self, "Fehler", f"Speichern fehlgeschlagen: {e}")
 
 

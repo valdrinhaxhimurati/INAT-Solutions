@@ -6,7 +6,7 @@ from PyQt5.QtWidgets import (
 from PyQt5.QtGui import QBrush, QColor
 from reportlab.lib.utils import ImageReader
 import io
-from db_connection import get_db, dict_cursor_factory
+from db_connection import get_db, dict_cursor_factory, get_rechnung_layout
 import json, os, subprocess, tempfile
 from gui.rechnung_dialog import RechnungDialog
 from gui.rechnung_layout_dialog import RechnungLayoutDialog
@@ -149,8 +149,6 @@ class RechnungenTab(QWidget):
             self.uid = ""
 
     def _lade_rechnungslayout(self):
-        """Layout primär aus DB lesen (rechnung_layout), sonst JSON/Defaults"""
-        # Defaults
         self.layout_config = {
             "kopfzeile": {
                 "text": "Deine Firma GmbH\nMusterstraße 1\n8000 Zürich",

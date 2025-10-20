@@ -71,3 +71,27 @@ CREATE TABLE IF NOT EXISTS app_settings (
   updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 -- Für PostgreSQL wird BYTEA statt BLOB verwendet (siehe settings_store.py).
+
+-- Tabelle für allgemeine Konfigurationen (ersetzt config.json)
+CREATE TABLE IF NOT EXISTS config (
+    key TEXT PRIMARY KEY,
+    value TEXT
+);
+
+-- Tabelle für Rechnungslayout (ersetzt rechnung_layout.json)
+CREATE TABLE IF NOT EXISTS rechnung_layout (
+    id INTEGER PRIMARY KEY DEFAULT 1,
+    layout_data TEXT  -- JSON-String speichern
+);
+
+-- Tabelle für Einstellungen (ersetzt einstellungen.json, z.B. Kategorien)
+CREATE TABLE IF NOT EXISTS einstellungen (
+    id INTEGER PRIMARY KEY DEFAULT 1,
+    data TEXT  -- JSON-String speichern
+);
+
+-- Tabelle für QR-Daten (ersetzt qr_daten.json)
+CREATE TABLE IF NOT EXISTS qr_daten (
+    id INTEGER PRIMARY KEY DEFAULT 1,
+    data TEXT  -- JSON-String speichern
+);

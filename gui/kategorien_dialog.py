@@ -5,7 +5,7 @@
 )
 from paths import data_dir
 import json, os
-from db_connection import get_db, dict_cursor_factory
+from db_connection import get_einstellungen, set_einstellungen
 class KategorienDialog(QDialog):
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -55,13 +55,11 @@ class KategorienDialog(QDialog):
         self.lade_kategorien()
 
     def lade_kategorien(self):
-        einstellungen_path = str(data_dir() / "einstellungen.json")
-        if not os.path.exists(einstellungen_path):
+        try:
+            daten = get_einstellungen()
+            self.kategorien = daten.get("buchhaltungs_kategorien", [])
+        except Exception:
             self.kategorien = []
-        else:
-            with open(einstellungen_path, "r") as f:
-                daten = json.load(f)
-                self.kategorien = daten.get("buchhaltungs_kategorien", [])
         self.aktualisiere_liste()
 
     def aktualisiere_liste(self):
@@ -88,16 +86,11 @@ class KategorienDialog(QDialog):
             self.speichern()
 
     def speichern(self):
-        einstellungen_path = str(data_dir() / "einstellungen.json")
-        if not os.path.exists(data_dir()):
-            os.makedirs(data_dir())
         try:
-            with open(einstellungen_path, "r") as f:
-                daten = json.load(f)
-        except FileNotFoundError:
-            daten = {}
-        daten["buchhaltungs_kategorien"] = self.kategorien
-        with open(einstellungen_path, "w") as f:
-            json.dump(daten, f, indent=4)
+            daten = get_einstellungen()
+            daten["buchhaltungs_kategorien"] = self.kategorien
+            set_einstellungen(daten)
+        except Exception as e:
+            QMessageBox.critical(self, "Fehler", f"Speichern fehlgeschlagen: {e}")
 
 

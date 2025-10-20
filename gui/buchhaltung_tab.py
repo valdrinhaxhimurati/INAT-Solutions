@@ -2,7 +2,7 @@
     QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QTableWidget, QTableWidgetItem,
     QMessageBox, QLineEdit, QFileDialog, QComboBox, QLabel, QDateEdit, QAbstractItemView, QToolButton  
 )
-from db_connection import get_db, dict_cursor_factory
+from db_connection import get_db, dict_cursor_factory, get_einstellungen
 from PyQt5.QtCore import Qt, QDate
 from PyQt5.QtGui import QColor, QFont
 import sqlite3
@@ -173,16 +173,11 @@ class BuchhaltungTab(QWidget):
         return "Meine Firma"
 
     def lade_kategorien_aus_einstellungen(self):
-        pfad = "config/einstellungen.json"
-        if not os.path.exists(pfad):
-            return ["Sonstiges"]
         try:
-            with open(pfad, "r") as f:
-                daten = json.load(f)
-            kategorien = daten.get("buchhaltungs_kategorien", [])
-            return kategorien if kategorien else ["Sonstiges"]
+            daten = get_einstellungen()
+            return daten.get("buchhaltungs_kategorien", [])
         except Exception:
-            return ["Sonstiges"]
+            return []
 
     def neuer_eintrag(self):
         while True:
