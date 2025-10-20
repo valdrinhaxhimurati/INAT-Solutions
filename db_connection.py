@@ -500,3 +500,34 @@ def set_qr_daten(data: dict):
     cur.execute("INSERT OR REPLACE INTO qr_daten (id, data) VALUES (1, ?)", (json.dumps(data),))
     conn.commit()
     conn.close()
+
+def ensure_database_and_tables():
+    db_path = str(local_db_path())
+    os.makedirs(os.path.dirname(db_path), exist_ok=True)
+    conn = sqlite3.connect(db_path)
+    conn.execute("""
+    CREATE TABLE IF NOT EXISTS config (
+        key TEXT PRIMARY KEY,
+        value TEXT
+    );
+    """)
+    conn.execute("""
+    CREATE TABLE IF NOT EXISTS rechnung_layout (
+        id INTEGER PRIMARY KEY DEFAULT 1,
+        layout_data TEXT
+    );
+    """)
+    conn.execute("""
+    CREATE TABLE IF NOT EXISTS einstellungen (
+        id INTEGER PRIMARY KEY DEFAULT 1,
+        data TEXT
+    );
+    """)
+    conn.execute("""
+    CREATE TABLE IF NOT EXISTS qr_daten (
+        id INTEGER PRIMARY KEY DEFAULT 1,
+        data TEXT
+    );
+    """)
+    conn.commit()
+    conn.close()

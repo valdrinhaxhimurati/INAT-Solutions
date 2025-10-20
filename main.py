@@ -7,7 +7,7 @@ import subprocess
 import tempfile
 import traceback
 import logging
-from db_connection import get_db
+from db_connection import get_db, ensure_database_and_tables
 
 from PyQt5.QtWidgets import QApplication, QMessageBox, QFileDialog, QDialog, QProgressDialog
 from PyQt5.QtCore import Qt
@@ -133,6 +133,7 @@ def run():
 
     # Login-DB initialisieren
     init_login_db(LOGIN_DB_PATH)
+    ensure_database_and_tables()
 
     # Benutzer sicherstellen
     while not benutzer_existieren(LOGIN_DB_PATH):
