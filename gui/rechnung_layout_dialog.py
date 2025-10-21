@@ -6,7 +6,7 @@ from PyQt5.QtWidgets import (
 from PyQt5.QtCore import Qt
 from PyQt5.QtGui import QPixmap
 from db_connection import get_db
-import os, mimetypes
+import os, mimetypes, sqlite3
 
 def _ensure_table(con):
     """Erstellt die Tabelle rechnung_layout, falls nötig (SQLite/PG)."""
@@ -64,21 +64,200 @@ def _ensure_logo_columns(con):
         cur.execute("ALTER TABLE rechnung_layout ADD COLUMN IF NOT EXISTS logo_mime text")
     con.commit()
 
+def _ensure_rechnung_layout_table_exists(conn):
+    """Stellt sicher, dass Tabelle 'rechnung_layout' und benötigte Spalten existieren."""
+    try:
+        is_sqlite = isinstance(conn, sqlite3.Connection) or "sqlite" in conn.__class__.__module__.lower()
+    except Exception:
+        is_sqlite = False
+
+    cur = conn.cursor()
+    try:
+        if is_sqlite:
+            cur.execute("""
+            CREATE TABLE IF NOT EXISTS rechnung_layout (
+                id TEXT PRIMARY KEY,
+                kopfzeile TEXT,
+                einleitung TEXT,
+                fusszeile TEXT,
+                logo BLOB,
+                logo_mime TEXT,
+                logo_skala REAL
+            )
+            """)
+            conn.commit()
+            # prüfe vorhandene Spalten
+            cur.execute("PRAGMA table_info(rechnung_layout)")
+            existing = {r[1] for r in cur.fetchall()}
+            needed = {
+                "kopfzeile": "TEXT",
+                "einleitung": "TEXT",
+                "fusszeile": "TEXT",
+                "logo": "BLOB",
+                "logo_mime": "TEXT",
+                "logo_skala": "REAL",
+            }
+            for col, typ in needed.items():
+                if col not in existing:
+                    try:
+                        cur.execute(f"ALTER TABLE rechnung_layout ADD COLUMN {col} {typ}")
+                    except Exception:
+                        pass
+            conn.commit()
+        else:
+            # Postgres / andere DBs
+            cur.execute("""
+            CREATE TABLE IF NOT EXISTS rechnung_layout (
+                id TEXT PRIMARY KEY,
+                kopfzeile TEXT,
+                einleitung TEXT,
+                fusszeile TEXT,
+                logo BYTEA,
+                logo_mime TEXT,
+                logo_skala REAL
+            )
+            """)
+            conn.commit()
+            # versuche IF NOT EXISTS Varianten, fallback auf einfache ALTER
+            alter_stmts = [
+                "ALTER TABLE rechnung_layout ADD COLUMN IF NOT EXISTS kopfzeile TEXT",
+                "ALTER TABLE rechnung_layout ADD COLUMN IF NOT EXISTS einleitung TEXT",
+                "ALTER TABLE rechnung_layout ADD COLUMN IF NOT EXISTS fusszeile TEXT",
+                "ALTER TABLE rechnung_layout ADD COLUMN IF NOT EXISTS logo BYTEA",
+                "ALTER TABLE rechnung_layout ADD COLUMN IF NOT EXISTS logo_mime TEXT",
+                "ALTER TABLE rechnung_layout ADD COLUMN IF NOT EXISTS logo_skala REAL",
+            ]
+            for s in alter_stmts:
+                try:
+                    cur.execute(s)
+                except Exception:
+                    try:
+                        # Fallback ohne IF NOT EXISTS
+                        simple = s.replace("ALTER TABLE rechnung_layout ADD COLUMN IF NOT EXISTS ", "ALTER TABLE rechnung_layout ADD COLUMN ")
+                        cur.execute(simple)
+                    except Exception:
+                        pass
+            conn.commit()
+    finally:
+        try:
+            cur.close()
+        except Exception:
+            pass
+
 def _ensure_default_row(con):
-    """Legt Datensatz id=1 an (Upsert für beide Dialekte)."""
-    with con.cursor() as cur:
-        cur.execute("""
+    """Sorgt dafür, dass eine Default-Zeile existiert. Robust gegen unterschiedlichen id-Typen."""
+    try:
+        _ensure_rechnung_layout_table_exists(con)
+    except Exception:
+        pass
+
+    try:
+        is_sqlite = isinstance(con, sqlite3.Connection) or "sqlite" in con.__class__.__module__.lower()
+    except Exception:
+        is_sqlite = False
+
+    cur = con.cursor()
+    try:
+        # Default-Werte
+        defaults = ("", "", "", None, None, 100.0)
+
+        if is_sqlite:
+            # Bestimme Typ der id-Spalte, damit wir keinen datatype mismatch erzeugen
+            try:
+                cur.execute("PRAGMA table_info(rechnung_layout)")
+                info = cur.fetchall()
+                id_type = None
+                for r in info:
+                    # r[1]=name, r[2]=type
+                    if r[1].lower() == "id":
+                        id_type = (r[2] or "").lower()
+                        break
+                id_is_integer = id_type is not None and ("int" in id_type)
+            except Exception:
+                id_is_integer = False
+
+            # Wähle einen id-Wert passend zum Typ
+            id_val = 1 if id_is_integer else "default"
+
+            # INSERT OR IGNORE (fügt nur ein, wenn noch kein Eintrag mit dieser id existiert)
+            try:
+                cur.execute(
+                    "INSERT OR IGNORE INTO rechnung_layout (id, kopfzeile, einleitung, fusszeile, logo, logo_mime, logo_skala) VALUES (?, ?, ?, ?, ?, ?, ?)",
+                    (id_val, *defaults)
+                )
+            except Exception:
+                # Fallback: ohne id (falls id AUTOINCREMENT INTEGER PK und INSERT OR IGNORE scheitert)
+                try:
+                    cur.execute(
+                        "INSERT OR IGNORE INTO rechnung_layout (kopfzeile, einleitung, fusszeile, logo, logo_mime, logo_skala) VALUES (?, ?, ?, ?, ?, ?)",
+                        defaults
+                    )
+                except Exception:
+                    pass
+
+            # Aktualisiere fehlende Felder (nur wenn Spalten NULL sind)
+            try:
+                cur.execute(
+                    """
+                    UPDATE rechnung_layout
+                    SET
+                      kopfzeile = COALESCE(kopfzeile, ?),
+                      einleitung = COALESCE(einleitung, ?),
+                      fusszeile = COALESCE(fusszeile, ?),
+                      logo = COALESCE(logo, ?),
+                      logo_mime = COALESCE(logo_mime, ?),
+                      logo_skala = COALESCE(logo_skala, ?)
+                    WHERE id = ?
+                    """,
+                    (*defaults, id_val)
+                )
+            except Exception:
+                # Falls WHERE id = ? nicht passt (z.B. es wurde ohne id eingefügt), versuche ein generelles UPDATE für NULL-Werte
+                try:
+                    cur.execute(
+                        """
+                        UPDATE rechnung_layout
+                        SET
+                          kopfzeile = COALESCE(kopfzeile, ?),
+                          einleitung = COALESCE(einleitung, ?),
+                          fusszeile = COALESCE(fusszeile, ?),
+                          logo = COALESCE(logo, ?),
+                          logo_mime = COALESCE(logo_mime, ?),
+                          logo_skala = COALESCE(logo_skala, ?)
+                        """,
+                        defaults
+                    )
+                except Exception:
+                    pass
+
+        else:
+            # Nicht-SQLite (z.B. Postgres) — benutzte Platzhalter %s und ON CONFLICT
+            sql = """
             INSERT INTO rechnung_layout (id, kopfzeile, einleitung, fusszeile, logo, logo_mime, logo_skala)
-            VALUES (1, %s, %s, %s, %s, %s, %s)
-            ON CONFLICT (id) DO UPDATE SET
-                kopfzeile=EXCLUDED.kopfzeile,
-                einleitung=EXCLUDED.einleitung,
-                fusszeile=EXCLUDED.fusszeile,
-                logo=COALESCE(rechnung_layout.logo, EXCLUDED.logo),
-                logo_mime=COALESCE(rechnung_layout.logo_mime, EXCLUDED.logo_mime),
-                logo_skala=COALESCE(rechnung_layout.logo_skala, EXCLUDED.logo_skala)
-        """, ("", "", "", None, None, 100.0))
-    con.commit()
+            VALUES (%s, %s, %s, %s, %s, %s, %s)
+            ON CONFLICT(id) DO UPDATE SET
+                kopfzeile = COALESCE(rechnung_layout.kopfzeile, EXCLUDED.kopfzeile),
+                einleitung = COALESCE(rechnung_layout.einleitung, EXCLUDED.einleitung),
+                fusszeile = COALESCE(rechnung_layout.fusszeile, EXCLUDED.fusszeile),
+                logo = COALESCE(rechnung_layout.logo, EXCLUDED.logo),
+                logo_mime = COALESCE(rechnung_layout.logo_mime, EXCLUDED.logo_mime),
+                logo_skala = COALESCE(rechnung_layout.logo_skala, EXCLUDED.logo_skala)
+            """
+            try:
+                cur.execute(sql, ("default", *defaults))
+            except Exception:
+                # Fallback: falls id-Spalte numerisch ist, verwende 1
+                try:
+                    cur.execute(sql, (1, *defaults))
+                except Exception:
+                    pass
+
+        con.commit()
+    finally:
+        try:
+            cur.close()
+        except Exception:
+            pass
 
 def _row_to_dict(cur, row):
     if row is None:

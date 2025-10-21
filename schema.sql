@@ -10,7 +10,8 @@ CREATE TABLE IF NOT EXISTS public.kunden (
   strasse  TEXT,
   stadt    TEXT,
   email    TEXT,
-  anrede   TEXT
+  anrede   TEXT,
+  bemerkung TEXT
 );
 
 -- Rechnungen
@@ -62,6 +63,15 @@ CREATE TABLE IF NOT EXISTS public.reifenlager (
   bemerkung      TEXT
 );
 
+-- Buchhaltung
+CREATE TABLE IF NOT EXISTS public.buchhaltung (
+  buchung_id BIGSERIAL PRIMARY KEY,
+  datum TEXT,
+  betrag REAL,
+  kategorie TEXT,
+  beschreibung TEXT
+);
+
 -- App-weite Einstellungen (Key-Value, inkl. BLOBs wie Logo)
 CREATE TABLE IF NOT EXISTS app_settings (
   key TEXT PRIMARY KEY,
@@ -94,4 +104,122 @@ CREATE TABLE IF NOT EXISTS einstellungen (
 CREATE TABLE IF NOT EXISTS qr_daten (
     id INTEGER PRIMARY KEY DEFAULT 1,
     data TEXT  -- JSON-String speichern
+);
+
+-- =========================
+-- PATCH: Tabellen für SQLite
+-- =========================
+
+-- Kunden
+CREATE TABLE IF NOT EXISTS kunden (
+  kundennr INTEGER PRIMARY KEY AUTOINCREMENT,
+  name     TEXT,
+  firma    TEXT,
+  plz      TEXT,
+  strasse  TEXT,
+  stadt    TEXT,
+  email    TEXT,
+  anrede   TEXT,
+  bemerkung TEXT
+);
+
+-- Reifenlager
+CREATE TABLE IF NOT EXISTS reifenlager (
+  reifen_id INTEGER PRIMARY KEY AUTOINCREMENT,
+  kundennr INTEGER,
+  kunde_anzeige TEXT,
+  fahrzeug TEXT,
+  dimension TEXT,
+  typ TEXT,
+  dot TEXT,
+  lagerort TEXT,
+  eingelagert_am TEXT,
+  ausgelagert_am TEXT,
+  bemerkung TEXT
+);
+
+-- Artikellager
+CREATE TABLE IF NOT EXISTS artikellager (
+  artikel_id INTEGER PRIMARY KEY AUTOINCREMENT,
+  artikelnummer TEXT,
+  bezeichnung TEXT,
+  bestand INTEGER,
+  lagerort TEXT
+);
+
+-- Lieferanten
+CREATE TABLE IF NOT EXISTS lieferanten (
+  lieferantnr INTEGER PRIMARY KEY AUTOINCREMENT,
+  name TEXT,
+  portal_link TEXT,
+  login TEXT,
+  passwort TEXT
+);
+
+-- Buchhaltung
+CREATE TABLE IF NOT EXISTS buchhaltung (
+  buchung_id INTEGER PRIMARY KEY AUTOINCREMENT,
+  datum TEXT,
+  betrag REAL,
+  kategorie TEXT,
+  beschreibung TEXT
+);
+
+-- ============================
+-- PATCH: Tabellen für Postgres
+-- ============================
+
+-- Kunden
+CREATE TABLE IF NOT EXISTS kunden (
+  kundennr BIGSERIAL PRIMARY KEY,
+  name     TEXT,
+  firma    TEXT,
+  plz      TEXT,
+  strasse  TEXT,
+  stadt    TEXT,
+  email    TEXT,
+  anrede   TEXT,
+  bemerkung TEXT
+);
+
+-- Reifenlager
+CREATE TABLE IF NOT EXISTS reifenlager (
+  reifen_id BIGSERIAL PRIMARY KEY,
+  kundennr INTEGER,
+  kunde_anzeige TEXT,
+  fahrzeug TEXT,
+  dimension TEXT,
+  typ TEXT,
+  dot TEXT,
+  lagerort TEXT,
+  eingelagert_am TEXT,
+  ausgelagert_am TEXT,
+  bemerkung TEXT
+);
+
+-- Artikellager
+CREATE TABLE IF NOT EXISTS artikellager (
+  artikel_id BIGSERIAL PRIMARY KEY,
+  artikelnummer TEXT,
+  bezeichnung TEXT,
+  bestand INTEGER,
+  lagerort TEXT
+);
+
+-- Lieferanten
+CREATE TABLE IF NOT EXISTS lieferanten (
+  lieferantnr BIGSERIAL PRIMARY KEY,
+  name TEXT,
+  portal_link TEXT,
+  login TEXT,
+  passwort TEXT
+);
+
+-- Buchhaltung
+CREATE TABLE IF NOT EXISTS buchhaltung (
+  buchung_id BIGSERIAL PRIMARY KEY,
+  datum TEXT,
+  betrag REAL,
+  kategorie TEXT,
+  beschreibung TEXT
 );

@@ -67,21 +67,43 @@ class ReifenlagerTab(QWidget):
     def lade_reifen(self):
         conn = get_db()
         cursor = conn.cursor(cursor_factory=dict_cursor_factory(conn))
-        cursor.execute("""
-            CREATE TABLE IF NOT EXISTS reifenlager (
-                reifen_id SERIAL PRIMARY KEY,
-                kundennr INTEGER,
-                kunde_anzeige TEXT,
-                fahrzeug TEXT,
-                dimension TEXT,
-                typ TEXT,
-                dot TEXT,
-                lagerort TEXT,
-                eingelagert_am TEXT,
-                ausgelagert_am TEXT,
-                bemerkung TEXT
-            )
-        """)
+        # create table with DB-appropriate id type (auto-incrementing primary key)
+        try:
+            is_sqlite = isinstance(conn, sqlite3.Connection) or "sqlite" in conn.__class__.__module__.lower()
+        except Exception:
+            is_sqlite = False
+        if is_sqlite:
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS reifenlager (
+                    reifen_id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    kundennr INTEGER,
+                    kunde_anzeige TEXT,
+                    fahrzeug TEXT,
+                    dimension TEXT,
+                    typ TEXT,
+                    dot TEXT,
+                    lagerort TEXT,
+                    eingelagert_am TEXT,
+                    ausgelagert_am TEXT,
+                    bemerkung TEXT
+                )
+            """)
+        else:
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS reifenlager (
+                    reifen_id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    kundennr INTEGER,
+                    kunde_anzeige TEXT,
+                    fahrzeug TEXT,
+                    dimension TEXT,
+                    typ TEXT,
+                    dot TEXT,
+                    lagerort TEXT,
+                    eingelagert_am TEXT,
+                    ausgelagert_am TEXT,
+                    bemerkung TEXT
+                )
+            """)
         cursor.execute("""SELECT * FROM reifenlager""")
         daten = cursor.fetchall()
 
@@ -112,7 +134,9 @@ class ReifenlagerTab(QWidget):
                     zeilenfarbe_orange = QColor(255, 230, 179)  # #ffe6b3 orange
 
             for col_idx, value in enumerate(row):
-                item = QTableWidgetItem(str(value))
+                # Vermeide "None" in Zellen — leer lassen, falls keine ID vorhanden
+                txt = "" if value is None else str(value)
+                item = QTableWidgetItem(txt)
                 item.setTextAlignment(Qt.AlignLeft | Qt.AlignVCenter)
                 item.setBackground(zeilenfarbe)
                 self.table.setItem(row_idx, col_idx, item)
@@ -129,7 +153,11 @@ class ReifenlagerTab(QWidget):
         self.table.setColumnWidth(7, 125)   # Eingelagert am
         self.table.setColumnWidth(8, 125)   # Ausgelagert am
         self.table.setColumnWidth(9, 170)   # Bemerkung        
-        
+        # keine Zeilennummern (vertical header) anzeigen
+        try:
+            self.table.verticalHeader().setVisible(False)
+        except Exception:
+            pass
         conn.close()
 
     def reifen_hinzufuegen(self):
@@ -139,6 +167,7 @@ class ReifenlagerTab(QWidget):
             daten = dialog.get_daten()
             conn = get_db()
             cursor = conn.cursor(cursor_factory=dict_cursor_factory(conn))
+            # IMPORTANT: reifen_id wird nicht übergeben — DB erzeugt sie automatisch
             cursor.execute("""
                 INSERT INTO reifenlager (kundennr, kunde_anzeige, fahrzeug, dimension, typ, dot, lagerort, eingelagert_am, ausgelagert_am, bemerkung)
                 VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
@@ -149,7 +178,7 @@ class ReifenlagerTab(QWidget):
             ))
             conn.commit()
             conn.close()
-            self.lade_reifen()
+            self.lade_reifen()  # zeigt nach Reload die automatisch vergebene ID
 
     def reifen_bearbeiten(self):
         from gui.reifenlager_dialog import ReifenlagerDialog

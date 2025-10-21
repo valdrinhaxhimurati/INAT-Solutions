@@ -38,8 +38,8 @@ class ArtikellagerTab(QWidget):
     # ---------- DB ----------
     def _ensure_table(self):
         sql = """
-        CREATE TABLE IF NOT EXISTS public.artikellager (
-            artikel_id    BIGSERIAL PRIMARY KEY,
+        CREATE TABLE IF NOT EXISTS artikellager (
+            artikel_id    INTEGER PRIMARY KEY AUTOINCREMENT,
             artikelnummer TEXT,
             bezeichnung   TEXT,
             bestand       INTEGER,

@@ -6,6 +6,7 @@ from PyQt5.QtWidgets import (
 from PyQt5.QtCore import Qt, pyqtSignal
 from db_connection import get_db, dict_cursor_factory
 from gui.kunden_dialog import KundenDialog
+import sqlite3
 
 
 class KundenTab(QWidget):
@@ -17,16 +18,28 @@ class KundenTab(QWidget):
         self.table.setSelectionBehavior(self.table.SelectRows)
         self.table.setSelectionMode(self.table.SingleSelection)
         # Spalten fix definieren, damit das UI konsistent ist
-        self.table.setColumnCount(8)
-        self.table.setHorizontalHeaderLabels(["ID", "Anrede", "Name", "PLZ", "Straße", "Stadt", "E-Mail", "Firma"])
+        # jetzt 9 Spalten: ID + die sichtbaren Felder inklusive "Bemerkung"
+        self.table.setColumnCount(9)
+        self.table.setHorizontalHeaderLabels(["ID", "Anrede", "Name", "Firma", "PLZ", "Straße", "Stadt", "E-Mail", "Bemerkung"])
 
         btn_layout = QVBoxLayout()
-        btn_add = QToolButton(); btn_add.setText("Kunde hinzufügen"); btn_add.setProperty("role", "add")
-        btn_edit = QToolButton(); btn_edit.setText("Kunde bearbeiten"); btn_edit.setProperty("role", "edit")
-        btn_del = QToolButton(); btn_del.setText("Kunde löschen"); btn_del.setProperty("role", "delete")
-        btn_layout.addWidget(btn_add); btn_layout.addWidget(btn_edit); btn_layout.addWidget(btn_del); btn_layout.addStretch()
+        btn_add = QToolButton();
+        btn_add.setText("Kunde hinzufügen");
+        btn_add.setProperty("role", "add")
+        btn_edit = QToolButton();
+        btn_edit.setText("Kunde bearbeiten");
+        btn_edit.setProperty("role", "edit")
+        btn_del = QToolButton();
+        btn_del.setText("Kunde löschen");
+        btn_del.setProperty("role", "delete")
+        btn_layout.addWidget(btn_add);
+        btn_layout.addWidget(btn_edit);
+        btn_layout.addWidget(btn_del);
+        btn_layout.addStretch()
 
-        main = QHBoxLayout(); main.addWidget(self.table); main.addLayout(btn_layout)
+        main = QHBoxLayout();
+        main.addWidget(self.table);
+        main.addLayout(btn_layout)
         self.setLayout(main)
 
         btn_add.clicked.connect(self.kunde_hinzufuegen)
@@ -95,60 +108,121 @@ class KundenTab(QWidget):
     def _ensure_table(self):
         with get_db() as con:
             with con.cursor() as cur:
-                cur.execute("""
-                    CREATE TABLE IF NOT EXISTS public.kunden (
-                        kundennr BIGSERIAL PRIMARY KEY,
-                        name     TEXT,
-                        firma    TEXT,
-                        plz      TEXT,
-                        strasse  TEXT,
-                        stadt    TEXT,
-                        email    TEXT,
-                        anrede   TEXT
+                try:
+                    is_sqlite = isinstance(con, sqlite3.Connection) or "sqlite" in con.__class__.__module__.lower()
+                except Exception:
+                    is_sqlite = False
+
+                if is_sqlite:
+                    cur.execute("""
+                    DROP TABLE IF EXISTS kunden
+                    """)
+                    cur.execute("""
+                    CREATE TABLE kunden (
+                        kundennr INTEGER PRIMARY KEY AUTOINCREMENT,
+                        anrede TEXT,
+                        name TEXT,
+                        firma TEXT,
+                        plz TEXT,
+                        strasse TEXT,
+                        stadt TEXT,
+                        email TEXT,
+                        bemerkung TEXT
                     )
-                """)
+                    """)
+                else:
+                    cur.execute("""
+                    CREATE TABLE IF NOT EXISTS kunden (
+                        kundennr BIGSERIAL PRIMARY KEY,
+                        anrede TEXT,
+                        name TEXT,
+                        firma TEXT,
+                        plz TEXT,
+                        strasse TEXT,
+                        stadt TEXT,
+                        email TEXT,
+                        bemerkung TEXT
+                    )
+                    """)
             con.commit()
 
     def lade_kunden(self):
+        import pprint
         conn = get_db()
         try:
             cols = self._detect_kunden_columns(conn)
-            def alias_or_empty(dbcol, alias): return f"{dbcol} AS {alias}" if dbcol else f"'' AS {alias}"
-            adresse_expr = self._adresse_expr(cols)
-
-            with conn.cursor(cursor_factory=dict_cursor_factory) as cur:
-                cur.execute(f"""
-                    SELECT
-                        {cols['kundennr']} AS kundennr,
-                        {cols['name']}     AS name,
-                        {alias_or_empty(cols.get('anrede'),  'anrede')},
-                        {alias_or_empty(cols.get('email'),   'email')},
-                        {alias_or_empty(cols.get('firma'),   'firma')},
-                        {alias_or_empty(cols.get('plz'),     'plz')},
-                        {alias_or_empty(cols.get('strasse'), 'strasse')},
-                        {alias_or_empty(cols.get('stadt'),   'stadt')},
-                        {adresse_expr} AS adresse
-                    FROM kunden
-                    ORDER BY {cols['kundennr']}
-                """)
+            def alias_or_empty(dbcol, alias): return f"{dbcol} AS {alias}" if dbcol else f"NULL AS {alias}"
+            bemerkung_expr = alias_or_empty(cols.get('bemerkung'), 'bemerkung')
+            sql = f"""
+                SELECT
+                    {cols['kundennr']} AS kundennr,
+                    {alias_or_empty(cols.get('anrede'), 'anrede')},
+                    {cols['name']}     AS name,
+                    {alias_or_empty(cols.get('firma'), 'firma')},
+                    {alias_or_empty(cols.get('plz'), 'plz')},
+                    {alias_or_empty(cols.get('strasse'), 'strasse')},
+                    {alias_or_empty(cols.get('stadt'), 'stadt')},
+                    {alias_or_empty(cols.get('email'), 'email')},
+                    {bemerkung_expr}
+                FROM kunden
+                ORDER BY {cols['kundennr']}
+            """
+            print("\n--- lade_kunden DEBUG ---")
+            print("Spalten-Mapping:", cols)
+            print("SQL:\n", sql)
+            with conn.cursor(cursor_factory=dict_cursor_factory(conn)) as cur:
+                cur.execute(sql)
                 rows = cur.fetchall()
+                print("Rows (raw):")
+                pprint.pprint(rows[:3])
                 if rows and not isinstance(rows[0], dict):
                     cols_desc = [d[0] for d in cur.description]
+                    print("Spalten aus DB:", cols_desc)
                     rows = [dict(zip(cols_desc, row)) for row in rows]
+            print("Rows (dict):")
+            pprint.pprint(rows[:3])
 
-            self.table.setRowCount(len(rows))
-            for i, r in enumerate(rows):
-                rid = int(r.get("kundennr", 0) or 0)
-                it_id = QTableWidgetItem(str(rid)); it_id.setData(Qt.UserRole, rid)
-                self.table.setItem(i, 0, it_id)
-                self.table.setItem(i, 1, QTableWidgetItem(r.get("anrede", "") or ""))
-                self.table.setItem(i, 2, QTableWidgetItem(r.get("name", "") or ""))
-                self.table.setItem(i, 3, QTableWidgetItem(r.get("plz", "") or ""))
-                self.table.setItem(i, 4, QTableWidgetItem(r.get("strasse", "") or ""))
-                self.table.setItem(i, 5, QTableWidgetItem(r.get("stadt", "") or ""))
-                self.table.setItem(i, 6, QTableWidgetItem(r.get("email", "") or ""))
-                self.table.setItem(i, 7, QTableWidgetItem(r.get("firma", "") or ""))
+            col_order = ["kundennr", "anrede", "name", "firma", "plz", "strasse", "stadt", "email", "bemerkung"]
+
+            norm_rows = []
+            for r in rows:
+                if isinstance(r, dict):
+                    vals = tuple(r.get(c) for c in col_order)
+                    norm_rows.append(vals)
+                    continue
+                vals = list(r)
+                if len(vals) < len(col_order):
+                    vals += [None] * (len(col_order) - len(vals))
+                norm_rows.append(tuple(vals[:len(col_order)]))
+            print("Normierte rows (erste 3):")
+            pprint.pprint(norm_rows[:3])
+
+            self.table.setRowCount(len(norm_rows))
+            self.table.setColumnCount(len(col_order))
+            self.table.setHorizontalHeaderLabels(["ID","Anrede","Name","Firma","PLZ","Strasse","Stadt","E-Mail","Bemerkung"])
+            self.table.setColumnHidden(0, False)
+            self.table.setColumnWidth(0, 60)
+
+            for ri, row in enumerate(norm_rows):
+                for ci, val in enumerate(row):
+                    txt = "" if val is None else str(val)
+                    item = QTableWidgetItem(txt)
+                    if ci == 0:
+                        item.setFlags(item.flags() & ~Qt.ItemIsEditable)
+                        try:
+                            item.setData(Qt.UserRole, int(val) if val is not None and str(val).strip() != "" else None)
+                        except Exception:
+                            item.setData(Qt.UserRole, None)
+                    item.setTextAlignment(Qt.AlignLeft | Qt.AlignVCenter)
+                    self.table.setItem(ri, ci, item)
+
+            try:
+                self.table.verticalHeader().setVisible(False)
+            except Exception:
+                pass
+
             self.table.resizeColumnsToContents()
+            print("--- lade_kunden DEBUG ENDE ---\n")
         finally:
             try:
                 conn.close()
@@ -178,23 +252,32 @@ class KundenTab(QWidget):
         if dlg.exec_() == QDialog.Accepted:
             d = dlg.get_daten()
             with get_db() as con:
+                is_sqlite = isinstance(con, sqlite3.Connection) or "sqlite" in con.__class__.__module__.lower()
                 cols = self._detect_kunden_columns(con)
                 field_map = {
+                    "anrede": cols.get("anrede"),
                     "name": cols.get("name"),
+                    "firma": cols.get("firma"),
                     "plz": cols.get("plz"),
                     "strasse": cols.get("strasse"),
                     "stadt": cols.get("stadt"),
                     "email": cols.get("email"),
-                    "firma": cols.get("firma"),
-                    "anrede": cols.get("anrede"),
+                    "bemerkung": cols.get("bemerkung"),
                 }
                 insert_cols = [dbcol for key, dbcol in field_map.items() if dbcol]
                 insert_vals = [d.get(key, "") for key, dbcol in field_map.items() if dbcol]
                 if insert_cols:
-                    placeholders = ", ".join(["%s"] * len(insert_cols))
+                    if is_sqlite:
+                        placeholders = ", ".join(["?"] * len(insert_cols))
+                    else:
+                        placeholders = ", ".join(["%s"] * len(insert_cols))
                     sql = f"INSERT INTO kunden ({', '.join(insert_cols)}) VALUES ({placeholders})"
+                    print("DEBUG INSERT:", sql)
+                    print("DEBUG VALUES:", insert_vals)
                     with con.cursor() as cur:
-                        cur.execute(sql, tuple(insert_vals))
+                        cur.execute(sql, insert_vals)
+                        if is_sqlite:
+                            print("DEBUG lastrowid:", cur.lastrowid)
                 con.commit()
             self.lade_kunden()
             self.kunde_aktualisiert.emit()

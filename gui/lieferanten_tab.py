@@ -56,7 +56,7 @@ class LieferantenTab(QWidget):
         cursor = conn.cursor(cursor_factory=dict_cursor_factory(conn))
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS lieferanten (
-                lieferantnr SERIAL PRIMARY KEY,
+                lieferantnr INTEGER PRIMARY KEY AUTOINCREMENT,
                 name TEXT,
                 portal_link TEXT,
                 login TEXT,

@@ -1,5 +1,5 @@
 ﻿from PyQt5.QtWidgets import (
-    QDialog, QVBoxLayout, QHBoxLayout, QLabel, QLineEdit, QComboBox, QPushButton, QDateEdit
+    QDialog, QVBoxLayout, QHBoxLayout, QLabel, QLineEdit, QComboBox, QPushButton, QDateEdit, QMessageBox
 )
 from db_connection import get_db, dict_cursor_factory
 from PyQt5.QtCore import Qt, QDate
@@ -134,10 +134,23 @@ class ReifenlagerDialog(QDialog):
             out.append((k["kundennr"], display))
         return out
 
+    def accept(self):
+        # keine Pflicht mehr: akzeptieren auch ohne Kundenauswahl (DB vergibt eigene ID)
+        super().accept()
 
     def get_daten(self):
-        return {
-            "kundennr": int(self.kunde_box.currentData()),
+        """Gibt die Dialogdaten zurück. Kundennr ist optional (None erlaubt)."""
+        try:
+            _kd = self.kunde_box.currentData()
+        except Exception:
+            _kd = None
+        try:
+            kundennr_val = int(_kd) if _kd is not None and str(_kd).strip() != "" else None
+        except Exception:
+            kundennr_val = None
+
+        daten = {
+            "kundennr": kundennr_val,
             "kunde_anzeige": self.kunde_box.currentText(),
             "fahrzeug": self.fahrzeug_input.text().strip(),
             "dimension": self.dimension_input.text().strip(),
@@ -148,4 +161,5 @@ class ReifenlagerDialog(QDialog):
             "ausgelagert_am": self.ausgelagert_am_input.date().toString("yyyy-MM-dd"),
             "bemerkung": self.bemerkung_input.text().strip()
         }
+        return daten
 

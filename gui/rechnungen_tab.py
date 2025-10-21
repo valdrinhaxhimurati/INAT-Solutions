@@ -94,42 +94,66 @@ class RechnungenTab(QWidget):
     def initialisiere_datenbank(self):
         with get_db() as conn:
             with conn.cursor() as cursor:
-                # Kunden
-                cursor.execute("""
-                    CREATE TABLE IF NOT EXISTS public.kunden (
-                        kundennr BIGSERIAL PRIMARY KEY,
-                        name     TEXT,
-                        firma    TEXT,
-                        plz      TEXT,
-                        strasse  TEXT,
-                        stadt    TEXT,
-                        email    TEXT,
-                        anrede   TEXT
-                    )
-                """)
-                # Rechnungen
-                cursor.execute("""
-                    CREATE TABLE IF NOT EXISTS public.rechnungen (
-                        id BIGSERIAL PRIMARY KEY,
-                        rechnung_nr TEXT,
-                        kunde TEXT,
-                        firma TEXT,
-                        adresse TEXT,
-                        datum TEXT,
-                        mwst REAL,
-                        zahlungskonditionen TEXT,
-                        positionen TEXT,
-                        uid TEXT,
-                        abschluss TEXT,
-                        abschluss_text TEXT
-                    )
-                """)
-                # Alte DBs: Spalten nachziehen (idempotent)
-                for spalte in ["abschluss", "uid", "firma", "abschluss_text"]:
-                    try:
-                        cursor.execute(f"ALTER TABLE public.rechnungen ADD COLUMN {spalte} TEXT")
-                    except Exception:
-                        pass
+                import sqlite3
+                is_sqlite = isinstance(conn, sqlite3.Connection) or "sqlite" in conn.__class__.__module__.lower()
+                if is_sqlite:
+                    cursor.execute("""
+                        CREATE TABLE IF NOT EXISTS kunden (
+                            kundennr INTEGER PRIMARY KEY AUTOINCREMENT,
+                            name     TEXT,
+                            firma    TEXT,
+                            plz      TEXT,
+                            strasse  TEXT,
+                            stadt    TEXT,
+                            email    TEXT,
+                            anrede   TEXT
+                        )
+                    """)
+                    cursor.execute("""
+                        CREATE TABLE IF NOT EXISTS rechnungen (
+                            id INTEGER PRIMARY KEY AUTOINCREMENT,
+                            rechnung_nr TEXT,
+                            kunde TEXT,
+                            firma TEXT,
+                            adresse TEXT,
+                            datum TEXT,
+                            mwst REAL,
+                            zahlungskonditionen TEXT,
+                            positionen TEXT,
+                            uid TEXT,
+                            abschluss TEXT,
+                            abschluss_text TEXT
+                        )
+                    """)
+                else:
+                    cursor.execute("""
+                        CREATE TABLE IF NOT EXISTS public.kunden (
+                            kundennr BIGSERIAL PRIMARY KEY,
+                            name     TEXT,
+                            firma    TEXT,
+                            plz      TEXT,
+                            strasse  TEXT,
+                            stadt    TEXT,
+                            email    TEXT,
+                            anrede   TEXT
+                        )
+                    """)
+                    cursor.execute("""
+                        CREATE TABLE IF NOT EXISTS public.rechnungen (
+                            id BIGSERIAL PRIMARY KEY,
+                            rechnung_nr TEXT,
+                            kunde TEXT,
+                            firma TEXT,
+                            adresse TEXT,
+                            datum TEXT,
+                            mwst REAL,
+                            zahlungskonditionen TEXT,
+                            positionen TEXT,
+                            uid TEXT,
+                            abschluss TEXT,
+                            abschluss_text TEXT
+                        )
+                    """)
             conn.commit()
 
     def oeffne_rechnungslayout_dialog(self):
