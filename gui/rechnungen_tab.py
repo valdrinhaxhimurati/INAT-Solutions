@@ -415,7 +415,19 @@ class RechnungenTab(QWidget):
     # ---------------- CRUD Rechnungen ----------------
 
     def neue_rechnung(self):
-        dialog = RechnungDialog(self.kunden_liste, self.kunden_firmen, self.kunden_adressen, mwst_voreinstellung=self.mwst)
+        # Vorschlagsnummer aus Buchhaltung holen
+        with get_db() as con:
+            with con.cursor() as cur:
+                cur.execute("SELECT MAX(id) FROM buchhaltung")
+                max_id = cur.fetchone()[0]
+                vorschlag_nr = str((max_id or 0) + 1)
+        dialog = RechnungDialog(
+            self.kunden_liste,
+            self.kunden_firmen,
+            self.kunden_adressen,
+            {"rechnung_nr": vorschlag_nr},
+            mwst_voreinstellung=self.mwst
+        )
         if dialog.exec_() == QDialog.Accepted:
             rechnung = dialog.get_rechnung()
             if not rechnung.get("zahlungskonditionen", "").strip():

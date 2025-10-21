@@ -132,6 +132,7 @@ class RechnungDialog(QDialog):
 
         grid.addWidget(QLabel("Kunde:"), row, 0)
         self.cb_kunde = QComboBox()
+        self.cb_kunde.addItem("")  # Leerer Eintrag als erstes
         self.cb_kunde.addItems(self.kunden_liste)
         grid.addWidget(self.cb_kunde, row, 1)
 

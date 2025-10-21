@@ -180,19 +180,19 @@ class BuchhaltungTab(QWidget):
             return []
 
     def neuer_eintrag(self):
-        while True:
-            dialog = BuchhaltungDialog(kategorien=self.kategorien)
-            if dialog.exec_() == dialog.Accepted:
+        # Nächste freie Nummer aus DB holen
+        with get_db() as con:
+            with con.cursor() as cur:
                 try:
-                    self.speichere_eintrag_aus_dialog(dialog)
-                    self.lade_eintraege()
-                    break  # Erfolg -> Schleife verlassen
-                except sqlite3.IntegrityError:
-                    # Der Fehler wird im Dialog schon gemeldet!
-                    pass
-            else:
-                break  
-
+                    cur.execute("SELECT MAX(id) FROM buchhaltung")
+                    max_id = cur.fetchone()[0]
+                    vorschlag_nr = str((max_id or 0) + 1)
+                except Exception:
+                    vorschlag_nr = ""
+        dialog = BuchhaltungDialog(eintrag={"id": vorschlag_nr}, kategorien=self.kategorien)
+        if dialog.exec_() == dialog.Accepted:
+            self.speichere_eintrag_aus_dialog(dialog)
+            self.lade_eintraege()
 
     def eintrag_bearbeiten(self):
         selected = self.table.currentRow()
@@ -681,7 +681,7 @@ class BuchhaltungTab(QWidget):
             if pd.notnull(val) and str(val).strip().isdigit():
                 break
         else:
-            QMessageBox.critical(self, "Fehler", "Keine Buchungszeile mit Belegnummer gefunden!")
+            QMessageBox.critical(self, "Fehler", "Keine Buchungszeile with Belegnummer gefunden!")
             return
 
         daten = df.iloc[start_row:].copy().reset_index(drop=True)
