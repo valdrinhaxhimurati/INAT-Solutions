@@ -2,7 +2,7 @@
     QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QTableWidget, QTableWidgetItem,
     QMessageBox, QLineEdit, QFileDialog, QComboBox, QLabel, QDateEdit, QAbstractItemView, QToolButton  
 )
-from db_connection import get_db, dict_cursor_factory, get_einstellungen
+from db_connection import get_db, dict_cursor_factory, get_einstellungen, get_config_value
 from PyQt5.QtCore import Qt, QDate
 from PyQt5.QtGui import QColor, QFont
 import sqlite3
@@ -162,15 +162,54 @@ class BuchhaltungTab(QWidget):
 
 
     def lade_firmenname(self):
-        config_path = "config.json"
-        if os.path.exists(config_path):
+        """
+        Lies 'firmenname' aus der Config-Tabelle (funktioniert für SQLite und Postgres).
+        Fallback: "Meine Firma".
+        """
+        import json
+        from db_connection import get_db
+
+        conn = None
+        try:
+            conn = get_db()
+            cur = conn.cursor()
+            sql = "SELECT value FROM config WHERE key=%s LIMIT 1"
             try:
-                with open(config_path, "r", encoding="utf-8") as f:
-                    config = json.load(f)
-                    return config.get("firmenname", "Meine Firma")
-            except (json.JSONDecodeError, IOError):
+                cur.execute(sql, ("firmenname",))
+            except Exception:
+                # fallback to sqlite paramstyle
+                cur.execute(sql.replace("%s", "?"), ("firmenname",))
+            row = cur.fetchone()
+
+            if not row:
                 return "Meine Firma"
-        return "Meine Firma"
+
+            # normalize row -> dict/tuple handling
+            if isinstance(row, dict):
+                val = row.get("value")
+            elif hasattr(row, "keys"):
+                try:
+                    val = dict(row).get("value")
+                except Exception:
+                    desc = getattr(cur, "description", None)
+                    if desc:
+                        cols = [d[0] for d in desc]
+                        val = dict(zip(cols, row)).get("value")
+                    else:
+                        val = row[0] if len(row) > 0 else None
+            else:
+                # tuple/list fallback
+                val = row[0] if len(row) > 0 else None
+
+            return val or "Meine Firma"
+        except Exception:
+            return "Meine Firma"
+        finally:
+            try:
+                if conn:
+                    conn.close()
+            except Exception:
+                pass
 
     def lade_kategorien_aus_einstellungen(self):
         try:

@@ -7,7 +7,7 @@ import subprocess
 import tempfile
 import traceback
 import logging
-from db_connection import get_db, ensure_database_and_tables
+from db_connection import get_db, ensure_database_and_tables, ensure_app_schema
 
 from PyQt5.QtWidgets import QApplication, QMessageBox, QFileDialog, QDialog, QProgressDialog
 from PyQt5.QtCore import Qt
@@ -225,10 +225,10 @@ def run():
 
     # DB-Verbindung sicherstellen (Postgres falls konfiguriert, sonst automatisch SQLite)
     try:
-        conn = get_db()
-        conn.close()
+        # ensure schema/tables exist for the configured backend (idempotent)
+        ensure_app_schema()
     except Exception as e:
-        QMessageBox.critical(None, "Abbruch", f"Datenbankverbindung fehlgeschlagen: {e}")
+        QMessageBox.critical(None, "Abbruch", f"Datenbank/Schema Fehler: {e}")
         return 1
 
     # Login-DB initialisieren

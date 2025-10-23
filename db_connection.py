@@ -501,33 +501,179 @@ def set_qr_daten(data: dict):
     conn.commit()
     conn.close()
 
+def ensure_app_schema():
+    """
+    Idempotent: legt Kern‑Tabellen an. Für SQLite werden Postgres‑Typen
+    normalisiert, damit sqlite_master keine BIGSERIAL-Literale behält.
+    """
+    schema = {
+        "config": [
+            ("key", "TEXT PRIMARY KEY"),
+            ("value", "TEXT")
+        ],
+        "buchhaltung": [
+            ("id", "BIGSERIAL PRIMARY KEY"),
+            ("datum", "TIMESTAMP"),
+            ("typ", "TEXT"),
+            ("kategorie", "TEXT"),
+            ("betrag", "NUMERIC"),
+            ("beschreibung", "TEXT")
+        ],
+        "lieferanten": [
+            ("id", "BIGSERIAL PRIMARY KEY"),
+            ("lieferantnr", "INTEGER"),
+            ("name", "TEXT"),
+            ("firma", "TEXT"),
+            ("strasse", "TEXT"),
+            ("plz", "TEXT"),
+            ("stadt", "TEXT"),
+            ("telefon", "TEXT"),
+            ("email", "TEXT"),
+            ("kommentare", "TEXT"),
+            ("portal_link", "TEXT"),
+            ("login", "TEXT"),
+            ("passwort", "TEXT"),
+        ],
+        "kunden": [
+            ("id", "BIGSERIAL PRIMARY KEY"),
+            ("kundennr", "BIGINT"),
+            ("anrede", "TEXT"),
+            ("name", "TEXT"),
+            ("firma", "TEXT"),
+            ("strasse", "TEXT"),
+            ("plz", "TEXT"),
+            ("stadt", "TEXT"),
+            ("telefon", "TEXT"),
+            ("email", "TEXT"),
+            ("bemerkung", "TEXT")
+        ],
+        "artikellager": [
+            ("artikel_id", "BIGSERIAL PRIMARY KEY"),
+            ("artikelnummer", "TEXT"),
+            ("bezeichnung", "TEXT"),
+            ("bestand", "INTEGER"),
+            ("lagerort", "TEXT")
+        ],
+        "reifenlager": [
+            ("reifen_id", "BIGSERIAL PRIMARY KEY"),
+            ("kundennr", "INTEGER"),
+            ("kunde_anzeige", "TEXT"),
+            ("fahrzeug", "TEXT"),
+            ("dimension", "TEXT"),
+            ("typ", "TEXT"),
+            ("dot", "TEXT"),
+            ("lagerort", "TEXT"),
+            ("eingelagert_am", "TEXT"),
+            ("ausgelagert_am", "TEXT"),
+            ("bemerkung", "TEXT")
+        ],
+        "rechnung_layout": [
+            ("id", "BIGSERIAL PRIMARY KEY"),
+            ("name", "TEXT"),
+            ("layout_data", "TEXT"),
+            ("layout", "JSONB"),
+            ("kopfzeile", "TEXT"),
+            ("einleitung", "TEXT"),
+            ("fusszeile", "TEXT"),
+            ("logo", "BYTEA"),
+            ("logo_mime", "TEXT"),
+            ("logo_skala", "REAL"),
+            ("created_at", "TIMESTAMP DEFAULT CURRENT_TIMESTAMP")
+        ],
+        "materiallager": [
+            ("material_id", "BIGSERIAL PRIMARY KEY"),
+            ("materialnummer", "TEXT"),
+            ("bezeichnung", "TEXT"),
+            ("menge", "INTEGER"),
+            ("einheit", "TEXT"),
+            ("lagerort", "TEXT"),
+            ("lieferantnr", "INTEGER"),
+            ("bemerkung", "TEXT")
+        ],
+    }
+
+    conn = get_db()
+    try:
+        is_sqlite = getattr(conn, "is_sqlite", False)
+
+        for table, cols in schema.items():
+            # build SQL appropriate for backend
+            if is_sqlite:
+                col_defs = []
+                for name, typ in cols:
+                    t = typ
+                    # convert PK bigserial -> sqlite integer autoincrement
+                    if "PRIMARY KEY" in t and "BIGSERIAL" in t:
+                        t = "INTEGER PRIMARY KEY AUTOINCREMENT"
+                    else:
+                        t = t.replace("BIGSERIAL", "INTEGER").replace("SERIAL", "INTEGER") \
+                             .replace("BYTEA", "BLOB").replace("JSONB", "TEXT")
+                    col_defs.append(f"{name} {t}")
+                create_sql = f"CREATE TABLE IF NOT EXISTS {table} ({', '.join(col_defs)})"
+            else:
+                col_defs = [f"{name} {typ}" for name, typ in cols]
+                create_sql = f"CREATE TABLE IF NOT EXISTS {table} ({', '.join(col_defs)})"
+
+            try:
+                with conn.cursor() as cur:
+                    cur.execute(create_sql)
+            except Exception:
+                # defensive: ignore/create attempts failing due to subtle sqlite versions
+                try:
+                    conn.rollback()
+                except Exception:
+                    pass
+
+        # ensure missing columns added (ALTER TABLE ADD COLUMN)
+        with conn.cursor() as cur:
+            if is_sqlite:
+                for table, cols in schema.items():
+                    try:
+                        cur.execute(f"PRAGMA table_info({table})")
+                        existing = [r[1] for r in cur.fetchall()]
+                    except Exception:
+                        existing = []
+                    for name, typ in cols:
+                        if name not in existing:
+                            t = typ.replace("BIGSERIAL", "INTEGER").replace("SERIAL", "INTEGER") \
+                                   .replace("BYTEA", "BLOB").replace("JSONB", "TEXT")
+                            try:
+                                cur.execute(f"ALTER TABLE {table} ADD COLUMN {name} {t}")
+                            except Exception:
+                                pass
+                # optional: fill kundennr from rowid if missing
+                try:
+                    cur.execute("UPDATE kunden SET kundennr = COALESCE(kundennr, rowid) WHERE kundennr IS NULL")
+                except Exception:
+                    pass
+            else:
+                for table, cols in schema.items():
+                    for name, typ in cols:
+                        try:
+                            cur.execute(f"ALTER TABLE {table} ADD COLUMN IF NOT EXISTS {name} {typ}")
+                        except Exception:
+                            pass
+                # Postgres sequences fallback
+                try:
+                    cur.execute("CREATE SEQUENCE IF NOT EXISTS kunden_kundennr_seq")
+                    cur.execute("ALTER TABLE kunden ALTER COLUMN kundennr SET DEFAULT nextval('kunden_kundennr_seq')")
+                    cur.execute("UPDATE kunden SET kundennr = nextval('kunden_kundennr_seq') WHERE kundennr IS NULL")
+                except Exception:
+                    pass
+
+        try:
+            conn.commit()
+        except Exception:
+            try:
+                conn.rollback()
+            except Exception:
+                pass
+    finally:
+        try:
+            conn.close()
+        except Exception:
+            pass
+
+# keep existing helper name for backward compatibility
 def ensure_database_and_tables():
-    db_path = str(local_db_path())
-    os.makedirs(os.path.dirname(db_path), exist_ok=True)
-    conn = sqlite3.connect(db_path)
-    conn.execute("""
-    CREATE TABLE IF NOT EXISTS config (
-        key TEXT PRIMARY KEY,
-        value TEXT
-    );
-    """)
-    conn.execute("""
-    CREATE TABLE IF NOT EXISTS rechnung_layout (
-        id INTEGER PRIMARY KEY DEFAULT 1,
-        layout_data TEXT
-    );
-    """)
-    conn.execute("""
-    CREATE TABLE IF NOT EXISTS einstellungen (
-        id INTEGER PRIMARY KEY DEFAULT 1,
-        data TEXT
-    );
-    """)
-    conn.execute("""
-    CREATE TABLE IF NOT EXISTS qr_daten (
-        id INTEGER PRIMARY KEY DEFAULT 1,
-        data TEXT
-    );
-    """)
-    conn.commit()
-    conn.close()
+    ensure_app_schema()

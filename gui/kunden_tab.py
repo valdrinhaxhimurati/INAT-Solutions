@@ -106,45 +106,49 @@ class KundenTab(QWidget):
         return (coalesce(strasse) if strasse else zip_city)
 
     def _ensure_table(self):
-        with get_db() as con:
+        con = get_db()
+        try:
+            is_sqlite = getattr(con, "is_sqlite", False)
             with con.cursor() as cur:
-                try:
-                    is_sqlite = isinstance(con, sqlite3.Connection) or "sqlite" in con.__class__.__module__.lower()
-                except Exception:
-                    is_sqlite = False
-
                 if is_sqlite:
-                    cur.execute("""
-                    DROP TABLE IF EXISTS kunden
-                    """)
-                    cur.execute("""
-                    CREATE TABLE kunden (
-                        kundennr INTEGER PRIMARY KEY AUTOINCREMENT,
-                        anrede TEXT,
-                        name TEXT,
-                        firma TEXT,
-                        plz TEXT,
-                        strasse TEXT,
-                        stadt TEXT,
-                        email TEXT,
-                        bemerkung TEXT
-                    )
-                    """)
+                    # nur anlegen, wenn noch nicht vorhanden (kein DROP!)
+                    cur.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='kunden'")
+                    exists = cur.fetchone() is not None
+                    if not exists:
+                        cur.execute("""
+                            CREATE TABLE kunden (
+                                kundennr INTEGER PRIMARY KEY AUTOINCREMENT,
+                                anrede TEXT,
+                                name TEXT,
+                                firma TEXT,
+                                plz TEXT,
+                                strasse TEXT,
+                                stadt TEXT,
+                                email TEXT,
+                                bemerkung TEXT
+                            )
+                        """)
                 else:
+                    # Postgres: create if not exists
                     cur.execute("""
-                    CREATE TABLE IF NOT EXISTS kunden (
-                        kundennr BIGSERIAL PRIMARY KEY,
-                        anrede TEXT,
-                        name TEXT,
-                        firma TEXT,
-                        plz TEXT,
-                        strasse TEXT,
-                        stadt TEXT,
-                        email TEXT,
-                        bemerkung TEXT
-                    )
+                        CREATE TABLE IF NOT EXISTS kunden (
+                            kundennr BIGSERIAL PRIMARY KEY,
+                            anrede TEXT,
+                            name TEXT,
+                            firma TEXT,
+                            plz TEXT,
+                            strasse TEXT,
+                            stadt TEXT,
+                            email TEXT,
+                            bemerkung TEXT
+                        )
                     """)
             con.commit()
+        finally:
+            try:
+                con.close()
+            except Exception:
+                pass
 
     def lade_kunden(self):
         import pprint
@@ -170,15 +174,22 @@ class KundenTab(QWidget):
             print("\n--- lade_kunden DEBUG ---")
             print("Spalten-Mapping:", cols)
             print("SQL:\n", sql)
-            with conn.cursor(cursor_factory=dict_cursor_factory(conn)) as cur:
+            # Use the connection's cursor; normalize fetched rows to dicts regardless of backend
+            with conn.cursor() as cur:
                 cur.execute(sql)
                 rows = cur.fetchall()
                 print("Rows (raw):")
                 pprint.pprint(rows[:3])
                 if rows and not isinstance(rows[0], dict):
-                    cols_desc = [d[0] for d in cur.description]
-                    print("Spalten aus DB:", cols_desc)
-                    rows = [dict(zip(cols_desc, row)) for row in rows]
+                    desc = getattr(cur, "description", None)
+                    if desc:
+                        cols_desc = [d[0] for d in desc]
+                        print("Spalten aus DB:", cols_desc)
+                        rows = [dict(zip(cols_desc, row)) for row in rows]
+                    else:
+                        # fallback for sqlite3.Row or similar mapping rows
+                        rows = [dict(r) if hasattr(r, "keys") else r for r in rows]
+
             print("Rows (dict):")
             pprint.pprint(rows[:3])
 

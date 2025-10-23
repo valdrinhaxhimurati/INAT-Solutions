@@ -93,9 +93,11 @@ class RechnungenTab(QWidget):
 
     def initialisiere_datenbank(self):
         with get_db() as conn:
+            # robust: check wrapper flags instead of isinstance on the wrapper object
+            is_sqlite = getattr(conn, "is_sqlite", None)
+            if is_sqlite is None:
+                is_sqlite = getattr(conn, "is_sqlite_conn", False)
             with conn.cursor() as cursor:
-                import sqlite3
-                is_sqlite = isinstance(conn, sqlite3.Connection) or "sqlite" in conn.__class__.__module__.lower()
                 if is_sqlite:
                     cursor.execute("""
                         CREATE TABLE IF NOT EXISTS kunden (
@@ -173,66 +175,112 @@ class RechnungenTab(QWidget):
             self.uid = ""
 
     def _lade_rechnungslayout(self):
-        """
-        Lade das Rechnungslayout aus der DB. Falls kein Eintrag vorhanden ist,
-        lege die Tabelle (falls nötig) an und schreibe einen Default-Eintrag
-        aus config/rechnung_layout.json in die DB.
-        """
-        import json, os
-        from db_connection import get_db, dict_cursor_factory
+        import json, os, base64
+        from db_connection import get_db
 
-        # Pfad zur config-Datei (relativ zum Repo-Root / dist/config)
-        cfg_paths = [
-            os.path.join(os.path.dirname(__file__), "..", "config", "rechnung_layout.json"),
-            os.path.join(os.path.dirname(__file__), "..", "..", "config", "rechnung_layout.json"),
-            os.path.join(os.getcwd(), "config", "rechnung_layout.json"),
-        ]
-        cfg_file = next((p for p in cfg_paths if os.path.exists(p)), None)
+        defaults = {
+            "logo_skala": 100,
+            "schrift": "Helvetica",
+            "schrift_bold": "Helvetica-Bold",
+            "schriftgroesse": 10,
+            "schriftgroesse_betreff": 12,
+            "farbe_text": [0, 0, 0],
+            "einleitung": "",
+            "betreff": "Rechnung",
+            "logo_bytes": None,
+            "logo_datei": None,
+            "fusszeile": {"text": ""}
+        }
 
+        layout = {}
         with get_db() as conn:
-            with conn.cursor(cursor_factory=dict_cursor_factory) as cur:
-                # sicherstellen, dass Tabelle existiert (minimales Schema)
-                cur.execute("""
-                    CREATE TABLE IF NOT EXISTS rechnung_layout (
-                        id SERIAL PRIMARY KEY,
-                        name TEXT,
-                        layout JSONB,
-                        logo BYTEA,
-                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-                    )
-                """)
-                # prüfe vorhandene Einträge
-                cur.execute("SELECT id, name, layout FROM rechnung_layout ORDER BY id LIMIT 1")
+            with conn.cursor() as cur:
+                # select a broad set of possible columns (works for both schemas)
+                cur.execute("SELECT id, name, layout, kopfzeile, einleitung, fusszeile, logo, logo_mime, logo_skala FROM rechnung_layout ORDER BY id LIMIT 1")
                 row = cur.fetchone()
-                if row:
-                    # benutze DB-Eintrag
-                    layout = row.get("layout") or {}
-                    return layout
-                # kein Eintrag -> falls config vorhanden, lade und insert
-                if cfg_file:
-                    try:
-                        with open(cfg_file, "r", encoding="utf-8") as f:
-                            cfg = json.load(f)
-                    except Exception:
-                        cfg = {}
-                    # logo-feld optional behandeln (falls in cfg als Base64/bytes)
-                    logo_bytes = None
-                    if isinstance(cfg.get("logo"), str):
-                        # Falls Base64-String, dekodiere; sonst ignoriere
+
+                # normalize row -> dict
+                if not row:
+                    dbrow = {}
+                else:
+                    if isinstance(row, dict):
+                        dbrow = row
+                    elif hasattr(row, "keys"):
                         try:
-                            import base64
-                            logo_bytes = base64.b64decode(cfg["logo"])
+                            dbrow = dict(row)
                         except Exception:
-                            logo_bytes = None
-                    # Insert Default
-                    cur.execute(
-                        "INSERT INTO rechnung_layout (name, layout, logo) VALUES (%s, %s, %s) RETURNING id",
-                        (cfg.get("name") or "default", json.dumps(cfg.get("layout") or cfg), logo_bytes)
-                    )
-                    conn.commit()
-                    return cfg.get("layout") or cfg
-                # kein config, keine DB-Einträge -> Rückgabe leerer dict
-                return {}
+                            dbrow = {}
+                    else:
+                        desc = getattr(cur, "description", None)
+                        if desc:
+                            cols = [d[0] for d in desc]
+                            dbrow = dict(zip(cols, row))
+                        else:
+                            dbrow = {}
+
+                # First prefer a single 'layout' JSON field
+                raw_layout = dbrow.get("layout")
+                if raw_layout:
+                    if isinstance(raw_layout, str):
+                        try:
+                            layout = json.loads(raw_layout)
+                        except Exception:
+                            layout = {}
+                    elif isinstance(raw_layout, (dict, list)):
+                        layout = raw_layout if isinstance(raw_layout, dict) else {}
+                    else:
+                        layout = {}
+                else:
+                    # fallback: assemble layout from separate columns (from RechnungLayoutDialog)
+                    layout = {}
+                    if dbrow.get("kopfzeile"):
+                        layout["kopfzeile"] = dbrow.get("kopfzeile")
+                    if dbrow.get("einleitung"):
+                        layout["einleitung"] = dbrow.get("einleitung")
+                    if dbrow.get("fusszeile"):
+                        # fusszeile may be JSON string or plain text
+                        f = dbrow.get("fusszeile")
+                        if isinstance(f, str):
+                            try:
+                                layout["fusszeile"] = json.loads(f)
+                            except Exception:
+                                layout["fusszeile"] = {"text": f}
+                        elif isinstance(f, dict):
+                            layout["fusszeile"] = f
+                        else:
+                            layout["fusszeile"] = {"text": str(f)}
+                    # logo as bytes
+                    logo_db = dbrow.get("logo")
+                    if isinstance(logo_db, (bytes, bytearray, memoryview)):
+                        layout["logo_bytes"] = bytes(logo_db)
+                    if dbrow.get("logo_skala") is not None:
+                        try:
+                            layout["logo_skala"] = float(dbrow.get("logo_skala"))
+                        except Exception:
+                            layout["logo_skala"] = defaults["logo_skala"]
+
+        # merge defaults + loaded layout and normalize
+        if not isinstance(layout, dict):
+            layout = {}
+        merged = {}
+        merged.update(defaults)
+        merged.update(layout)
+        # normalize possible base64 logo string
+        if merged.get("logo_bytes") and isinstance(merged["logo_bytes"], str):
+            try:
+                merged["logo_bytes"] = base64.b64decode(merged["logo_bytes"])
+            except Exception:
+                merged["logo_bytes"] = None
+
+        # ensure fusszeile is dict with "text"
+        f = merged.get("fusszeile") or {}
+        if isinstance(f, str):
+            merged["fusszeile"] = {"text": f}
+        elif not isinstance(f, dict):
+            merged["fusszeile"] = {"text": ""}
+
+        self.layout_config = merged
+        return layout
 
     # ---------------- Kunden Daten ----------------
 
@@ -770,6 +818,16 @@ class RechnungenTab(QWidget):
         fuss_font  = fuss.get("schrift", self.layout_config["schrift"])
         fuss_size  = int(fuss.get("groesse", self.layout_config["schriftgroesse"]))
         fuss_farbe = fuss.get("farbe", [100, 100, 100])
+
+        if isinstance(fuss, dict):
+            fuss_text = (fuss.get("text") or "").strip()
+        elif isinstance(fuss, str):
+            fuss_text = fuss.strip()
+        else:
+            try:
+                fuss_text = str(fuss).strip()
+            except Exception:
+                fuss_text = ""
 
         if fuss_text:
             # Farbe optional übernehmen

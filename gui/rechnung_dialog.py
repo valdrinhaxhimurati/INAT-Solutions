@@ -5,7 +5,7 @@ from PyQt5.QtWidgets import (
     QTableWidgetItem, QDoubleSpinBox, QSizePolicy
 )
 from PyQt5.QtCore import Qt, QDate
-from db_connection import get_db
+from db_connection import get_db, get_config_value
 from reportlab.lib.utils import ImageReader
 from io import BytesIO
 import json
@@ -158,6 +158,34 @@ class RechnungDialog(QDialog):
         grid.addWidget(QLabel("UID:"), row, 2)
         self.le_uid = QLineEdit()
         grid.addWidget(self.le_uid, row, 3)
+        row += 1
+
+        # UID immer setzen
+        try:
+            uid_val = None
+            if getattr(self, "rechnung", None):
+                if isinstance(self.rechnung, dict):
+                    # nur echte 'uid' nutzen — kein Fallback auf rechnung_nr
+                    uid_val = self.rechnung.get("uid")
+            if not uid_val:
+                try:
+                    uid_val = get_config_value("uid")
+                except Exception:
+                    uid_val = None
+            if not uid_val:
+                try:
+                    uid_val = _get_next_uid_from_db()
+                except Exception:
+                    uid_val = None
+            if uid_val is None:
+                uid_val = ""  # never leave as None
+            self.le_uid.setText(str(uid_val))
+        except Exception:
+            # best-effort: falls etwas schiefgeht, setze leeres Feld, aber nicht None
+            try:
+                self.le_uid.setText("")
+            except Exception:
+                pass
         row += 1
 
         # MWST
@@ -336,7 +364,11 @@ class RechnungDialog(QDialog):
             except Exception:
                 pass
 
-        self.le_uid.setText(r.get("uid", ""))
+        # setze UID nur wenn tatsächlich vorhanden; sonst vorherigen Wert behalten
+        uid_from_r = r.get("uid")
+        if uid_from_r:
+            self.le_uid.setText(uid_from_r)
+
         try:
             self.sb_mwst.setValue(float(r.get("mwst", self.mwst_voreinstellung)))
         except Exception:
@@ -497,4 +529,47 @@ class RechnungDialog(QDialog):
                 "gesamt": _to_float(self.le_total.text(), 0.0)
             }
         }
+
+def _get_next_uid_from_db():
+    """
+    Liefert eine vorgeschlagene nächste UID als string.
+    - Postgres: versucht nextval(pg_get_serial_sequence('rechnungen','id'))
+    - SQLite: berechnet MAX(id)+1
+    """
+    conn = None
+    try:
+        conn = get_db()
+        cur = conn.cursor()
+        # Postgres sequence attempt
+        try:
+            cur.execute("SELECT nextval(pg_get_serial_sequence('rechnungen','id'))")
+            row = cur.fetchone()
+            if row:
+                return str(row[0] if not isinstance(row, dict) else next(iter(row.values()), "")) 
+        except Exception:
+            pass
+        # SQLite fallback: MAX(id)+1
+        try:
+            cur.execute("SELECT MAX(id) FROM rechnungen")
+            row = cur.fetchone()
+            if not row:
+                return "1"
+            if isinstance(row, (list, tuple)):
+                max_id = row[0]
+            elif isinstance(row, dict):
+                max_id = row.get("MAX(id)") or next(iter(row.values()), None)
+            elif hasattr(row, "keys"):
+                max_id = dict(row).get("MAX(id)") or next(iter(dict(row).values()), None)
+            else:
+                max_id = None
+            next_id = (int(max_id) if max_id not in (None, "") else 0) + 1
+            return str(next_id)
+        except Exception:
+            return ""
+    finally:
+        try:
+            if conn:
+                conn.close()
+        except Exception:
+            pass
 

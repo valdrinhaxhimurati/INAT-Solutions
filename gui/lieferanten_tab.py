@@ -53,33 +53,75 @@ class LieferantenTab(QWidget):
 
     def lade_lieferanten(self):
         conn = get_db()
-        cursor = conn.cursor(cursor_factory=dict_cursor_factory(conn))
-        cursor.execute("""
-            CREATE TABLE IF NOT EXISTS lieferanten (
-                lieferantnr INTEGER PRIMARY KEY AUTOINCREMENT,
-                name TEXT,
-                portal_link TEXT,
-                login TEXT,
-                passwort TEXT
-            )
-        """)
-        cursor.execute("SELECT lieferantnr, name, portal_link, login, passwort FROM lieferanten")
-        daten = cursor.fetchall()
+        try:
+            # Verwende dict-cursor wenn verfügbar, so haben wir konsistente Schlüssel-Zugriffe
+            cursor = conn.cursor(cursor_factory=dict_cursor_factory(conn))
+        except Exception:
+            cursor = conn.cursor()
 
-        self.table.setRowCount(len(daten))
-        self.table.setColumnCount(5)
-        self.table.setHorizontalHeaderLabels([
-            "Nr.", "Name", "Portal-Link", "Login", "Passwort"
-        ])
-        self.table.setColumnWidth(0, 40)   # "Nr." Spalte
-        self.table.setColumnWidth(1, 250)  # "Name" Spalte
-        self.table.setColumnWidth(2, 500)  # "Portal-Link" Spalte
-        self.table.setColumnWidth(3, 150)  # "Login" Spalte
-        self.table.setColumnWidth(4, 150)  # "Passwort" Spalte
-        for row_idx, row in enumerate(daten):
-            for col_idx, value in enumerate(row):
-                self.table.setItem(row_idx, col_idx, QTableWidgetItem(str(value)))
-        conn.close()
+        try:
+            # backend-aware CREATE (SQLite vs Postgres)
+            is_sqlite = getattr(conn, "is_sqlite", False)
+            if is_sqlite:
+                cursor.execute("""
+                    CREATE TABLE IF NOT EXISTS lieferanten (
+                        lieferantnr INTEGER PRIMARY KEY AUTOINCREMENT,
+                        name TEXT,
+                        portal_link TEXT,
+                        login TEXT,
+                        passwort TEXT
+                    )
+                """)
+            else:
+                cursor.execute("""
+                    CREATE TABLE IF NOT EXISTS lieferanten (
+                        lieferantnr BIGSERIAL PRIMARY KEY,
+                        name TEXT,
+                        portal_link TEXT,
+                        login TEXT,
+                        passwort TEXT
+                    )
+                """)
+            # Explizit Spaltenreihenfolge sicherstellen (lieferantnr zuerst)
+            cursor.execute("SELECT lieferantnr, name, portal_link, login, passwort FROM lieferanten ORDER BY lieferantnr")
+            rows = cursor.fetchall()
+
+            cols = ["lieferantnr", "name", "portal_link", "login", "passwort"]
+
+            # normalize rows: immer Tupel in definierter Reihenfolge (lieferantnr,...)
+            daten = []
+            for r in rows:
+                if isinstance(r, dict):
+                    daten.append(tuple(r.get(c) for c in cols))
+                elif hasattr(r, "keys"):
+                    # z.B. sqlite3.Row oder ähnliche, sicherheitshalber in dict umwandeln
+                    try:
+                        rd = dict(r)
+                        daten.append(tuple(rd.get(c) for c in cols))
+                    except Exception:
+                        # fallback: konvertiere zu tuple (Annahme: Reihenfolge stimmt mit SELECT)
+                        daten.append(tuple(r))
+                else:
+                    daten.append(tuple(r))
+
+            # Tabellenspalten explizit auf 5 setzen und Header beschriften
+            self.table.setRowCount(len(daten))
+            self.table.setColumnCount(len(cols))
+            self.table.setHorizontalHeaderLabels(["Nr.", "Name", "Portal-Link", "Login", "Passwort"])
+            self.table.setColumnWidth(0, 40)   # "Nr." Spalte
+            self.table.setColumnWidth(1, 250)  # "Name" Spalte
+            self.table.setColumnWidth(2, 500)  # "Portal-Link" Spalte
+            self.table.setColumnWidth(3, 150)  # "Login" Spalte
+            self.table.setColumnWidth(4, 150)  # "Passwort" Spalte
+
+            for row_idx, row in enumerate(daten):
+                for col_idx, value in enumerate(row):
+                    self.table.setItem(row_idx, col_idx, QTableWidgetItem("" if value is None else str(value)))
+        finally:
+            try:
+                conn.close()
+            except Exception:
+                pass
 
     def lieferant_hinzufuegen(self):
         from gui.lieferanten_dialog import LieferantenDialog

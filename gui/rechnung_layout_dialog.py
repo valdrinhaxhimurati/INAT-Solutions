@@ -375,10 +375,15 @@ class RechnungLayoutDialog(QDialog):
         con = get_db()
         try:
             with con.cursor() as cur:
-                cur.execute("""
-                    SELECT kopfzeile, einleitung, fusszeile, logo, logo_mime, logo_skala
-                      FROM rechnung_layout WHERE id=%s
-                """, [1])
+                # Prefer latest row: try sqlite rowid ordering first, fallback to id ordering (Postgres)
+                try:
+                    cur.execute("SELECT kopfzeile, einleitung, fusszeile, logo, logo_mime, logo_skala FROM rechnung_layout ORDER BY rowid DESC LIMIT 1")
+                except Exception:
+                    try:
+                        cur.execute("SELECT kopfzeile, einleitung, fusszeile, logo, logo_mime, logo_skala FROM rechnung_layout ORDER BY id DESC LIMIT 1")
+                    except Exception:
+                        # last resort: try selecting any row
+                        cur.execute("SELECT kopfzeile, einleitung, fusszeile, logo, logo_mime, logo_skala FROM rechnung_layout LIMIT 1")
                 row = cur.fetchone()
                 data = _row_to_dict(cur, row)
         finally:
@@ -421,18 +426,38 @@ class RechnungLayoutDialog(QDialog):
         con = get_db()
         try:
             with con.cursor() as cur:
-                cur.execute("""
-                    INSERT INTO rechnung_layout
-                        (id, kopfzeile, einleitung, fusszeile, logo, logo_mime, logo_skala)
-                    VALUES (%s, %s, %s, %s, %s, %s, %s)
-                    ON CONFLICT (id) DO UPDATE SET
-                        kopfzeile=EXCLUDED.kopfzeile,
-                        einleitung=EXCLUDED.einleitung,
-                        fusszeile=EXCLUDED.fusszeile,
-                        logo=EXCLUDED.logo,
-                        logo_mime=EXCLUDED.logo_mime,
-                        logo_skala=EXCLUDED.logo_skala
-                """, (1, kopf, einl, fuss, logo_param, self.logo_mime, scale))
+                # Simpler, deterministic approach:
+                # remove existing layout rows and insert a single fresh row so readers always find the latest data
+                try:
+                    cur.execute("DELETE FROM rechnung_layout")
+                except Exception:
+                    # ignore errors (e.g. permission) and continue with insert attempts
+                    try:
+                        con.rollback()
+                    except Exception:
+                        pass
+
+                # Try Postgres paramstyle first, fallback to sqlite paramstyle
+                try:
+                    cur.execute("""
+                        INSERT INTO rechnung_layout (kopfzeile, einleitung, fusszeile, logo, logo_mime, logo_skala)
+                        VALUES (%s, %s, %s, %s, %s, %s)
+                    """, (kopf, einl, fuss, logo_param, self.logo_mime, scale))
+                except Exception:
+                    try:
+                        cur.execute("""
+                            INSERT INTO rechnung_layout (kopfzeile, einleitung, fusszeile, logo, logo_mime, logo_skala)
+                            VALUES (?, ?, ?, ?, ?, ?)
+                        """, (kopf, einl, fuss, logo_param, self.logo_mime, scale))
+                    except Exception as e_inner:
+                        # As last resort try INSERT OR REPLACE with sqlite style
+                        try:
+                            cur.execute("""
+                                INSERT OR REPLACE INTO rechnung_layout (id, kopfzeile, einleitung, fusszeile, logo, logo_mime, logo_skala)
+                                VALUES (1, ?, ?, ?, ?, ?, ?)
+                            """, (kopf, einl, fuss, logo_param, self.logo_mime, scale))
+                        except Exception:
+                            raise  # re-raise to show error to user
             con.commit()
         except Exception as e:
             try: con.rollback()

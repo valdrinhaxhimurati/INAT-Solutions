@@ -104,7 +104,11 @@ class ReifenlagerTab(QWidget):
                     bemerkung TEXT
                 )
             """)
-        cursor.execute("""SELECT * FROM reifenlager""")
+        # Explizite Spalten in der gewünschten Reihenfolge (10 Spalten für die Tabelle)
+        cursor.execute("""
+            SELECT reifen_id, kunde_anzeige, fahrzeug, dimension, typ, dot, lagerort, eingelagert_am, ausgelagert_am, bemerkung
+            FROM reifenlager
+        """)
         daten = cursor.fetchall()
 
         self.table.setRowCount(len(daten))
@@ -115,15 +119,38 @@ class ReifenlagerTab(QWidget):
         ])
         
         for row_idx, row in enumerate(daten):
+            # Reihe als dict oder Sequence behandeln und Werte in festgelegter Reihenfolge holen
+            if isinstance(row, dict):
+                vals = [
+                    row.get("reifen_id"),
+                    row.get("kunde_anzeige"),
+                    row.get("fahrzeug"),
+                    row.get("dimension"),
+                    row.get("typ"),
+                    row.get("dot"),
+                    row.get("lagerort"),
+                    row.get("eingelagert_am"),
+                    row.get("ausgelagert_am"),
+                    row.get("bemerkung"),
+                ]
+            else:
+                # Sequence / sqlite3.Row
+                vals = [row[i] for i in range(10)]
+
             # --- DOT-Logik für Farbe ---
             dot_jahr = None
-            dot_wert = str(row[5]).strip()
+            dot_wert = "" if vals[5] is None else str(vals[5]).strip()
             # DOT als Jahr oder als KW/Jahr
             if len(dot_wert) == 4 and dot_wert.isdigit():
                 if dot_wert.startswith("19") or dot_wert.startswith("20"):
                     dot_jahr = int(dot_wert)
                 else:
-                    dot_jahr = 2000 + int(dot_wert[2:])
+                    # falls Format wie "KW/YY" erwartet wird, hier ggf. anpassen
+                    try:
+                        dot_jahr = 2000 + int(dot_wert[2:])
+                    except Exception:
+                        dot_jahr = None
+
             zeilenfarbe = QColor(230, 255, 230)  # #e6ffe6 green
             if dot_jahr:
                 aktuelles_jahr = datetime.datetime.now().year
@@ -131,10 +158,9 @@ class ReifenlagerTab(QWidget):
                 if alter >= 6:
                     zeilenfarbe = QColor(255, 230, 230)  # #ffe6e6 red
                 elif alter >= 5:
-                    zeilenfarbe_orange = QColor(255, 230, 179)  # #ffe6b3 orange
+                    zeilenfarbe = QColor(255, 230, 179)  # #ffe6b3 orange
 
-            for col_idx, value in enumerate(row):
-                # Vermeide "None" in Zellen — leer lassen, falls keine ID vorhanden
+            for col_idx, value in enumerate(vals):
                 txt = "" if value is None else str(value)
                 item = QTableWidgetItem(txt)
                 item.setTextAlignment(Qt.AlignLeft | Qt.AlignVCenter)
