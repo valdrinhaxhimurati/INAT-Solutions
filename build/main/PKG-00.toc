@@ -1,5 +1,5 @@
 ('C:\\Users\\V.Haxhimurati\\Documents\\GitHub '
- 'Repository\\INAT-Solutions\\build\\main\\INAT Solutions.pkg',
+ 'Repository\\INAT-Solutions\\build\\main\\INAT-Solutions.pkg',
  {'BINARY': True,
   'DATA': True,
   'EXECUTABLE': True,

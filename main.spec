@@ -41,7 +41,7 @@ pyz = PYZ(a.pure, a.zipped_data, cipher=block_cipher)
 exe = EXE(
     pyz, a.scripts, [],
     exclude_binaries=True,
-    name='INAT Solutions',
+    name='INAT-Solutions',
     debug=False,
     strip=False,
     upx=True,
@@ -57,5 +57,5 @@ coll = COLLECT(
     strip=False,
     upx=True,
     upx_exclude=[],
-    name='INAT Solutions'
+    name='INAT-Solutions'
 )

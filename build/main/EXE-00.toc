@@ -1,5 +1,5 @@
 ('C:\\Users\\V.Haxhimurati\\Documents\\GitHub '
- 'Repository\\INAT-Solutions\\build\\main\\INAT Solutions.exe',
+ 'Repository\\INAT-Solutions\\build\\main\\INAT-Solutions.exe',
  False,
  False,
  True,
@@ -32,7 +32,7 @@
  None,
  None,
  'C:\\Users\\V.Haxhimurati\\Documents\\GitHub '
- 'Repository\\INAT-Solutions\\build\\main\\INAT Solutions.pkg',
+ 'Repository\\INAT-Solutions\\build\\main\\INAT-Solutions.pkg',
  [('pyi-contents-directory _internal', '', 'OPTION'),
   ('PYZ-00.pyz',
    'C:\\Users\\V.Haxhimurati\\Documents\\GitHub '
@@ -90,7 +90,7 @@
  [],
  False,
  False,
- 1760705537,
+ 1761202504,
  [('runw.exe',
    'C:\\Users\\V.Haxhimurati\\AppData\\Local\\Programs\\Python\\Python313\\Lib\\site-packages\\PyInstaller\\bootloader\\Windows-64bit-intel\\runw.exe',
    'EXECUTABLE')],
