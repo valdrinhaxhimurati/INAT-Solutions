@@ -173,77 +173,66 @@ class RechnungenTab(QWidget):
             self.uid = ""
 
     def _lade_rechnungslayout(self):
-        self.layout_config = {
-            "kopfzeile": {
-                "text": "Deine Firma GmbH\nMusterstraße 1\n8000 Zürich",
-                "schrift": "Helvetica-Bold",
-                "groesse": 14,
-                "farbe": [0, 0, 0]
-            },
-            "einleitung": ("Sehr geehrte Damen und Herren,\n\n"
-                           "vielen Dank für Ihren Auftrag. Hiermit erhalten Sie unsere Rechnung:"),
-            "fusszeile": {
-                "text": "Vielen Dank für Ihren Auftrag!",
-                "schrift": "Helvetica-Oblique",
-                "groesse": 8,
-                "farbe": [100, 100, 100]
-            },
-            "logo_datei": None,
-            "logo_bytes": None,
-            "logo_mime": None,
-            "logo_skala": 100,
-            "betreff": "Rechnung",
-            "schrift": "Helvetica",
-            "schrift_bold": "Helvetica-Bold",
-            "schrift_kursiv": "Helvetica-Oblique",
-            "farbe_text": [0, 0, 0],
-            "schriftgroesse": 10,
-            "schriftgroesse_betreff": 12
-        }
-        # 1) Aus DB laden
-        try:
-            with get_db() as conn:
-                with conn.cursor(cursor_factory=dict_cursor_factory) as cur:
-                    cur.execute("SELECT kopfzeile, einleitung, fusszeile, logo, logo_mime, logo_skala FROM rechnung_layout WHERE id=1")
-                    row = cur.fetchone()
-                    if row is not None and not isinstance(row, dict):
-                        cols = [d[0] for d in cur.description]
-                        row = dict(zip(cols, row))
-            if row:
-                self.layout_config["kopfzeile"]["text"] = (row.get("kopfzeile") or "")
-                self.layout_config["einleitung"] = (row.get("einleitung") or "")
-                self.layout_config["fusszeile"]["text"] = (row.get("fusszeile") or "")
-                lb = row.get("logo")
-                self.layout_config["logo_bytes"] = bytes(lb) if lb is not None else None
-                self.layout_config["logo_mime"] = row.get("logo_mime")
-                try:
-                    self.layout_config["logo_skala"] = int(float(row.get("logo_skala") or 100))
-                except Exception:
-                    self.layout_config["logo_skala"] = 100
-                return
-        except Exception:
-            pass
-        # 2) JSON-Fallback laden (falls vorhanden)
-        pfad = "config/rechnung_layout.json"
-        if os.path.exists(pfad):
-            try:
-                with open(pfad, "r", encoding="utf-8") as f:
-                    daten = json.load(f)
-                self.layout_config["kopfzeile"]["text"] = daten.get("kopfzeile", "") or ""
-                self.layout_config["einleitung"] = daten.get("einleitung", "") or ""
-                self.layout_config["fusszeile"]["text"] = daten.get("fusszeile", "") or ""
-                self.layout_config["logo_datei"] = daten.get("logo_pfad")
-                self.layout_config["logo_skala"] = int(daten.get("logo_skala", 100) or 100)
-                self.layout_config["betreff"] = daten.get("betreff", "Rechnung")
-                self.layout_config["schrift"] = daten.get("schrift", "Helvetica")
-                self.layout_config["schrift_bold"] = daten.get("schrift_bold", "Helvetica-Bold")
-                self.layout_config["schrift_kursiv"] = daten.get("schrift_kursiv", "Helvetica-Oblique")
-                self.layout_config["farbe_text"] = daten.get("farbe_text", [0, 0, 0])
-                self.layout_config["schriftgroesse"] = daten.get("schriftgroesse", 10)
-                self.layout_config["schriftgroesse_betreff"] = daten.get("schriftgroesse_betreff", 12)
-            except Exception:
-                pass
-        # sonst bleiben Defaults aktiv
+        """
+        Lade das Rechnungslayout aus der DB. Falls kein Eintrag vorhanden ist,
+        lege die Tabelle (falls nötig) an und schreibe einen Default-Eintrag
+        aus config/rechnung_layout.json in die DB.
+        """
+        import json, os
+        from db_connection import get_db, dict_cursor_factory
+
+        # Pfad zur config-Datei (relativ zum Repo-Root / dist/config)
+        cfg_paths = [
+            os.path.join(os.path.dirname(__file__), "..", "config", "rechnung_layout.json"),
+            os.path.join(os.path.dirname(__file__), "..", "..", "config", "rechnung_layout.json"),
+            os.path.join(os.getcwd(), "config", "rechnung_layout.json"),
+        ]
+        cfg_file = next((p for p in cfg_paths if os.path.exists(p)), None)
+
+        with get_db() as conn:
+            with conn.cursor(cursor_factory=dict_cursor_factory) as cur:
+                # sicherstellen, dass Tabelle existiert (minimales Schema)
+                cur.execute("""
+                    CREATE TABLE IF NOT EXISTS rechnung_layout (
+                        id SERIAL PRIMARY KEY,
+                        name TEXT,
+                        layout JSONB,
+                        logo BYTEA,
+                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                    )
+                """)
+                # prüfe vorhandene Einträge
+                cur.execute("SELECT id, name, layout FROM rechnung_layout ORDER BY id LIMIT 1")
+                row = cur.fetchone()
+                if row:
+                    # benutze DB-Eintrag
+                    layout = row.get("layout") or {}
+                    return layout
+                # kein Eintrag -> falls config vorhanden, lade und insert
+                if cfg_file:
+                    try:
+                        with open(cfg_file, "r", encoding="utf-8") as f:
+                            cfg = json.load(f)
+                    except Exception:
+                        cfg = {}
+                    # logo-feld optional behandeln (falls in cfg als Base64/bytes)
+                    logo_bytes = None
+                    if isinstance(cfg.get("logo"), str):
+                        # Falls Base64-String, dekodiere; sonst ignoriere
+                        try:
+                            import base64
+                            logo_bytes = base64.b64decode(cfg["logo"])
+                        except Exception:
+                            logo_bytes = None
+                    # Insert Default
+                    cur.execute(
+                        "INSERT INTO rechnung_layout (name, layout, logo) VALUES (%s, %s, %s) RETURNING id",
+                        (cfg.get("name") or "default", json.dumps(cfg.get("layout") or cfg), logo_bytes)
+                    )
+                    conn.commit()
+                    return cfg.get("layout") or cfg
+                # kein config, keine DB-Einträge -> Rückgabe leerer dict
+                return {}
 
     # ---------------- Kunden Daten ----------------
 

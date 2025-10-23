@@ -115,67 +115,79 @@ del "%~f0"
     sys.exit(0)
 
 def sync_from_remote():
-    import urllib.request, json, hashlib, tempfile
+    import urllib.request, json, hashlib, tempfile, os, shutil, subprocess, sys
     from packaging import version
+    from PyQt5.QtWidgets import QMessageBox
 
-    version_url = "https://valdrinhaxhimurati.github.io/INAT-Solutions-Updates/version.json"
+    log = os.path.join(tempfile.gettempdir(), "inat_update_debug.log")
+    def dbg(s):
+        try:
+            with open(log, "a", encoding="utf-8") as f:
+                f.write(s + "\n")
+        except Exception:
+            pass
+
+    dbg("sync_from_remote start")
     try:
-        with urllib.request.urlopen(version_url, timeout=5) as r:
+        version_url = "https://valdrinhaxhimurati.github.io/INAT-Solutions-Updates/version.json"
+        dbg(f"fetching {version_url}")
+        with urllib.request.urlopen(version_url, timeout=10) as r:
             meta = json.load(r)
-    except Exception:
-        return  # keine Remote‑Info erreichbar -> kein Update
+        dbg(f"meta: {meta!r}")
 
-    try:
-        remote_ver = version.parse(meta.get("version", "0"))
-        current_ver = version.parse(__version__)
-    except Exception:
-        return
+        # normalize version strings (strip leading 'v' or 'V')
+        remote_ver_str = str(meta.get("version", "0")).lstrip("vV")
+        current_ver_str = str(__version__).lstrip("vV")
+        remote_ver = version.parse(remote_ver_str)
+        current_ver = version.parse(current_ver_str)
+        dbg(f"remote={remote_ver} current={current_ver}")
 
-    if remote_ver <= current_ver:
-        return
+        if remote_ver <= current_ver:
+            dbg("no update available")
+            return
 
-    # Frage Nutzer
-    ans = QMessageBox.question(None, "Update verfügbar",
-        f"Neue Version {remote_ver} verfügbar (aktuell {current_ver}). Jetzt aktualisieren?",
-        QMessageBox.Yes | QMessageBox.No)
-    if ans != QMessageBox.Yes:
-        return
+        ans = QMessageBox.question(None, "Update verfügbar",
+            f"Neue Version {remote_ver} verfügbar (aktuell {current_ver}). Jetzt aktualisieren?",
+            QMessageBox.Yes | QMessageBox.No)
+        dbg(f"user_answer={ans}")
+        if ans != QMessageBox.Yes:
+            dbg("user declined")
+            return
 
-    url = meta.get("url")
-    expected_sha = meta.get("sha256", "").lower()
-    if not url:
-        QMessageBox.critical(None, "Update fehlgeschlagen", "Keine Download-URL in version.json")
-        return
+        url = meta.get("url")
+        expected_sha = str(meta.get("sha256", "")).lower()
+        if not url:
+            dbg("no url in meta")
+            QMessageBox.critical(None, "Update fehlgeschlagen", "Keine Download-URL in version.json")
+            return
 
-    # download in temp
-    tmp = tempfile.gettempdir()
-    tmp_file = os.path.join(tmp, "INAT-Solutions-update.exe")
-    try:
+        tmp = tempfile.gettempdir()
+        tmp_file = os.path.join(tmp, "INAT-Solutions-update.exe")
+        dbg(f"downloading to {tmp_file}")
         urllib.request.urlretrieve(url, tmp_file)
-    except Exception as e:
-        QMessageBox.critical(None, "Download fehlgeschlagen", str(e))
-        return
 
-    # sha prüfen
-    h = hashlib.sha256()
-    with open(tmp_file, "rb") as f:
-        for chunk in iter(lambda: f.read(8192), b""):
-            h.update(chunk)
-    if expected_sha and h.hexdigest().lower() != expected_sha.lower():
-        QMessageBox.critical(None, "Integritätsfehler", "SHA256 stimmt nicht überein.")
-        return
+        # checksum
+        h = hashlib.sha256()
+        with open(tmp_file, "rb") as f:
+            for chunk in iter(lambda: f.read(8192), b""):
+                h.update(chunk)
+        got = h.hexdigest().lower()
+        dbg(f"got_sha={got} expected_sha={expected_sha}")
+        if expected_sha and got != expected_sha:
+            dbg("sha mismatch")
+            QMessageBox.critical(None, "Integritätsfehler", "SHA256 stimmt nicht überein.")
+            return
 
-    # ersetze laufende exe (wie vorher über .bat)
-    dst = sys.executable
-    backup = dst + ".old"
-    try:
-        shutil.copy2(dst, backup)
-    except Exception:
-        pass
+        dst = sys.executable
+        backup = dst + ".old"
+        try:
+            shutil.copy2(dst, backup)
+        except Exception:
+            pass
 
-    bat_path = os.path.join(tempfile.gettempdir(), "inat_update_remote.bat")
-    with open(bat_path, "w", encoding="utf-8") as bat:
-        bat.write(f"""@echo off
+        bat_path = os.path.join(tmp, "inat_update_remote.bat")
+        with open(bat_path, "w", encoding="utf-8") as bat:
+            bat.write(f"""@echo off
 :WAIT
 tasklist /FI "IMAGENAME eq {os.path.basename(dst)}" | find /I "{os.path.basename(dst)}" >nul
 if %ERRORLEVEL%==0 (
@@ -187,8 +199,16 @@ copy /Y "{tmp_file}" "{dst}"
 start "" "{dst}"
 del "%~f0"
 """)
-    subprocess.Popen(["cmd", "/c", bat_path], creationflags=subprocess.CREATE_NEW_CONSOLE)
-    sys.exit(0)
+        subprocess.Popen(["cmd", "/c", bat_path], creationflags=subprocess.CREATE_NEW_CONSOLE)
+        dbg("updater started")
+        sys.exit(0)
+
+    except Exception as e:
+        dbg("exception: " + repr(e))
+        try:
+            QMessageBox.critical(None, "Update-Fehler", str(e))
+        except Exception:
+            pass
 
 def run():
     app = QApplication(sys.argv)
