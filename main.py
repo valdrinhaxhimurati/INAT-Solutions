@@ -55,6 +55,7 @@ LOCAL_FOLDER = r"C:\Users\V.Haxhimurati\Documents\TEST\dist\INAT Solutions"
 LOCAL_EXE = "INAT Solutions.exe"
 
 def sync_from_local():
+    # alte lokale Prüfung entfernen oder belassen als Fallback
     progress = QProgressDialog("Suche nach Updates…", None, 0, 0)
     progress.resize(400, 120)
     progress.setWindowModality(Qt.ApplicationModal)
@@ -113,6 +114,82 @@ del "%~f0"
     subprocess.Popen(["cmd", "/c", bat_path], creationflags=subprocess.CREATE_NEW_CONSOLE)
     sys.exit(0)
 
+def sync_from_remote():
+    import urllib.request, json, hashlib, tempfile
+    from packaging import version
+
+    version_url = "https://valdrinhaxhimurati.github.io/INAT-Solutions-Updates/version.json"
+    try:
+        with urllib.request.urlopen(version_url, timeout=5) as r:
+            meta = json.load(r)
+    except Exception:
+        return  # keine Remote‑Info erreichbar -> kein Update
+
+    try:
+        remote_ver = version.parse(meta.get("version", "0"))
+        current_ver = version.parse(__version__)
+    except Exception:
+        return
+
+    if remote_ver <= current_ver:
+        return
+
+    # Frage Nutzer
+    ans = QMessageBox.question(None, "Update verfügbar",
+        f"Neue Version {remote_ver} verfügbar (aktuell {current_ver}). Jetzt aktualisieren?",
+        QMessageBox.Yes | QMessageBox.No)
+    if ans != QMessageBox.Yes:
+        return
+
+    url = meta.get("url")
+    expected_sha = meta.get("sha256", "").lower()
+    if not url:
+        QMessageBox.critical(None, "Update fehlgeschlagen", "Keine Download-URL in version.json")
+        return
+
+    # download in temp
+    tmp = tempfile.gettempdir()
+    tmp_file = os.path.join(tmp, "INAT-Solutions-update.exe")
+    try:
+        urllib.request.urlretrieve(url, tmp_file)
+    except Exception as e:
+        QMessageBox.critical(None, "Download fehlgeschlagen", str(e))
+        return
+
+    # sha prüfen
+    h = hashlib.sha256()
+    with open(tmp_file, "rb") as f:
+        for chunk in iter(lambda: f.read(8192), b""):
+            h.update(chunk)
+    if expected_sha and h.hexdigest().lower() != expected_sha.lower():
+        QMessageBox.critical(None, "Integritätsfehler", "SHA256 stimmt nicht überein.")
+        return
+
+    # ersetze laufende exe (wie vorher über .bat)
+    dst = sys.executable
+    backup = dst + ".old"
+    try:
+        shutil.copy2(dst, backup)
+    except Exception:
+        pass
+
+    bat_path = os.path.join(tempfile.gettempdir(), "inat_update_remote.bat")
+    with open(bat_path, "w", encoding="utf-8") as bat:
+        bat.write(f"""@echo off
+:WAIT
+tasklist /FI "IMAGENAME eq {os.path.basename(dst)}" | find /I "{os.path.basename(dst)}" >nul
+if %ERRORLEVEL%==0 (
+  timeout /t 1 >nul
+  goto WAIT
+)
+if exist "{backup}" del /F /Q "{backup}"
+copy /Y "{tmp_file}" "{dst}"
+start "" "{dst}"
+del "%~f0"
+""")
+    subprocess.Popen(["cmd", "/c", bat_path], creationflags=subprocess.CREATE_NEW_CONSOLE)
+    sys.exit(0)
+
 def run():
     app = QApplication(sys.argv)
     app.setStyle("Fusion")
@@ -121,7 +198,10 @@ def run():
         app.setStyleSheet(ss)
 
     # Update-Check NACH Erzeugen der QApplication
-    sync_from_local()
+    # remote-first Update check (falls nicht erreichbar, optional lokalen Fallback nutzen)
+    sync_from_remote()
+    # optionaler Fallback zu lokaler Prüfung:
+    # sync_from_local()
 
     # DB-Verbindung sicherstellen (Postgres falls konfiguriert, sonst automatisch SQLite)
     try:
