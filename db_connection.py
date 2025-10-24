@@ -700,6 +700,10 @@ def ensure_app_schema():
             ("id", "BIGSERIAL PRIMARY KEY"),
             ("data", "JSONB")
         ],
+        "qr_daten": [
+            ("id", "BIGSERIAL PRIMARY KEY"),
+            ("data", "JSONB")
+        ],
     }
 
     conn = get_db()
@@ -787,4 +791,47 @@ def ensure_app_schema():
 # keep existing helper name for backward compatibility
 def ensure_database_and_tables():
     ensure_app_schema()
+
+def get_qr_daten():
+    """
+    Liefert QR-Daten als dict.
+    Versucht DB (SELECT data FROM qr_daten WHERE id=1), fällt bei Fehlern auf config/qr_daten.json zurück.
+    """
+    # 1) Versuch DB
+    try:
+        conn = get_db()
+        cur = conn.cursor()
+        try:
+            cur.execute("SELECT data FROM qr_daten WHERE id = %s", (1,))
+            row = cur.fetchone()
+            if row and row[0]:
+                data = row[0]
+                try:
+                    return dict(data) if isinstance(data, dict) else json.loads(data)
+                except Exception:
+                    return data
+        except Exception:
+            pass
+        finally:
+            try:
+                cur.close()
+            except Exception:
+                pass
+            try:
+                conn.close()
+            except Exception:
+                pass
+    except Exception:
+        pass
+
+    # 2) Fallback auf Datei config/qr_daten.json
+    cfg_path = os.path.join(os.path.dirname(__file__), "config", "qr_daten.json")
+    if os.path.exists(cfg_path):
+        try:
+            with open(cfg_path, "r", encoding="utf-8") as f:
+                return json.load(f)
+        except Exception:
+            return {}
+    # 3) letzter Fallback: leeres dict
+    return {}
 
