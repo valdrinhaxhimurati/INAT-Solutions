@@ -1,4 +1,4 @@
-import os
+﻿import os
 import platform
 import shutil
 from pathlib import Path
@@ -55,3 +55,4 @@ def publish(c):
     """Publish package to PyPi"""
     os.chdir(own_dir.parent)
     c.run("twine upload dist/*")
+

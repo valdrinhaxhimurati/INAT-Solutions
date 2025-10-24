@@ -185,3 +185,4 @@ class DBSettingsDialog(QDialog):
         _save_cfg(cfg, path)
         QMessageBox.information(self, "Gespeichert", "Einstellungen gespeichert.")
         self.accept()
+

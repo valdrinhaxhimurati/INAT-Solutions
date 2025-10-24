@@ -22,3 +22,4 @@ def get_pg_conn():
         cur.execute("SET search_path TO public")
     return conn
 
+

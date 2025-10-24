@@ -2,9 +2,49 @@
     QDialog, QVBoxLayout, QLabel, QLineEdit, QTextEdit, QComboBox,
     QPushButton, QDateEdit
 )
-from PyQt5.QtCore import QDate
+from PyQt5.QtCore import Qt, QDate
+import datetime
 from gui.utils import create_button_bar
-from db_connection import get_db, dict_cursor_factory
+
+def _to_qdate_dateonly(val):
+    """Konvertiert val zu QDate (Datum-only)."""
+    if val is None:
+        return QDate()  # invalid
+    if isinstance(val, QDate):
+        return QDate(val.year(), val.month(), val.day())
+    if isinstance(val, datetime.datetime):
+        d = val.date()
+        return QDate(d.year, d.month, d.day)
+    if isinstance(val, datetime.date):
+        return QDate(val.year, val.month, val.day)
+    s = str(val).split(" ")[0]
+    q = QDate.fromString(s, "yyyy-MM-dd")
+    if q.isValid():
+        return q
+    return QDate.fromString(s, "dd.MM.yyyy")
+
+def _to_date_str(val):
+    """Gibt ISO-Datum 'YYYY-MM-DD' zurück (kein Zeitanteil)."""
+    if val is None or val == "":
+        return ""
+    if isinstance(val, QDate):
+        return val.toString("yyyy-MM-dd")
+    if isinstance(val, datetime.datetime):
+        return val.date().isoformat()
+    if isinstance(val, datetime.date):
+        return val.isoformat()
+    s = str(val).split(" ")[0]
+    try:
+        # akzeptiere ISO
+        datetime.date.fromisoformat(s)
+        return s
+    except Exception:
+        # fallback deutsches Format dd.MM.yyyy
+        try:
+            d = datetime.datetime.strptime(s, "%d.%m.%Y").date()
+            return d.isoformat()
+        except Exception:
+            return ""
 
 class BuchhaltungDialog(QDialog):
     def __init__(self, eintrag=None, kategorien=None):
@@ -68,7 +108,8 @@ class BuchhaltungDialog(QDialog):
 
             # Datum im Format YYYY-MM-DD erwartet
             datum_str = eintrag.get("datum", "")
-            qdate = QDate.fromString(datum_str, "yyyy-MM-dd")
+            qdate = _to_qdate(datum_str)
+
             if qdate.isValid():
                 self.input_datum.setDate(qdate)
 
@@ -88,5 +129,29 @@ class BuchhaltungDialog(QDialog):
             "betrag": self.input_betrag.text(),
             "beschreibung": self.input_beschreibung.toPlainText(),
         }
+
+def _to_qdate(val):
+    """Konvertiert val (None/str/date/datetime/QDate) sicher zu QDate oder Rückgabe ungültiges QDate."""
+    if val is None:
+        return QDate()  # invalid
+    # bereits QDate
+    if isinstance(val, QDate):
+        return val
+    # datetime/date -> QDate
+    if isinstance(val, datetime.datetime) or isinstance(val, datetime.date):
+        d = val.date() if isinstance(val, datetime.datetime) else val
+        return QDate(d.year, d.month, d.day)
+    # string: versuche ISO yyyy-MM-dd, fallback auf Qt parser
+    try:
+        s = str(val)
+        qd = QDate.fromString(s, "yyyy-MM-dd")
+        if qd.isValid():
+            return qd
+        # Fallback deutsches Format
+        qd = QDate.fromString(s, "dd.MM.yyyy")
+        return qd
+    except Exception:
+        return QDate()
+
 
 

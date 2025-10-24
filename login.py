@@ -122,3 +122,4 @@ class LoginDialog(QDialog):
                 return
 
         QMessageBox.warning(self, "Fehler", "Benutzername oder Passwort falsch")
+

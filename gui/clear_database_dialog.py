@@ -1,4 +1,4 @@
-from PyQt5.QtWidgets import (
+﻿from PyQt5.QtWidgets import (
     QDialog, QVBoxLayout, QHBoxLayout, QLabel, QCheckBox, QPushButton,
     QWidget, QScrollArea, QMessageBox
 )
@@ -8,7 +8,7 @@ from db_connection import list_business_tables, clear_selected_tables, get_remot
 class ClearDatabaseDialog(QDialog):
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.setWindowTitle("Datenbank löschen")
+        self.setWindowTitle("Datenbank lÃ¶schen")
         self.setMinimumWidth(420)
 
         try:
@@ -22,11 +22,11 @@ class ClearDatabaseDialog(QDialog):
         root.setContentsMargins(16, 16, 16, 16)
         root.setSpacing(10)
 
-        info = QLabel(f"Wählen Sie die Tabellen, die gelöscht werden sollen.\nModus: {mode_txt}\nHinweis: Die Benutzer-Tabelle 'users' wird nie gelöscht.")
+        info = QLabel(f"WÃ¤hlen Sie die Tabellen, die gelÃ¶scht werden sollen.\nModus: {mode_txt}\nHinweis: Die Benutzer-Tabelle 'users' wird nie gelÃ¶scht.")
         info.setWordWrap(True)
         root.addWidget(info)
 
-        self.select_all_cb = QCheckBox("Alle auswählen")
+        self.select_all_cb = QCheckBox("Alle auswÃ¤hlen")
         root.addWidget(self.select_all_cb)
 
         # Scrollbare Liste der Tabellen
@@ -55,7 +55,7 @@ class ClearDatabaseDialog(QDialog):
         # Buttons
         btn_row = QHBoxLayout()
         btn_row.addStretch(1)
-        self.btn_clear = QPushButton("Löschen")
+        self.btn_clear = QPushButton("LÃ¶schen")
         self.btn_cancel = QPushButton("Abbrechen")
         btn_row.addWidget(self.btn_cancel)
         btn_row.addWidget(self.btn_clear)
@@ -73,19 +73,19 @@ class ClearDatabaseDialog(QDialog):
     def _on_clear(self):
         selected = [cb.text() for cb in self.checks if cb.isChecked()]
         if not selected:
-            QMessageBox.information(self, "Hinweis", "Bitte wählen Sie mindestens eine Tabelle aus.")
+            QMessageBox.information(self, "Hinweis", "Bitte wÃ¤hlen Sie mindestens eine Tabelle aus.")
             return
         names = ", ".join(selected)
         res = QMessageBox.warning(
-            self, "Bestätigen",
-            f"Diese Aktion löscht alle Daten aus {len(selected)} Tabelle(n):\n{names}\n\nFortfahren?",
+            self, "BestÃ¤tigen",
+            f"Diese Aktion lÃ¶scht alle Daten aus {len(selected)} Tabelle(n):\n{names}\n\nFortfahren?",
             QMessageBox.Yes | QMessageBox.No, QMessageBox.No
         )
         if res != QMessageBox.Yes:
             return
         try:
             clear_selected_tables(selected)
-            QMessageBox.information(self, "Erfolg", "Ausgewählte Tabellen wurden gelöscht.")
+            QMessageBox.information(self, "Erfolg", "AusgewÃ¤hlte Tabellen wurden gelÃ¶scht.")
             self.accept()
         except Exception as e:
-            QMessageBox.critical(self, "Fehler", f"Löschen fehlgeschlagen:\n{e}")
+            QMessageBox.critical(self, "Fehler", f"LÃ¶schen fehlgeschlagen:\n{e}")

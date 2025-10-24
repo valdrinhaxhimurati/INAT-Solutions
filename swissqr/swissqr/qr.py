@@ -1,4 +1,4 @@
-import io
+﻿import io
 import qrcode
 import qrcode.image.svg
 from pathlib import Path
@@ -85,3 +85,4 @@ class SwissQR:
             path = Path(path)
         with path.open('w') as f:
             f.write(self._svg_code())
+

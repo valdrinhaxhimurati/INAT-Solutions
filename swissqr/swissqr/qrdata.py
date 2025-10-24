@@ -1,4 +1,4 @@
-from pydantic import field_validator, ConfigDict, BaseModel, model_validator
+﻿from pydantic import field_validator, ConfigDict, BaseModel, model_validator
 from enum import Enum
 from typing import Union, Optional
 from iso4217 import Currency
@@ -151,3 +151,4 @@ class QRData(BaseModel):
             self.trailer
         ]
         return "\r\n".join(elements)
+

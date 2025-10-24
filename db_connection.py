@@ -438,20 +438,44 @@ def clear_selected_tables(tables: Iterable[str]) -> None:
 import json
 
 # Helper für config.json (DB-Backend, postgres_url, etc.)
-def get_config_value(key: str) -> str | None:
+def get_config_value(key, default=None):
     conn = get_db()
-    cur = conn.cursor()
-    cur.execute("SELECT value FROM config WHERE key = ?", (key,))
-    row = cur.fetchone()
-    conn.close()
-    return row[0] if row else None
+    try:
+        cur = conn.cursor()
+        # use %s placeholder so the project's SQL-adapter/wrapper kann es für SQLite anpassen
+        cur.execute("SELECT value FROM config WHERE key = %s", (key,))
+        row = cur.fetchone()
+        if row:
+            return row[0]
+        return default
+    finally:
+        try:
+            conn.close()
+        except Exception:
+            pass
 
-def set_config_value(key: str, value: str):
+def set_config_value(key, value):
     conn = get_db()
-    cur = conn.cursor()
-    cur.execute("INSERT OR REPLACE INTO config (key, value) VALUES (?, ?)", (key, value))
-    conn.commit()
-    conn.close()
+    try:
+        cur = conn.cursor()
+        # erkennen, ob es sich um eine SQLite-Verbindung handelt
+        is_sqlite = getattr(conn, "is_sqlite", False) or "sqlite" in conn.__class__.__module__.lower()
+        if is_sqlite:
+            # Wrapper erwartet %s - wird intern zu ? konvertiert
+            cur.execute("INSERT OR REPLACE INTO config (key, value) VALUES (%s, %s)", (key, value))
+        else:
+            # Postgres: ON CONFLICT verwenden
+            cur.execute(
+                "INSERT INTO config (key, value) VALUES (%s, %s) "
+                "ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value",
+                (key, value)
+            )
+        conn.commit()
+    finally:
+        try:
+            conn.close()
+        except Exception:
+            pass
 
 # Helper für rechnung_layout.json
 def get_rechnung_layout() -> dict:
@@ -465,41 +489,122 @@ def get_rechnung_layout() -> dict:
 def set_rechnung_layout(data: dict):
     conn = get_db()
     cur = conn.cursor()
-    cur.execute("INSERT OR REPLACE INTO rechnung_layout (id, layout_data) VALUES (1, ?)", (json.dumps(data),))
+    cur.execute("INSERT OR REPLACE INTO rechnung_layout (id, layout_data) VALUES (1, %s)", (json.dumps(data),))
     conn.commit()
     conn.close()
 
 # Helper für einstellungen.json
-def get_einstellungen() -> dict:
-    conn = get_db()
-    cur = conn.cursor()
-    cur.execute("SELECT data FROM einstellungen WHERE id = 1")
-    row = cur.fetchone()
-    conn.close()
-    return json.loads(row[0]) if row and row[0] else {}
+def get_einstellungen(id=1):
+    """
+    Liefert Einstellungen als dict.
+    Versucht DB (SELECT data FROM einstellungen WHERE id=%s), fällt bei Fehlern / fehlender Tabelle
+    auf config/einstellungen.json oder leeres dict zurück.
+    """
+    # 1) Versuch DB
+    try:
+        conn = get_db()
+        cur = conn.cursor()
+        try:
+            cur.execute("SELECT data FROM einstellungen WHERE id = %s", (id,))
+            row = cur.fetchone()
+            if row and row[0]:
+                # falls jsonb in DB, row[0] ist bereits dict
+                data = row[0]
+                try:
+                    # sicherstellen, dass dict zurückkommt
+                    return dict(data) if isinstance(data, dict) else json.loads(data)
+                except Exception:
+                    return data
+        except Exception:
+            # Tabelle fehlt oder andere DB-Fehler -> fallback unten
+            pass
+        finally:
+            try:
+                cur.close()
+            except Exception:
+                pass
+            try:
+                conn.close()
+            except Exception:
+                pass
+    except Exception:
+        # kein DB-Zugriff möglich -> fallback
+        pass
+
+    # 2) Fallback auf Datei config/einstellungen.json (falls vorhanden)
+    cfg_path = os.path.join(os.path.dirname(__file__), "config", "einstellungen.json")
+    if os.path.exists(cfg_path):
+        try:
+            with open(cfg_path, "r", encoding="utf-8") as f:
+                return json.load(f)
+        except Exception:
+            return {}
+    # 3) letzter Fallback: leeres dict
+    return {}
 
 def set_einstellungen(data: dict):
     conn = get_db()
-    cur = conn.cursor()
-    cur.execute("INSERT OR REPLACE INTO einstellungen (id, data) VALUES (1, ?)", (json.dumps(data),))
-    conn.commit()
-    conn.close()
+    try:
+        cur = conn.cursor()
+        is_sqlite = getattr(conn, "is_sqlite", False) or getattr(conn, "is_sqlite_conn", False) or ("sqlite" in conn.__class__.__module__.lower())
+        payload = json.dumps(data)
+        if is_sqlite:
+            # Wrapper wandelt %s -> ? für SQLite
+            cur.execute("INSERT OR REPLACE INTO einstellungen (id, data) VALUES (1, %s)", (payload,))
+        else:
+            cur.execute(
+                "INSERT INTO public.einstellungen (id, data) VALUES (1, %s) "
+                "ON CONFLICT (id) DO UPDATE SET data = EXCLUDED.data",
+                (payload,)
+            )
+        conn.commit()
+    finally:
+        try:
+            conn.close()
+        except Exception:
+            pass
 
-# Helper für qr_daten.json
-def get_qr_daten() -> dict:
+def set_rechnung_layout(data: dict):
     conn = get_db()
-    cur = conn.cursor()
-    cur.execute("SELECT data FROM qr_daten WHERE id = 1")
-    row = cur.fetchone()
-    conn.close()
-    return json.loads(row[0]) if row and row[0] else {}
+    try:
+        cur = conn.cursor()
+        is_sqlite = getattr(conn, "is_sqlite", False) or getattr(conn, "is_sqlite_conn", False) or ("sqlite" in conn.__class__.__module__.lower())
+        payload = json.dumps(data)
+        if is_sqlite:
+            cur.execute("INSERT OR REPLACE INTO rechnung_layout (id, layout_data) VALUES (1, %s)", (payload,))
+        else:
+            cur.execute(
+                "INSERT INTO public.rechnung_layout (id, layout_data) VALUES (1, %s) "
+                "ON CONFLICT (id) DO UPDATE SET layout_data = EXCLUDED.layout_data",
+                (payload,)
+            )
+        conn.commit()
+    finally:
+        try:
+            conn.close()
+        except Exception:
+            pass
 
 def set_qr_daten(data: dict):
     conn = get_db()
-    cur = conn.cursor()
-    cur.execute("INSERT OR REPLACE INTO qr_daten (id, data) VALUES (1, ?)", (json.dumps(data),))
-    conn.commit()
-    conn.close()
+    try:
+        cur = conn.cursor()
+        is_sqlite = getattr(conn, "is_sqlite", False) or getattr(conn, "is_sqlite_conn", False) or ("sqlite" in conn.__class__.__module__.lower())
+        payload = json.dumps(data)
+        if is_sqlite:
+            cur.execute("INSERT OR REPLACE INTO qr_daten (id, data) VALUES (1, %s)", (payload,))
+        else:
+            cur.execute(
+                "INSERT INTO public.qr_daten (id, data) VALUES (1, %s) "
+                "ON CONFLICT (id) DO UPDATE SET data = EXCLUDED.data",
+                (payload,)
+            )
+        conn.commit()
+    finally:
+        try:
+            conn.close()
+        except Exception:
+            pass
 
 def ensure_app_schema():
     """
@@ -590,6 +695,11 @@ def ensure_app_schema():
             ("lieferantnr", "INTEGER"),
             ("bemerkung", "TEXT")
         ],
+        # Einstellungen (App-Settings) — wichtig für get_einstellungen / set_einstellungen
+        "einstellungen": [
+            ("id", "BIGSERIAL PRIMARY KEY"),
+            ("data", "JSONB")
+        ],
     }
 
     conn = get_db()
@@ -677,3 +787,4 @@ def ensure_app_schema():
 # keep existing helper name for backward compatibility
 def ensure_database_and_tables():
     ensure_app_schema()
+

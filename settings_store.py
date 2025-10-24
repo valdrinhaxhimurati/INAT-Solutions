@@ -1,4 +1,4 @@
-import os, sys, json, sqlite3
+﻿import os, sys, json, sqlite3
 from typing import Optional, Tuple, Any
 from db_connection import get_db
 
@@ -160,7 +160,7 @@ def import_json_if_missing(key: str, rel_path: str) -> Optional[Any]:
     except Exception:
         return None
 
-# Convenience für Logo
+# Convenience fÃ¼r Logo
 def save_logo_from_file(path: str) -> None:
     if not path or not os.path.isfile(path):
         return

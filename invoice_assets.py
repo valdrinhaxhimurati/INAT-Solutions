@@ -1,4 +1,4 @@
-import io
+﻿import io
 from typing import Optional
 from reportlab.lib.utils import ImageReader
 from settings_store import get_blob

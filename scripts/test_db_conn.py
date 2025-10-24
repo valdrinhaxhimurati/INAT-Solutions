@@ -1,8 +1,8 @@
-import sys, os
+﻿import sys, os
 # ensure repo root is on sys.path so imports like "import db_connection" work
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
-# Test DB connection + schema + simple insert (works für SQLite und Postgres via get_db())
+# Test DB connection + schema + simple insert (works fÃ¼r SQLite und Postgres via get_db())
 import traceback
 from db_connection import get_db, get_configured_url, ensure_app_schema
 

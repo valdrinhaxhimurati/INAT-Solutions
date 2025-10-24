@@ -1,4 +1,4 @@
-# -*- coding: utf-8 -*-
+﻿# -*- coding: utf-8 -*-
 from PyQt5.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QTableWidget, QTableWidgetItem,
     QToolButton, QDialog, QMessageBox
@@ -84,7 +84,7 @@ class KundenTab(QWidget):
             "email":    pick(["email", "e_mail", "mail"]),
             "firma":    pick(["firma", "company", "unternehmen"]),
             "plz":      pick(["plz", "postleitzahl", "zip"]),
-            "strasse":  pick(["strasse", "straße", "street", "adresse", "address"]),
+            "strasse":  pick(["strasse", "straÃŸe", "street", "adresse", "address"]),
             "stadt":    pick(["stadt", "ort", "city", "ortschaft"]),
         }
 
@@ -299,16 +299,24 @@ class KundenTab(QWidget):
             QMessageBox.warning(self, "Keine Auswahl", "Bitte zuerst einen Kunden auswählen.")
             return
         row = self.table.currentRow()
+
+        def cell_text(r, c):
+            it = self.table.item(r, c)
+            return it.text() if it is not None else ""
+
+        # Spalten-Layout: 0=ID,1=Anrede,2=Name,3=Firma,4=PLZ,5=Strasse,6=Stadt,7=E-Mail,8=Bemerkung
         kunde = {
             "kundennr": rid,
-            "anrede": self.table.item(row, 1).text(),
-            "name": self.table.item(row, 2).text(),
-            "plz": self.table.item(row, 3).text(),
-            "strasse": self.table.item(row, 4).text(),
-            "stadt": self.table.item(row, 5).text(),
-            "email": self.table.item(row, 6).text(),
-            "firma": self.table.item(row, 7).text(),
+            "anrede": cell_text(row, 1),
+            "name": cell_text(row, 2),
+            "firma": cell_text(row, 3),
+            "plz": cell_text(row, 4),
+            "strasse": cell_text(row, 5),
+            "stadt": cell_text(row, 6),
+            "email": cell_text(row, 7),
+            "bemerkung": cell_text(row, 8)
         }
+
         dlg = KundenDialog(self, kunde=kunde)
         if dlg.exec_() == QDialog.Accepted:
             d = dlg.get_daten()
@@ -322,11 +330,13 @@ class KundenTab(QWidget):
                     "stadt": cols.get("stadt"),
                     "email": cols.get("email"),
                     "firma": cols.get("firma"),
+                    "bemerkung": cols.get("bemerkung"),
                 }
                 sets, params = [], []
                 for key, dbcol in field_map.items():
                     if dbcol is not None:
-                        sets.append(f"{dbcol}=%s"); params.append(d.get(key, ""))
+                        sets.append(f"{dbcol}=%s")
+                        params.append(d.get(key, ""))
                 if sets:
                     with con.cursor() as cur:
                         cur.execute(f"UPDATE kunden SET {', '.join(sets)} WHERE {cols['kundennr']}=%s", tuple(params + [rid]))
@@ -348,3 +358,4 @@ class KundenTab(QWidget):
             con.commit()
         self.lade_kunden()
         self.kunde_aktualisiert.emit()
+

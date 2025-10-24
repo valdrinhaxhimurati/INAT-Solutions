@@ -1,4 +1,4 @@
-# gui/select_inventory_item.py
+﻿# gui/select_inventory_item.py
 
 from PyQt5 import QtWidgets, QtCore
 from db_connection import get_db, dict_cursor_factory
@@ -15,7 +15,7 @@ def _is_sqlite(con) -> bool:
 class SelectInventoryItemDialog(QtWidgets.QDialog):
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.setWindowTitle("Artikel aus Lager auswählen")
+        self.setWindowTitle("Artikel aus Lager auswÃ¤hlen")
         self._items = []               # Liste von Dicts
         self.selected_item = None      # dict: artikel_id, artikelnummer, bezeichnung, bestand, lagerort, preis
 
@@ -34,7 +34,7 @@ class SelectInventoryItemDialog(QtWidgets.QDialog):
         self.table.doubleClicked.connect(self.accept_selection)
 
         # Buttons
-        btn_ok = QtWidgets.QPushButton("Übernehmen")
+        btn_ok = QtWidgets.QPushButton("Ãœbernehmen")
         btn_cancel = QtWidgets.QPushButton("Abbrechen")
         btn_ok.clicked.connect(self.accept_selection)
         btn_cancel.clicked.connect(self.reject)
@@ -143,7 +143,7 @@ class SelectInventoryItemDialog(QtWidgets.QDialog):
             for c, val in enumerate(values):
                 it = QtWidgets.QTableWidgetItem(str(val))
                 it.setFlags(it.flags() ^ QtCore.Qt.ItemIsEditable)
-                if c in (2, 4):  # Bestand / Preis rechtsbündig
+                if c in (2, 4):  # Bestand / Preis rechtsbÃ¼ndig
                     it.setTextAlignment(QtCore.Qt.AlignRight | QtCore.Qt.AlignVCenter)
                 self.table.setItem(r, c, it)
 
@@ -161,3 +161,4 @@ class SelectInventoryItemDialog(QtWidgets.QDialog):
 
     def exec_and_get(self):
         return self.exec_() == QtWidgets.QDialog.Accepted, self.selected_item
+

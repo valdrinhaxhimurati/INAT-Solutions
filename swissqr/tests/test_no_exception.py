@@ -1,4 +1,4 @@
-import unittest
+﻿import unittest
 import pathlib
 import uuid
 import tempfile
@@ -49,3 +49,4 @@ class TestNoException(unittest.TestCase):
         q.save(path)
         self.assertTrue(path.is_file())
         path.unlink()
+

@@ -151,3 +151,4 @@ class QRData(BaseModel):
             self.trailer
         ]
         return "\r\n".join(elements)
+

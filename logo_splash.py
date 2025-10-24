@@ -63,3 +63,4 @@ class LogoSplash(QWidget):
     def _on_finished(self):
         self.finished.emit()
         self.close()
+

@@ -1,4 +1,4 @@
-import sqlite3, os, sys, re, shutil, time, argparse, traceback
+﻿import sqlite3, os, sys, re, shutil, time, argparse, traceback
 
 def resolve_db_path():
     # prefer INAT_DB_URL if set and is sqlite:///

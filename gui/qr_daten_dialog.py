@@ -81,3 +81,4 @@ class QRDatenDialog(QDialog):
             QMessageBox.critical(self, "Fehler", f"Speichern fehlgeschlagen: {e}")
 
 
+

@@ -31,3 +31,4 @@ if __name__ == "__main__":
     })
     # Schema importieren
     psql_apply_schema(psql_bin_dir, host, port, db, user, pwd, sslmode, schema_path)
+

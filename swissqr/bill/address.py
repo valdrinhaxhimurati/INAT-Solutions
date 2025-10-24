@@ -1,4 +1,4 @@
-from .types import AddressType
+﻿from .types import AddressType
 from pydantic import BaseModel
 
 
@@ -10,3 +10,4 @@ class Address(BaseModel):
     postal_code: str
     city: str
     country: str
+

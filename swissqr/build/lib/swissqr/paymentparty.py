@@ -139,3 +139,4 @@ class PaymentParty(BaseModel):
                 self.country
             ]
         return "\r\n".join(elements)
+

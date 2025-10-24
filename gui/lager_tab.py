@@ -18,3 +18,4 @@ class LagerTab(QWidget):
         layout.addWidget(self.tabs)
         self.setLayout(layout)
 
+

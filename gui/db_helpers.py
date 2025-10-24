@@ -1,8 +1,8 @@
-import json
+﻿import json
 from db_connection import get_db, dict_cursor_factory
 
 def run_db(sql, params=None, fetch=False, many=False):
-    """Führe ein Statement sicher aus; gibt optional fetch-Ergebnisse zurück."""
+    """FÃ¼hre ein Statement sicher aus; gibt optional fetch-Ergebnisse zurÃ¼ck."""
     with get_db() as conn:
         try:
             try:
@@ -10,7 +10,7 @@ def run_db(sql, params=None, fetch=False, many=False):
             except Exception:
                 pass
 
-            # erkenne sqlite vs postgres über Wrapper-Property
+            # erkenne sqlite vs postgres Ã¼ber Wrapper-Property
             is_sqlite = getattr(conn, "is_sqlite", getattr(conn, "is_sqlite_conn", False))
 
             cur = conn.cursor() if is_sqlite else conn.cursor(cursor_factory=dict_cursor_factory)

@@ -1,4 +1,4 @@
-from pydantic import BaseModel
+﻿from pydantic import BaseModel
 from typing import Optional
 from .address import Address
 
@@ -10,3 +10,4 @@ class PaymentInformation(BaseModel):
     amount: float
     reference: Optional[str] = None
     unstructured_message: Optional[str] = None
+

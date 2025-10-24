@@ -85,3 +85,4 @@ class SwissQR:
             path = Path(path)
         with path.open('w') as f:
             f.write(self._svg_code())
+

@@ -1,4 +1,4 @@
-# -*- coding: utf-8 -*-
+﻿# -*- coding: utf-8 -*-
 from PyQt5.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QToolButton, QTableWidget, QTableWidgetItem,
     QMessageBox, QDialog, QFileDialog, QInputDialog
@@ -626,7 +626,7 @@ class RechnungenTab(QWidget):
         c = canvas.Canvas(dateipfad, pagesize=A4)
         width, height = A4
 
-        # Blöcke
+        # BlÃ¶cke
         blocks = {
             "logo":      (20*mm, 250*mm, 170*mm, 35*mm),
             "adresse":   (20*mm, 200*mm, 70*mm, 25*mm),
@@ -811,7 +811,7 @@ class RechnungenTab(QWidget):
                 textobj.textLine(zeile)
             c.drawText(textobj)
 
-        # Fusszeile aus dem Layout-Dialog (JSON-Key 'fusszeile') – zentriert
+        # Fusszeile aus dem Layout-Dialog (JSON-Key 'fusszeile') â€“ zentriert
         x_f, y_f, w_f, h_f = blocks["fusszeile"]
         fuss = self.layout_config.get("fusszeile", {}) or {}
         fuss_text  = (fuss.get("text") or "").strip()
@@ -862,7 +862,7 @@ class RechnungenTab(QWidget):
             qr_data = _get_qr_daten()
             creditor = qr_data.get("creditor") or {
                 'name': "Deine Firma GmbH", 'street': "Musterstrasse 1",
-                'pcode': "8000", 'city': "Zürich", 'country': "CH",
+                'pcode': "8000", 'city': "ZÃ¼rich", 'country': "CH",
             }
             iban = qr_data.get("iban") or "CH5800791123000889012"
             currency = qr_data.get("currency", "CHF")
@@ -871,7 +871,7 @@ class RechnungenTab(QWidget):
                 'name': "Deine Firma GmbH",
                 'street': "Musterstrasse 1",
                 'pcode': "8000",
-                'city': "Zürich",
+                'city': "ZÃ¼rich",
                 'country': "CH",
             }
             iban = "CH5800791123000889012"
@@ -907,7 +907,7 @@ class RechnungenTab(QWidget):
             language='de'
         )
 
-        # SVG generieren und ins PDF einfügen (Textmodus für svgwrite)
+        # SVG generieren und ins PDF einfÃ¼gen (Textmodus fÃ¼r svgwrite)
         with tempfile.NamedTemporaryFile(delete=False, suffix=".svg", mode="w", encoding="utf-8") as tmp_svg:
             my_bill.as_svg(tmp_svg)
             tmp_svg_path = tmp_svg.name
@@ -930,8 +930,8 @@ class RechnungenTab(QWidget):
 
     def draw_logo_from_db_or_path(c, x, y, w, h, file_path=None):
         """
-        Zeichnet das Logo an (x,y) mit Breite w und Höhe h.
-        Nimmt zuerst das Logo aus der DB, sonst (Fallback) den übergebenen Dateipfad.
+        Zeichnet das Logo an (x,y) mit Breite w und HÃ¶he h.
+        Nimmt zuerst das Logo aus der DB, sonst (Fallback) den Ã¼bergebenen Dateipfad.
         """
         img = get_invoice_logo_imagereader()
         try:
@@ -947,3 +947,4 @@ def _get_qr_daten():
     if qr is None:
         qr = import_json_if_missing("qr_daten", "config/qr_daten.json") or {}
     return qr
+

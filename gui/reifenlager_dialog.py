@@ -13,11 +13,14 @@ class ReifenlagerDialog(QDialog):
 
         # Kundenliste als ComboBox
         layout.addWidget(QLabel("Kunde:"))
-        self.kunde_box = QComboBox()
         self.kunden = self.lade_kundenliste()
-        for kundennr, anzeige in self.kunden:
-            self.kunde_box.addItem(anzeige, kundennr)
-        layout.addWidget(self.kunde_box)
+        self.kunden_box = QComboBox()
+        self.kunden_box.addItem("Kein Kunde", None)
+        for k in self.kunden:
+            kundennr = k.get("kundennr")
+            anzeige = k.get("display") or f"{(k.get('anrede') or '').strip()} {(k.get('name') or '').strip()}".strip()
+            self.kunden_box.addItem(anzeige or "", kundennr)
+        layout.addWidget(self.kunden_box)
 
         # Restliche Felder
         self.fahrzeug_input = QLineEdit()
@@ -60,9 +63,9 @@ class ReifenlagerDialog(QDialog):
         layout.addWidget(self.bemerkung_input)
 
         if reifen:
-            idx = self.kunde_box.findText(reifen.get("kunde_anzeige", ""), Qt.MatchContains)
+            idx = self.kunden_box.findText(reifen.get("kunde_anzeige", ""), Qt.MatchContains)
             if idx >= 0:
-                self.kunde_box.setCurrentIndex(idx)
+                self.kunden_box.setCurrentIndex(idx)
             self.fahrzeug_input.setText(reifen.get("fahrzeug", ""))
             self.dimension_input.setText(reifen.get("dimension", ""))
             typ_idx = self.typ_input.findText(reifen.get("typ", ""), Qt.MatchExactly)
@@ -98,40 +101,74 @@ class ReifenlagerDialog(QDialog):
         self.setLayout(layout)
 
     def lade_kundenliste(self):
-        con = get_db()
-        cur = con.cursor(cursor_factory=dict_cursor_factory(con))
-        try:
-            cur.execute("""
-                SELECT 
-                    kundennr,
-                    COALESCE(anrede,'') AS anrede,
-                    COALESCE(name,'')   AS name,
-                    COALESCE(firma,'')  AS firma,
-                    COALESCE(plz,'')    AS plz,
-                    COALESCE(stadt,'')  AS stadt
-                FROM public.kunden
-                ORDER BY name
-            """)
-            kunden = cur.fetchall()  # Liste von Dicts
-        finally:
-            cur.close()
-            con.close()
-
+        """
+        Liefert Liste von dicts mit mindestens den Keys:
+        'kundennr', 'anrede', 'name', 'firma', 'display'
+        (robust gegen dict / sqlite3.Row / tuple rows)
+        """
         out = []
-        for k in kunden:
-            anrede = k["anrede"].strip()
-            name   = k["name"].strip()
-            firma  = k["firma"].strip()
-            plz    = k["plz"].strip()
-            stadt  = k["stadt"].strip()
+        conn = get_db()
+        try:
+            try:
+                cur = conn.cursor(cursor_factory=dict_cursor_factory(conn))
+            except Exception:
+                cur = conn.cursor()
+            # explizit Spalten abfragen, damit Reihenfolge bekannt ist
+            cur.execute("SELECT kundennr, anrede, name, firma FROM kunden ORDER BY name")
+            rows = cur.fetchall()
+            desc = getattr(cur, "description", None)
+            col_names = [d[0].lower() for d in desc] if desc else []
+        except Exception:
+            rows = []
+            col_names = []
+        finally:
+            try:
+                conn.close()
+            except Exception:
+                pass
 
-            # Anzeige-String bauen
-            left = f"{anrede} {name}".strip() if anrede else name
-            firmapart = f" ({firma})" if firma else ""
-            right = f"{plz} {stadt}".strip()
-            display = f"{left}{firmapart} - {right}" if right else f"{left}{firmapart}"
+        for r in rows:
+            # dict-like (oder sqlite3.Row behaves like mapping)
+            if isinstance(r, dict) or hasattr(r, "keys"):
+                try:
+                    rd = dict(r)
+                except Exception:
+                    rd = {k: getattr(r, k) for k in getattr(r, "keys", lambda: [])()}
+                # case-insensitive access
+                rd_lower = {k.lower(): v for k, v in rd.items()}
+                kundennr = rd_lower.get("kundennr")
+                anrede = (rd_lower.get("anrede") or "") 
+                name = (rd_lower.get("name") or "")
+                firma = (rd_lower.get("firma") or "")
+            else:
+                # sequence/tuple fallback - use description mapping if available
+                try:
+                    seq = list(r)
+                except Exception:
+                    seq = []
+                if col_names and len(col_names) == len(seq):
+                    m = dict(zip(col_names, seq))
+                    kundennr = m.get("kundennr")
+                    anrede = (m.get("anrede") or "")
+                    name = (m.get("name") or "")
+                    firma = (m.get("firma") or "")
+                else:
+                    # assume order (kundennr, anrede, name, firma)
+                    while len(seq) < 4:
+                        seq.append(None)
+                    kundennr, anrede, name, firma = seq[0], seq[1] or "", seq[2] or "", seq[3] or ""
 
-            out.append((k["kundennr"], display))
+            display = f"{anrede} {name}".strip()
+            if firma:
+                display = f"{display} ({firma})" if display else firma
+
+            out.append({
+                "kundennr": kundennr,
+                "anrede": anrede,
+                "name": name,
+                "firma": firma,
+                "display": display
+            })
         return out
 
     def accept(self):
@@ -139,27 +176,30 @@ class ReifenlagerDialog(QDialog):
         super().accept()
 
     def get_daten(self):
-        """Gibt die Dialogdaten zurück. Kundennr ist optional (None erlaubt)."""
-        try:
-            _kd = self.kunde_box.currentData()
-        except Exception:
-            _kd = None
-        try:
-            kundennr_val = int(_kd) if _kd is not None and str(_kd).strip() != "" else None
-        except Exception:
-            kundennr_val = None
+        # Sentinel für "kein Datum" (falls ihr das so verwendet habt)
+        sentinel = QDate(2000, 1, 1)
 
-        daten = {
-            "kundennr": kundennr_val,
-            "kunde_anzeige": self.kunde_box.currentText(),
+        def fmt_date(widget):
+            if not hasattr(widget, "date"):
+                return ""
+            d = widget.date()
+            if not d.isValid():
+                return ""
+            if d == sentinel:
+                return ""
+            return d.toString("yyyy-MM-dd")
+
+        return {
+            "kundennr": None if self.kunden_box.currentData() is None else int(self.kunden_box.currentData()),
+            "kunde_anzeige": self.kunden_box.currentText(),
             "fahrzeug": self.fahrzeug_input.text().strip(),
             "dimension": self.dimension_input.text().strip(),
             "typ": self.typ_input.currentText(),
             "dot": self.dot_input.text().strip(),
             "lagerort": self.lagerort_input.text().strip(),
-            "eingelagert_am": self.eingelagert_am_input.date().toString("yyyy-MM-dd"),
-            "ausgelagert_am": self.ausgelagert_am_input.date().toString("yyyy-MM-dd"),
+            "eingelagert_am": fmt_date(getattr(self, "eingelagert_am_input", None)),
+            "ausgelagert_am": fmt_date(getattr(self, "ausgelagert_am_input", None)),
             "bemerkung": self.bemerkung_input.text().strip()
         }
-        return daten
+
 

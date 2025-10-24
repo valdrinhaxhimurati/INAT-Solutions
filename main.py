@@ -306,3 +306,4 @@ if __name__ == "__main__":
         print(f"Ein Fehler ist aufgetreten. Details wurden in '{LOG_FILE}' gespeichert.")
         sys.exit(1)
 
+

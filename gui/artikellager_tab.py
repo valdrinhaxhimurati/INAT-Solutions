@@ -37,19 +37,37 @@ class ArtikellagerTab(QWidget):
 
     # ---------- DB ----------
     def _ensure_table(self):
-        sql = """
-        CREATE TABLE IF NOT EXISTS artikellager (
-            artikel_id    INTEGER PRIMARY KEY AUTOINCREMENT,
-            artikelnummer TEXT,
-            bezeichnung   TEXT,
-            bestand       INTEGER,
-            lagerort      TEXT
-        )
-        """
-        with get_db() as con:
-            with con.cursor() as cur:
+        conn = get_db()
+        is_sqlite = getattr(conn, "is_sqlite", False) or getattr(conn, "is_sqlite_conn", False)
+        if is_sqlite:
+            sql = """
+            CREATE TABLE IF NOT EXISTS artikellager (
+                artikel_id     INTEGER PRIMARY KEY AUTOINCREMENT,
+                artikelnummer  TEXT,
+                bezeichnung    TEXT,
+                bestand        INTEGER,
+                lagerort       TEXT
+            )
+            """
+        else:
+            sql = """
+            CREATE TABLE IF NOT EXISTS artikellager (
+                artikel_id     BIGSERIAL PRIMARY KEY,
+                artikelnummer  TEXT,
+                bezeichnung    TEXT,
+                bestand        INTEGER,
+                lagerort       TEXT
+            )
+            """
+        try:
+            with conn.cursor() as cur:
                 cur.execute(sql)
-            con.commit()
+            conn.commit()
+        finally:
+            try:
+                conn.close()
+            except Exception:
+                pass
 
     def lade_artikel(self):
         with get_db() as con:
@@ -122,5 +140,6 @@ class ArtikellagerTab(QWidget):
                 cur.execute("DELETE FROM public.artikellager WHERE artikel_id=%s", (artikel_id,))
             con.commit()
         self.lade_artikel()
+
 
 

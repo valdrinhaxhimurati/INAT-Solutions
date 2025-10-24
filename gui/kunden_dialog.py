@@ -71,3 +71,4 @@ class KundenDialog(QDialog):
         }
 
 
+

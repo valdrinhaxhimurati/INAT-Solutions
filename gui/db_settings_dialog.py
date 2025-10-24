@@ -1,4 +1,4 @@
-from PyQt5.QtWidgets import (
+﻿from PyQt5.QtWidgets import (
     QDialog, QVBoxLayout, QGroupBox, QLabel, QLineEdit, QCheckBox,
     QPushButton, QWidget, QHBoxLayout, QFormLayout, QMessageBox, QRadioButton, QApplication
 )
@@ -76,7 +76,7 @@ class DBSettingsDialog(QDialog):
         # Initial UI-State
         self._sync_mode_ui()
 
-        # 15% größer starten
+        # 15% grÃ¶ÃŸer starten
         self.resize(int(self.sizeHint().width() * 1.15), int(self.sizeHint().height() * 1.15))
 
     def _sync_mode_ui(self):
@@ -120,11 +120,11 @@ class DBSettingsDialog(QDialog):
 
         changed = (is_remote != self._initial_use_remote) or (is_remote and new_url != self._initial_url)
         if changed:
-            # Neustart vorschlagen und ggf. ausführen
+            # Neustart vorschlagen und ggf. ausfÃ¼hren
             res = QMessageBox.question(
                 self,
                 "Neustart erforderlich",
-                "Die Datenbank-Einstellungen wurden geändert. Anwendung jetzt neu starten?",
+                "Die Datenbank-Einstellungen wurden geÃ¤ndert. Anwendung jetzt neu starten?",
                 QMessageBox.Yes | QMessageBox.No,
                 QMessageBox.Yes
             )

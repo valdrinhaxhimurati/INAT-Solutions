@@ -1,4 +1,4 @@
-# Kopiert Ressourcen aus _internal neben die EXE, damit QSS/Logos gefunden werden.
+﻿# Kopiert Ressourcen aus _internal neben die EXE, damit QSS/Logos gefunden werden.
 import os, shutil, sys
 from paths import data_dir
 

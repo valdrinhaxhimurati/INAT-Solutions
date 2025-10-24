@@ -1,4 +1,4 @@
-from .payment_information import PaymentInformation
+﻿from .payment_information import PaymentInformation
 import qrcode
 from io import BytesIO
 
@@ -34,3 +34,4 @@ class QRBill:
         qr.make(fit=True)
         img = qr.make_image(fill="black", back_color="white")
         img.save(buffer, format="PNG")
+

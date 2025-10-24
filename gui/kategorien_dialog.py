@@ -94,3 +94,4 @@ class KategorienDialog(QDialog):
             QMessageBox.critical(self, "Fehler", f"Speichern fehlgeschlagen: {e}")
 
 
+

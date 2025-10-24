@@ -496,3 +496,4 @@ class RechnungLayoutDialog(QDialog):
         self.logo_vorschau.clear()
         self.btn_logo_entfernen.setEnabled(False)
 
+

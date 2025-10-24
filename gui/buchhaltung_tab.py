@@ -1,30 +1,93 @@
-﻿from PyQt5.QtWidgets import (
+﻿# -*- coding: utf-8 -*-
+from PyQt5.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QTableWidget, QTableWidgetItem,
-    QMessageBox, QLineEdit, QFileDialog, QComboBox, QLabel, QDateEdit, QAbstractItemView, QToolButton  
+    QMessageBox, QLineEdit, QFileDialog, QComboBox, QLabel, QDateEdit, QAbstractItemView, QToolButton,
+    QHeaderView  # <-- fehlte
 )
-from db_connection import get_db, dict_cursor_factory, get_einstellungen, get_config_value
 from PyQt5.QtCore import Qt, QDate
-from PyQt5.QtGui import QColor, QFont
-import sqlite3
-import json
-import os
-from gui.buchhaltung_dialog import BuchhaltungDialog
+from PyQt5.QtGui import QColor, QFont  # <-- fehlten
 from fpdf import FPDF
-import tempfile
-import subprocess
-from PyQt5.QtCore import QUrl
-from PyQt5.QtGui import QDesktopServices
-import glob
-import shutil
-from PyQt5.QtWidgets import QHeaderView
-from paths import local_db_path, data_dir
-
+from db_connection import get_db, dict_cursor_factory, get_einstellungen, get_config_value
+from paths import data_dir, local_db_path  # <-- fehlte
 import pandas as pd
+import datetime
+import os, shutil, glob  # <-- fehlten
+import sqlite3  # <-- fehlte
 
+from gui.buchhaltung_dialog import BuchhaltungDialog
+
+# ----------------- Einfache, zentrale Helfer (einmalig, modul-level) -----------------
+def _is_sqlite_conn(conn) -> bool:
+    """Erkenne SQLite-Verbindung (robust gegen Wrapper)."""
+    try:
+        import sqlite3 as _sqlite
+        if isinstance(conn, _sqlite.Connection):
+            return True
+        return "sqlite" in conn.__class__.__module__.lower()
+    except Exception:
+        return False
+
+def normalize_date_for_display(val) -> str:
+    """Return 'YYYY-MM-DD' (no time) for display. Accepts date/datetime/str/bytes."""
+    if val is None:
+        return ""
+    if isinstance(val, (bytes, bytearray)):
+        try:
+            val = val.decode("utf-8")
+        except Exception:
+            val = str(val)
+    if isinstance(val, datetime.datetime):
+        return val.date().isoformat()
+    if isinstance(val, datetime.date):
+        return val.isoformat()
+    s = str(val).strip()
+    if " " in s:
+        s = s.split(" ", 1)[0]
+    try:
+        datetime.date.fromisoformat(s)
+        return s
+    except Exception:
+        pass
+    try:
+        d = datetime.datetime.strptime(s, "%d.%m.%Y").date()
+        return d.isoformat()
+    except Exception:
+        return s
+
+def to_qdate(val) -> QDate:
+    """Return QDate from val (date/datetime/str)."""
+    if val is None or val == "":
+        return QDate()  # invalid
+    if isinstance(val, QDate):
+        return val
+    if isinstance(val, datetime.datetime):
+        d = val.date()
+        return QDate(d.year, d.month, d.day)
+    if isinstance(val, datetime.date):
+        return QDate(val.year, val.month, val.day)
+    s = normalize_date_for_display(val)
+    return QDate.fromString(s, "yyyy-MM-dd")
+
+def to_db_date(val) -> str:
+    """Return ISO 'YYYY-MM-DD' string for DB storage (no time)."""
+    if val is None or val == "":
+        return ""
+    if isinstance(val, QDate):
+        return val.toString("yyyy-MM-dd")
+    if isinstance(val, datetime.datetime):
+        return val.date().isoformat()
+    if isinstance(val, datetime.date):
+        return val.isoformat()
+    return normalize_date_for_display(val)
+# ------------------------------------------------------------------------------------
 
 class BuchhaltungTab(QWidget):
     def __init__(self):
         super().__init__()
+        self.init_ui()
+        self.lade_eintraege()
+
+    def init_ui(self):
         main_layout = QHBoxLayout()
         left_layout = QVBoxLayout()
 
@@ -446,15 +509,26 @@ class BuchhaltungTab(QWidget):
         except (ValueError, TypeError):
             neue_id = None
 
+        # sicherstellen: datum als ISO-String (YYYY-MM-DD) bevor SQL
         try:
+            # konvertiere datum vor SQL
+            daten["datum"] = to_db_date(daten.get("datum"))
             if eintrag_id:
                 # Update - Achtung: auch ID darf geändert werden
                 if neue_id is not None:
-                    cursor.execute("""
-                        UPDATE buchhaltung
-                        SET id= %s, datum= %s, typ= %s, kategorie= %s, betrag= %s, beschreibung= %s
-                        WHERE id= %s
-                    """, (neue_id, daten["datum"], daten["typ"], daten["kategorie"], betrag, daten["beschreibung"], eintrag_id))
+                    if _is_sqlite_conn(conn):
+                        cursor.execute("""
+                            UPDATE buchhaltung
+                            SET id= %s, datum= %s, typ= %s, kategorie= %s, betrag= %s, beschreibung= %s
+                            WHERE id= %s
+                        """, (neue_id, daten["datum"], daten["typ"], daten["kategorie"], betrag, daten["beschreibung"], eintrag_id))
+                    else:
+                        # Postgres: ON CONFLICT bei ID-Änderung (falls nötig, aber hier ist es UPDATE)
+                        cursor.execute("""
+                            UPDATE public.buchhaltung
+                            SET id= %s, datum= %s, typ= %s, kategorie= %s, betrag= %s, beschreibung= %s
+                            WHERE id= %s
+                        """, (neue_id, daten["datum"], daten["typ"], daten["kategorie"], betrag, daten["beschreibung"], eintrag_id))
                 else:
                     # Falls keine gültige neue ID, kein Update der ID
                     cursor.execute("""
@@ -465,10 +539,17 @@ class BuchhaltungTab(QWidget):
             else:
                 # Neuer Eintrag mit manueller ID oder ohne
                 if neue_id is not None:
-                    cursor.execute("""
-                        INSERT INTO buchhaltung (id, datum, typ, kategorie, betrag, beschreibung)
-                        VALUES (%s, %s, %s, %s, %s, %s)
-                    """, (neue_id, daten["datum"], daten["typ"], daten["kategorie"], betrag, daten["beschreibung"]))
+                    if _is_sqlite_conn(conn):
+                        cursor.execute("""
+                            INSERT OR IGNORE INTO buchhaltung (id, datum, typ, kategorie, betrag, beschreibung)
+                            VALUES (%s, %s, %s, %s, %s, %s)
+                        """, (neue_id, daten["datum"], daten["typ"], daten["kategorie"], betrag, daten["beschreibung"]))
+                    else:
+                        cursor.execute("""
+                            INSERT INTO public.buchhaltung (id, datum, typ, kategorie, betrag, beschreibung)
+                            VALUES (%s, %s, %s, %s, %s, %s)
+                            ON CONFLICT (id) DO NOTHING
+                        """, (neue_id, daten["datum"], daten["typ"], daten["kategorie"], betrag, daten["beschreibung"]))
                 else:
                     cursor.execute("""
                         INSERT INTO buchhaltung (datum, typ, kategorie, betrag, beschreibung)
@@ -493,16 +574,29 @@ class BuchhaltungTab(QWidget):
         conn = get_db()
         cursor = conn.cursor(cursor_factory=dict_cursor_factory(conn))
 
-        cursor.execute("""
-            CREATE TABLE IF NOT EXISTS buchhaltung (
-                id SERIAL PRIMARY KEY,
-                datum TEXT,
-                typ TEXT,
-                kategorie TEXT,
-                betrag REAL,
-                beschreibung TEXT
-            )
-        """)
+        # backend-aware CREATE TABLE
+        if _is_sqlite_conn(conn):
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS buchhaltung (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    datum TEXT,
+                    typ TEXT,
+                    kategorie TEXT,
+                    betrag REAL,
+                    beschreibung TEXT
+                )
+            """)
+        else:
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS public.buchhaltung (
+                    id SERIAL PRIMARY KEY,
+                    datum TEXT,
+                    typ TEXT,
+                    kategorie TEXT,
+                    betrag REAL,
+                    beschreibung TEXT
+                )
+            """)
 
         query = "SELECT id, datum, typ, kategorie, betrag, beschreibung FROM buchhaltung WHERE 1=1"
         params = []
@@ -552,8 +646,12 @@ class BuchhaltungTab(QWidget):
         
         for row_idx, row in enumerate(daten):
             for col_idx, value in enumerate(row):
-                item = QTableWidgetItem(str(value))
-                # ... Alignment setzen ...
+                if col_idx == 1:  # Datum-Spalte
+                    text = normalize_date_for_display(value)
+                else:
+                    text = "" if value is None else str(value)
+                item = QTableWidgetItem(text)
+                # ...existing code...
                 self.table.setItem(row_idx, col_idx, item)
 
             # Spalte "Rechnung" ganz am Ende hinzufügen
@@ -609,10 +707,9 @@ class BuchhaltungTab(QWidget):
 
         # 2) Eintrags-ID und Datum auslesen
         eintrag_id = int(self.table.item(row, 0).text())
-        datum_text = self.table.item(row, 1).text()  
-        
-        # QDate zum Year-String
-        datum_qdate = QDate.fromString(datum_text, "yyyy-MM-dd")
+        datum_text = self.table.item(row, 1).text()
+        # parse/normalize Datum per zentralem Helper
+        datum_qdate = to_qdate(datum_text)
         if not datum_qdate.isValid():
             QMessageBox.warning(self, "Fehler", f"Ungültiges Datum: {datum_text}")
             return
@@ -732,6 +829,30 @@ class BuchhaltungTab(QWidget):
         conn = get_db()
         cursor = conn.cursor(cursor_factory=dict_cursor_factory(conn))
 
+        # backend-aware CREATE TABLE
+        if _is_sqlite_conn(conn):
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS buchhaltung (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    datum TEXT,
+                    typ TEXT,
+                    kategorie TEXT,
+                    betrag REAL,
+                    beschreibung TEXT
+                )
+            """)
+        else:
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS public.buchhaltung (
+                    id SERIAL PRIMARY KEY,
+                    datum TEXT,
+                    typ TEXT,
+                    kategorie TEXT,
+                    betrag REAL,
+                    beschreibung TEXT
+                )
+            """)
+
         def parse_datum(val):
             import datetime
             if pd.isnull(val) or str(val).strip() == "":
@@ -750,7 +871,7 @@ class BuchhaltungTab(QWidget):
                 return ""
 
 
-        for idx, row in daten.iterrows():
+        for index, row in df.iterrows():
             belegnr = int(row["Belegnr"])
             datum = parse_datum(row["Datum"])
             einnahme = row["Einnahme"] if pd.notnull(row["Einnahme"]) else 0
@@ -763,17 +884,24 @@ class BuchhaltungTab(QWidget):
                            .replace("'", "")
                            .replace(",", ".") or 0)
 
-            cursor.execute("""
-                INSERT OR IGNORE INTO buchhaltung (id, datum, typ, kategorie, betrag, beschreibung)
-                VALUES (%s, %s, %s, %s, %s, %s)
-            """, (
-                belegnr, datum, typ, "Sonstiges", betrag, bemerkung
-            ))
+            if _is_sqlite_conn(conn):
+                cursor.execute(
+                    "INSERT OR IGNORE INTO buchhaltung (id, datum, typ, kategorie, betrag, beschreibung) VALUES (%s, %s, %s, %s, %s, %s)",
+                    (belegnr, datum, typ, "Sonstiges", betrag, bemerkung)
+                )
+            else:
+                cursor.execute(
+                    "INSERT INTO public.buchhaltung (id, datum, typ, kategorie, betrag, beschreibung) "
+                    "VALUES (%s, %s, %s, %s, %s, %s) "
+                    "ON CONFLICT (id) DO NOTHING",
+                    (belegnr, datum, typ, "Sonstiges", betrag, bemerkung)
+                )
 
         conn.commit()
         conn.close()
         QMessageBox.information(self, "Fertig", f"{len(daten)} Buchungen importiert!")
         self.lade_eintraege()
+
 
 
 

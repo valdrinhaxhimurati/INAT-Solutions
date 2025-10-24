@@ -261,3 +261,4 @@ class EinstellungenTab(QWidget):
         from gui.benutzer_dialog import BenutzerVerwaltenDialog
         dlg = BenutzerVerwaltenDialog(self.login_db_path or USERS_DB_PATH, self)
         dlg.exec_()
+

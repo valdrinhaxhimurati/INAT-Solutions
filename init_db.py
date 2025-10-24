@@ -238,3 +238,4 @@ def apply_schema(app_url, schema_path=None):
             conn.close()
         except Exception:
             pass
+

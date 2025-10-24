@@ -244,3 +244,4 @@ class BenutzerVerwaltenDialog(QDialog):
             self._reload()
         except Exception as e:
             QMessageBox.critical(self, "Fehler", str(e))
+

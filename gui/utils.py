@@ -99,3 +99,4 @@ def exportiere_rechnung_pdf(rechnung):
     c.save()
     print(f"PDF {datei_name} wurde erstellt.")
 
+

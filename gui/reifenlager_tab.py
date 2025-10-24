@@ -69,7 +69,7 @@ class ReifenlagerTab(QWidget):
         cursor = conn.cursor(cursor_factory=dict_cursor_factory(conn))
         # create table with DB-appropriate id type (auto-incrementing primary key)
         try:
-            is_sqlite = isinstance(conn, sqlite3.Connection) or "sqlite" in conn.__class__.__module__.lower()
+            is_sqlite = getattr(conn, "is_sqlite", False) or getattr(conn, "is_sqlite_conn", False)
         except Exception:
             is_sqlite = False
         if is_sqlite:
@@ -91,7 +91,7 @@ class ReifenlagerTab(QWidget):
         else:
             cursor.execute("""
                 CREATE TABLE IF NOT EXISTS reifenlager (
-                    reifen_id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    reifen_id BIGSERIAL PRIMARY KEY,
                     kundennr INTEGER,
                     kunde_anzeige TEXT,
                     fahrzeug TEXT,
@@ -252,5 +252,6 @@ class ReifenlagerTab(QWidget):
         conn.commit()
         conn.close()
         self.lade_reifen()
+
 
 

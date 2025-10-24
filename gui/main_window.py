@@ -1,4 +1,5 @@
-﻿from PyQt5.QtWidgets import (
+﻿# -*- coding: utf-8 -*-
+from PyQt5.QtWidgets import (
     QMainWindow, QTabWidget, QLabel, QWidget 
 )
 from db_connection import get_db, dict_cursor_factory
@@ -55,7 +56,7 @@ class MainWindow(QMainWindow):
         self.tabs.addTab(self.einstellungen_tab, "Einstellungen")
 
         self.status_bar = self.statusBar()
-        user_label = QLabel(f"ðŸ‘¤  Angemeldet als: {self.benutzername}")
+        user_label = QLabel(f"👤  Angemeldet als: {self.benutzername}")
         font = QFont("Segoe UI", 15)
         font.setBold(False)
         user_label.setFont(font)
@@ -73,3 +74,4 @@ class MainWindow(QMainWindow):
         self.status_bar.addWidget(user_label)
 
         self.setCentralWidget(self.tabs)
+

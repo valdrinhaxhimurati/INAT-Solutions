@@ -160,25 +160,18 @@ class RechnungDialog(QDialog):
         grid.addWidget(self.le_uid, row, 3)
         row += 1
 
-        # UID immer setzen
+        # UID immer setzen (nur aus Rechnung oder Konfiguration; nicht aus DB-Sequenz)
         try:
-            uid_val = None
-            if getattr(self, "rechnung", None):
-                if isinstance(self.rechnung, dict):
-                    # nur echte 'uid' nutzen — kein Fallback auf rechnung_nr
-                    uid_val = self.rechnung.get("uid")
+            uid_val = ""
+            if isinstance(self.rechnung, dict):
+                # nur echte 'uid' nutzen — kein Fallback auf rechnung_nr
+                uid_val = self.rechnung.get("uid") or ""
             if not uid_val:
                 try:
-                    uid_val = get_config_value("uid")
+                    uid_val = get_config_value("uid") or ""
                 except Exception:
-                    uid_val = None
-            if not uid_val:
-                try:
-                    uid_val = _get_next_uid_from_db()
-                except Exception:
-                    uid_val = None
-            if uid_val is None:
-                uid_val = ""  # never leave as None
+                    uid_val = ""
+            # keine weiteren Versuche / DB-Abfragen — UID ist die Geschäft‑UID oder leer
             self.le_uid.setText(str(uid_val))
         except Exception:
             # best-effort: falls etwas schiefgeht, setze leeres Feld, aber nicht None
@@ -532,44 +525,9 @@ class RechnungDialog(QDialog):
 
 def _get_next_uid_from_db():
     """
-    Liefert eine vorgeschlagene nächste UID als string.
-    - Postgres: versucht nextval(pg_get_serial_sequence('rechnungen','id'))
-    - SQLite: berechnet MAX(id)+1
+    Rückgabe leerer String: UID wird nicht aus der DB ermittelt.
+    (Behalten als Platzhalter, falls irgendwo anders noch aufgerufen.)
     """
-    conn = None
-    try:
-        conn = get_db()
-        cur = conn.cursor()
-        # Postgres sequence attempt
-        try:
-            cur.execute("SELECT nextval(pg_get_serial_sequence('rechnungen','id'))")
-            row = cur.fetchone()
-            if row:
-                return str(row[0] if not isinstance(row, dict) else next(iter(row.values()), "")) 
-        except Exception:
-            pass
-        # SQLite fallback: MAX(id)+1
-        try:
-            cur.execute("SELECT MAX(id) FROM rechnungen")
-            row = cur.fetchone()
-            if not row:
-                return "1"
-            if isinstance(row, (list, tuple)):
-                max_id = row[0]
-            elif isinstance(row, dict):
-                max_id = row.get("MAX(id)") or next(iter(row.values()), None)
-            elif hasattr(row, "keys"):
-                max_id = dict(row).get("MAX(id)") or next(iter(dict(row).values()), None)
-            else:
-                max_id = None
-            next_id = (int(max_id) if max_id not in (None, "") else 0) + 1
-            return str(next_id)
-        except Exception:
-            return ""
-    finally:
-        try:
-            if conn:
-                conn.close()
-        except Exception:
-            pass
+    return ""
+
 

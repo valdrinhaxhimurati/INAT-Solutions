@@ -1,3 +1,4 @@
+﻿# -*- coding: utf-8 -*-
 from PyQt5.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QTableWidget,
     QTableWidgetItem, QDialog, QMessageBox, QToolButton
@@ -36,30 +37,48 @@ class MateriallagerTab(QWidget):
         btn_loeschen.clicked.connect(self.material_loeschen)
 
     def _ensure_table(self):
-        sql = """
-        CREATE TABLE IF NOT EXISTS materiallager (
-            material_id     INTEGER PRIMARY KEY AUTOINCREMENT,
-            materialnummer  TEXT,
-            bezeichnung     TEXT,
-            menge           INTEGER,
-            einheit         TEXT,
-            lagerort        TEXT,
-            lieferantnr     INTEGER,
-            bemerkung       TEXT
-        )
-        """
+        conn = get_db()
+        is_sqlite = getattr(conn, "is_sqlite", False) or getattr(conn, "is_sqlite_conn", False)
+        if is_sqlite:
+            sql = """
+            CREATE TABLE IF NOT EXISTS materiallager (
+                material_id     INTEGER PRIMARY KEY AUTOINCREMENT,
+                materialnummer  TEXT,
+                bezeichnung     TEXT,
+                menge           INTEGER,
+                einheit         TEXT,
+                lagerort        TEXT,
+                lieferantnr     INTEGER,
+                bemerkung       TEXT
+            )
+            """
+        else:
+            sql = """
+            CREATE TABLE IF NOT EXISTS materiallager (
+                material_id     BIGSERIAL PRIMARY KEY,
+                materialnummer  TEXT,
+                bezeichnung     TEXT,
+                menge           INTEGER,
+                einheit         TEXT,
+                lagerort        TEXT,
+                lieferantnr     INTEGER,
+                bemerkung       TEXT
+            )
+            """
         try:
-            with get_db() as con:
-                with con.cursor() as cur:
-                    cur.execute(sql)
-                con.commit()
-        except Exception:
-            # Fallback: offene Verbindung verwenden
-            conn = get_db()
-            cur = conn.cursor()
-            cur.execute(sql)
+            with conn.cursor() as cur:
+                cur.execute(sql)
             conn.commit()
-            conn.close()
+        except Exception:
+            try:
+                conn.rollback()
+            except Exception:
+                pass
+        finally:
+            try:
+                conn.close()
+            except Exception:
+                pass
 
     def lade_material(self):
         try:

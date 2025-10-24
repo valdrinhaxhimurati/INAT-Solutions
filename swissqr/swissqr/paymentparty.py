@@ -1,4 +1,4 @@
-from enum import Enum
+﻿from enum import Enum
 import pycountry
 from copy import copy
 from pydantic import field_validator, BaseModel, model_validator
@@ -139,3 +139,4 @@ class PaymentParty(BaseModel):
                 self.country
             ]
         return "\r\n".join(elements)
+
