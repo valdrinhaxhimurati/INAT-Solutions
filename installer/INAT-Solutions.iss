@@ -1,8 +1,8 @@
 #define MyAppName "INAT Solutions"
-#define MyAppVersion "1.0.0"
+#define MyAppVersion "0.8.2"
 #define MyAppPublisher "INAT Solutions"
-#define MyAppExeName "INAT Solutions.exe"
-#define MySourceDir "..\dist\INAT Solutions"
+#define MyAppExeName "INAT-Solutions.exe"
+#define MySourceDir "..\dist\INAT-Solutions"
 #define MyAssetsDir ".\assets"
 
 [Setup]
