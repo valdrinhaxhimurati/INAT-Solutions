@@ -943,8 +943,15 @@ class RechnungenTab(QWidget):
             print("Logo-Zeichnung fehlgeschlagen:", e)
 
 def _get_qr_daten():
-    qr = get_json("qr_daten")
-    if qr is None:
-        qr = import_json_if_missing("qr_daten", "config/qr_daten.json") or {}
-    return qr
+    """Lädt QR-Daten aus DB (mit Fallback auf JSON)."""
+    try:
+        from db_connection import get_qr_daten
+        return get_qr_daten()
+    except Exception as e:
+        print("Fehler beim Laden aus DB:", e)
+        # Fallback auf JSON
+        qr = get_json("qr_daten")
+        if qr is None:
+            qr = import_json_if_missing("qr_daten", "config/qr_daten.json") or {}
+        return qr
 

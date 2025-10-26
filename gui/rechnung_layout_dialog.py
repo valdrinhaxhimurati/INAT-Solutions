@@ -372,47 +372,132 @@ class RechnungLayoutDialog(QDialog):
 
     # --- DB I/O ---
     def lade_layout(self):
-        con = get_db()
-        try:
-            with con.cursor() as cur:
-                # Prefer latest row: try sqlite rowid ordering first, fallback to id ordering (Postgres)
-                try:
-                    cur.execute("SELECT kopfzeile, einleitung, fusszeile, logo, logo_mime, logo_skala FROM rechnung_layout ORDER BY rowid DESC LIMIT 1")
-                except Exception:
-                    try:
-                        cur.execute("SELECT kopfzeile, einleitung, fusszeile, logo, logo_mime, logo_skala FROM rechnung_layout ORDER BY id DESC LIMIT 1")
-                    except Exception:
-                        # last resort: try selecting any row
-                        cur.execute("SELECT kopfzeile, einleitung, fusszeile, logo, logo_mime, logo_skala FROM rechnung_layout LIMIT 1")
+        """Lädt Layout-Daten aus DB (backend-agnostisch)."""
+        import json, os, base64
+        from db_connection import get_db
+
+        defaults = {
+            "logo_skala": 100,
+            "schrift": "Helvetica",
+            "schrift_bold": "Helvetica-Bold",
+            "schriftgroesse": 10,
+            "schriftgroesse_betreff": 12,
+            "farbe_text": [0, 0, 0],
+            "einleitung": "",
+            "betreff": "Rechnung",
+            "logo_bytes": None,
+            "logo_datei": None,
+            "fusszeile": {"text": ""}
+        }
+
+        layout = {}
+        with get_db() as conn:
+            with conn.cursor() as cur:
+                # backend-agnostische Abfrage: ORDER BY id DESC (funktioniert in SQLite und Postgres)
+                cur.execute("SELECT id, name, layout, kopfzeile, einleitung, fusszeile, logo, logo_mime, logo_skala FROM rechnung_layout ORDER BY id DESC LIMIT 1")
                 row = cur.fetchone()
-                data = _row_to_dict(cur, row)
-        finally:
-            try: con.close()
-            except Exception: pass
 
-        self.text_kopf.setPlainText(data.get("kopfzeile") or "")
-        self.text_einleitung.setPlainText(data.get("einleitung") or "")
-        self.text_fuss.setPlainText(data.get("fusszeile") or "")
-        try:
-            self.logo_skala = float(data.get("logo_skala") or 100.0)
-        except Exception:
-            self.logo_skala = 100.0
-        s = int(round(self.logo_skala / 10.0) * 10)
-        self.scale_slider.setValue(self._snap10(s))
-        self.scale_spin.setValue(self._snap10(s))
+                # normalize row -> dict
+                if not row:
+                    dbrow = {}
+                else:
+                    if isinstance(row, dict):
+                        dbrow = row
+                    elif hasattr(row, "keys"):
+                        try:
+                            dbrow = dict(row)
+                        except Exception:
+                            dbrow = {}
+                    else:
+                        desc = getattr(cur, "description", None)
+                        if desc:
+                            cols = [d[0] for d in desc]
+                            dbrow = dict(zip(cols, row))
+                        else:
+                            dbrow = {}
 
-        v = data.get("logo")
-        if isinstance(v, memoryview):
-            v = v.tobytes()
-        self.logo_bytes = v if isinstance(v, (bytes, bytearray)) else None
-        self.logo_mime = data.get("logo_mime") or None
+                # First prefer a single 'layout' JSON field
+                raw_layout = dbrow.get("layout")
+                if raw_layout:
+                    if isinstance(raw_layout, str):
+                        try:
+                            layout = json.loads(raw_layout)
+                        except Exception:
+                            layout = {}
+                    elif isinstance(raw_layout, (dict, list)):
+                        layout = raw_layout if isinstance(raw_layout, dict) else {}
+                    else:
+                        layout = {}
+                else:
+                    # fallback: assemble layout from separate columns (from RechnungLayoutDialog)
+                    layout = {}
+                    if dbrow.get("kopfzeile"):
+                        layout["kopfzeile"] = dbrow.get("kopfzeile")
+                    if dbrow.get("einleitung"):
+                        layout["einleitung"] = dbrow.get("einleitung")
+                    if dbrow.get("fusszeile"):
+                        # fusszeile may be JSON string or plain text
+                        f = dbrow.get("fusszeile")
+                        if isinstance(f, str):
+                            try:
+                                layout["fusszeile"] = json.loads(f)
+                            except Exception:
+                                layout["fusszeile"] = {"text": f}
+                        elif isinstance(f, dict):
+                            layout["fusszeile"] = f
+                        else:
+                            layout["fusszeile"] = {"text": str(f)}
+                    # logo as bytes
+                    logo_db = dbrow.get("logo")
+                    if isinstance(logo_db, (bytes, bytearray, memoryview)):
+                        layout["logo_bytes"] = bytes(logo_db)
+                    if dbrow.get("logo_skala") is not None:
+                        try:
+                            layout["logo_skala"] = float(dbrow.get("logo_skala"))
+                        except Exception:
+                            layout["logo_skala"] = defaults["logo_skala"]
 
-        pm = QPixmap()
-        if self.logo_bytes and pm.loadFromData(bytes(self.logo_bytes)):
-            self.logo_vorschau.setPixmap(pm)
+        # merge defaults + loaded layout and normalize
+        if not isinstance(layout, dict):
+            layout = {}
+        merged = {}
+        merged.update(defaults)
+        merged.update(layout)
+        # normalize possible base64 logo string
+        if merged.get("logo_bytes") and isinstance(merged["logo_bytes"], str):
+            try:
+                merged["logo_bytes"] = base64.b64decode(merged["logo_bytes"])
+            except Exception:
+                merged["logo_bytes"] = None
+
+        # ensure fusszeile is dict with "text"
+        f = merged.get("fusszeile") or {}
+        if isinstance(f, str):
+            merged["fusszeile"] = {"text": f}
+        elif not isinstance(f, dict):
+            merged["fusszeile"] = {"text": ""}
+
+        self.layout_config = merged
+
+        # UI-Felder füllen (neu hinzugefügt)
+        self.text_kopf.setPlainText(merged.get("kopfzeile", ""))
+        self.text_einleitung.setPlainText(merged.get("einleitung", ""))
+        fuss_text = merged.get("fusszeile", {}).get("text", "")
+        self.text_fuss.setPlainText(fuss_text)
+        self.logo_skala = merged.get("logo_skala", 100.0)
+        self.scale_slider.setValue(int(self.logo_skala))
+        self.scale_spin.setValue(int(self.logo_skala))
+        if merged.get("logo_bytes"):
+            self.logo_bytes = merged["logo_bytes"]
+            self.logo_mime = merged.get("logo_mime")
+            pm = QPixmap()
+            if pm.loadFromData(self.logo_bytes):
+                self.logo_vorschau.setPixmap(pm)
+            self.btn_logo_entfernen.setEnabled(True)
         else:
-            self.logo_vorschau.clear()
-        self.btn_logo_entfernen.setEnabled(bool(self.logo_bytes))
+            self.logo_entfernen()
+
+        return layout
 
     def speichern(self):
         kopf = self.text_kopf.toPlainText().strip()

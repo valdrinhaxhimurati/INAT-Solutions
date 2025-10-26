@@ -85,29 +85,34 @@ class MateriallagerTab(QWidget):
             with get_db() as con:
                 with con.cursor(cursor_factory=dict_cursor_factory(con)) as cur:
                     cur.execute("""
-                        SELECT material_id, materialnummer, bezeichnung, COALESCE(menge,0) AS menge,
-                               COALESCE(einheit,'') AS einheit, COALESCE(lagerort,'') AS lagerort,
-                               COALESCE(lieferantnr, NULL) AS lieferantnr, COALESCE(bemerkung,'') AS bemerkung
-                        FROM public.materiallager
-                        ORDER BY bezeichnung
+                        SELECT m.material_id, m.materialnummer, m.bezeichnung, COALESCE(m.menge,0) AS menge,
+                               COALESCE(m.einheit,'') AS einheit, COALESCE(m.lagerort,'') AS lagerort,
+                               COALESCE(l.name, '') AS lieferant_name,
+                               COALESCE(m.bemerkung,'') AS bemerkung
+                        FROM public.materiallager m
+                        LEFT JOIN public.lieferanten l ON m.lieferantnr = l.id
+                        ORDER BY m.bezeichnung
                     """)
                     rows = cur.fetchall()
         except Exception:
             conn = get_db()
             cur = conn.cursor()
             cur.execute("""
-                SELECT material_id, materialnummer, bezeichnung, COALESCE(menge,0) AS menge,
-                       COALESCE(einheit,'') AS einheit, COALESCE(lagerort,'') AS lagerort,
-                       COALESCE(lieferantnr, NULL) AS lieferantnr, COALESCE(bemerkung,'') AS bemerkung
-                FROM public.materiallager
-                ORDER BY bezeichnung
+                SELECT m.material_id, m.materialnummer, m.bezeichnung, COALESCE(m.menge,0) AS menge,
+                       COALESCE(m.einheit,'') AS einheit, COALESCE(m.lagerort,'') AS lagerort,
+                       COALESCE(l.name, '') AS lieferant_name,
+                       COALESCE(m.bemerkung,'') AS bemerkung
+                FROM materiallager m
+                LEFT JOIN lieferanten l ON m.lieferantnr = l.id
+                ORDER BY m.bezeichnung
             """)
             rows = cur.fetchall()
             conn.close()
 
+        print("Rows:", rows)
         # Normalisiere Reihen (dict oder sequence)
         daten = []
-        cols = ["material_id", "materialnummer", "bezeichnung", "menge", "einheit", "lagerort", "lieferantnr", "bemerkung"]
+        cols = ["material_id", "materialnummer", "bezeichnung", "menge", "einheit", "lagerort", "lieferant_name", "bemerkung"]
         for r in rows:
             if isinstance(r, dict):
                 daten.append(tuple(r.get(c) for c in cols))
@@ -120,14 +125,14 @@ class MateriallagerTab(QWidget):
 
         self.table.setRowCount(len(daten))
         self.table.setColumnCount(len(cols))
-        self.table.setHorizontalHeaderLabels(["ID", "Materialnr.", "Bezeichnung", "Menge", "Einheit", "Lagerort", "LieferantNr", "Bemerkung"])
+        self.table.setHorizontalHeaderLabels(["ID", "Materialnr.", "Bezeichnung", "Menge", "Einheit", "Lagerort", "Lieferant", "Bemerkung"])
         self.table.setColumnWidth(0, 60)
         self.table.setColumnWidth(1, 140)
         self.table.setColumnWidth(2, 260)
         self.table.setColumnWidth(3, 90)
         self.table.setColumnWidth(4, 80)
         self.table.setColumnWidth(5, 120)
-        self.table.setColumnWidth(6, 80)
+        self.table.setColumnWidth(6, 120)  # angepasst für "Lieferant"
         self.table.setColumnWidth(7, 180)
 
         for r_idx, row in enumerate(daten):
@@ -162,16 +167,44 @@ class MateriallagerTab(QWidget):
         z = self.table.currentRow()
         if z < 0:
             return
-        material = {
-            "material_id": int(self.table.item(z, 0).text()),
-            "materialnummer": self.table.item(z, 1).text(),
-            "bezeichnung": self.table.item(z, 2).text(),
-            "menge": int(self.table.item(z, 3).text()),
-            "einheit": self.table.item(z, 4).text(),
-            "lagerort": self.table.item(z, 5).text(),
-            "lieferantnr": None if self.table.item(z,6) is None or self.table.item(z,6).text()=="" else int(self.table.item(z,6).text()),
-            "bemerkung": self.table.item(z, 7).text()
-        }
+        material_id = int(self.table.item(z, 0).text())
+        # Lade die vollständigen Daten aus DB (inkl. lieferantnr), nicht aus der Tabelle
+        try:
+            with get_db() as con:
+                with con.cursor(cursor_factory=dict_cursor_factory(con)) as cur:
+                    cur.execute("""
+                        SELECT material_id, materialnummer, bezeichnung, COALESCE(menge,0) AS menge,
+                               COALESCE(einheit,'') AS einheit, COALESCE(lagerort,'') AS lagerort,
+                               lieferantnr, COALESCE(bemerkung,'') AS bemerkung
+                        FROM public.materiallager WHERE material_id = %s
+                    """, (material_id,))
+                    row = cur.fetchone()
+        except Exception:
+            conn = get_db()
+            cur = conn.cursor()
+            cur.execute("""
+                SELECT material_id, materialnummer, bezeichnung, COALESCE(menge,0) AS menge,
+                       COALESCE(einheit,'') AS einheit, COALESCE(lagerort,'') AS lagerort,
+                       lieferantnr, COALESCE(bemerkung,'') AS bemerkung
+                FROM materiallager WHERE material_id = %s
+            """, (material_id,))
+            row = cur.fetchone()
+            conn.close()
+        if not row:
+            return
+        if isinstance(row, dict):
+            material = row
+        else:
+            material = {
+                "material_id": row[0],
+                "materialnummer": row[1],
+                "bezeichnung": row[2],
+                "menge": row[3],
+                "einheit": row[4],
+                "lagerort": row[5],
+                "lieferantnr": row[6],
+                "bemerkung": row[7]
+            }
         dlg = MateriallagerDialog(self, material=material)
         if dlg.exec_() == QDialog.Accepted:
             d = dlg.get_daten()
@@ -213,3 +246,22 @@ class MateriallagerTab(QWidget):
             conn.commit()
             conn.close()
         self.lade_material()
+
+    def lade_lieferanten(self):
+        try:
+            with get_db() as con:
+                with con.cursor(cursor_factory=dict_cursor_factory(con)) as cur:
+                    cur.execute("""
+                        SELECT lieferantnr, name FROM public.lieferanten ORDER BY name
+                    """)
+                    rows = cur.fetchall()
+        except Exception:
+            conn = get_db()
+            cur = conn.cursor()
+            cur.execute("""
+                SELECT lieferantnr, name FROM lieferanten ORDER BY name
+            """)
+            rows = cur.fetchall()
+            conn.close()
+        print("Lieferanten rows:", rows)
+        return rows

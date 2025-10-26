@@ -70,28 +70,24 @@ class MateriallagerDialog(QDialog):
         self.setLayout(layout)
 
     def _lade_lieferanten(self):
-        out = []
         try:
-            with get_db() as con:
-                with con.cursor(cursor_factory=dict_cursor_factory(con)) as cur:
-                    cur.execute("SELECT lieferantnr, name FROM public.lieferanten ORDER BY name")
-                    rows = cur.fetchall()
-        except Exception:
             conn = get_db()
             cur = conn.cursor()
-            cur.execute("SELECT lieferantnr, name FROM public.lieferanten ORDER BY name")
+            cur.execute("SELECT id AS lieferantnr, name FROM public.lieferanten ORDER BY name")
             rows = cur.fetchall()
             conn.close()
-        for r in rows:
-            if isinstance(r, dict):
-                out.append((r.get("lieferantnr"), r.get("name")))
-            else:
-                try:
-                    out.append((r[0], r[1]))
-                except Exception:
-                    out.append((None, ""))
-
-        return out
+            return rows
+        except Exception:
+            try:
+                conn = get_db()
+                cur = conn.cursor()
+                cur.execute("SELECT id AS lieferantnr, name FROM lieferanten ORDER BY name")
+                rows = cur.fetchall()
+                conn.close()
+                return rows
+            except Exception as e:
+                print("Fehler beim Laden der Lieferanten:", e)
+                return []
 
     def get_daten(self):
         try:

@@ -60,30 +60,8 @@ class LieferantenTab(QWidget):
             except Exception:
                 cur = conn.cursor()
 
-            # Stelle sicher, dass Tabelle existiert (keine Löschungen durchführen)
-            is_sqlite = getattr(conn, "is_sqlite", False) or getattr(conn, "is_sqlite_conn", False)
-            if is_sqlite:
-                cur.execute("""
-                    CREATE TABLE IF NOT EXISTS lieferanten (
-                        lieferantnr INTEGER PRIMARY KEY AUTOINCREMENT,
-                        name TEXT,
-                        portal_link TEXT,
-                        login TEXT,
-                        passwort TEXT
-                    )
-                """)
-            else:
-                cur.execute("""
-                    CREATE TABLE IF NOT EXISTS lieferanten (
-                        lieferantnr BIGSERIAL PRIMARY KEY,
-                        name TEXT,
-                        portal_link TEXT,
-                        login TEXT,
-                        passwort TEXT
-                    )
-                """)
-
-            # Hole alle Spalten (robust gegen Schema-Varianten)
+            # Entferne CREATE TABLE (wird von ensure_app_schema() gehandhabt)
+            # Hole alle Spalten
             cur.execute("SELECT * FROM lieferanten")
             rows = cur.fetchall()
             desc = getattr(cur, "description", None)
@@ -99,11 +77,10 @@ class LieferantenTab(QWidget):
             except Exception:
                 pass
 
-        # Bestimme ID-Kandidaten und baue daten in Reihenfolge (ID, name, portal_link, login, passwort)
-        id_candidates = ("lieferantnr", "id", "lieferant_id")
+        # Verwende id als ID (konsistent mit Schema)
+        id_candidates = ("id", "lieferant_id")
         daten = []
         for r in rows:
-            # mapping-like (dict / sqlite3.Row)
             if isinstance(r, dict) or hasattr(r, "keys"):
                 try:
                     rd = dict(r)
@@ -117,6 +94,7 @@ class LieferantenTab(QWidget):
                         break
                 daten.append((
                     id_val,
+                    rd_lower.get("lieferantnr"),
                     rd_lower.get("name"),
                     rd_lower.get("portal_link"),
                     rd_lower.get("login"),
@@ -124,14 +102,13 @@ class LieferantenTab(QWidget):
                 ))
                 continue
 
-            # sequence/tuple fallback - use description mapping if available
+            # sequence fallback
             try:
                 seq = list(r)
             except Exception:
                 seq = []
             if col_names and len(col_names) == len(seq):
                 m = dict(zip(col_names, seq))
-                # ensure keys are lower-case for consistent access
                 m = {k.lower(): v for k, v in m.items()}
                 id_val = None
                 for cand in id_candidates:
@@ -140,35 +117,34 @@ class LieferantenTab(QWidget):
                         break
                 daten.append((
                     id_val,
+                    m.get("lieferantnr"),
                     m.get("name"),
                     m.get("portal_link"),
                     m.get("login"),
                     m.get("passwort")
                 ))
             else:
-                # fallback: assume order (lieferantnr, name, portal_link, login, passwort)
-                while len(seq) < 5:
+                while len(seq) < 6:
                     seq.append(None)
-                # prefer seq[0] but allow it to be None (will display empty)
-                daten.append((seq[0], seq[1], seq[2], seq[3], seq[4]))
+                daten.append((seq[0], seq[1], seq[2], seq[3], seq[4], seq[5]))
 
-        # UI füllen (nur UI-Teil, ID sichtbar, nicht editierbar)
+        # UI: 6 Spalten (ID, LieferantNr, Name, Portal-Link, Login, Passwort)
         self.table.setRowCount(len(daten))
-        self.table.setColumnCount(5)
-        self.table.setHorizontalHeaderLabels(["ID", "Name", "Portal-Link", "Login", "Passwort"])
+        self.table.setColumnCount(6)
+        self.table.setHorizontalHeaderLabels(["ID", "LieferantNr", "Name", "Portal-Link", "Login", "Passwort"])
         self.table.setColumnHidden(0, False)
         self.table.setColumnWidth(0, 60)
-        self.table.setColumnWidth(1, 250)
-        self.table.setColumnWidth(2, 400)
-        self.table.setColumnWidth(3, 150)
+        self.table.setColumnWidth(1, 100)
+        self.table.setColumnWidth(2, 250)
+        self.table.setColumnWidth(3, 400)
         self.table.setColumnWidth(4, 150)
+        self.table.setColumnWidth(5, 150)
 
         for ri, row in enumerate(daten):
             for ci, val in enumerate(row):
                 txt = "" if val is None else str(val)
                 item = QTableWidgetItem(txt)
                 if ci == 0:
-                    # ID nicht editierbar + als UserRole speichern
                     try:
                         item.setData(Qt.UserRole, int(val) if val is not None and str(val).strip() != "" else None)
                         item.setFlags(item.flags() & ~Qt.ItemIsEditable)
@@ -198,11 +174,12 @@ class LieferantenTab(QWidget):
         if zeile < 0:
             return
         lieferant = {
-            "lieferantnr": int(self.table.item(zeile, 0).text()),
-            "name": self.table.item(zeile, 1).text(),
-            "portal_link": self.table.item(zeile, 2).text(),
-            "login": self.table.item(zeile, 3).text(),
-            "passwort": self.table.item(zeile, 4).text()
+            "id": int(self.table.item(zeile, 0).text()),
+            "lieferantnr": self.table.item(zeile, 1).text(),
+            "name": self.table.item(zeile, 2).text(),
+            "portal_link": self.table.item(zeile, 3).text(),
+            "login": self.table.item(zeile, 4).text(),
+            "passwort": self.table.item(zeile, 5).text()
         }
         dialog = LieferantenDialog(self, lieferant=lieferant)
         if dialog.exec_() == QDialog.Accepted:
@@ -211,9 +188,9 @@ class LieferantenTab(QWidget):
             cursor = conn.cursor(cursor_factory=dict_cursor_factory(conn))
             cursor.execute("""
                 UPDATE lieferanten
-                SET name= %s, portal_link= %s, login= %s, passwort= %s
-                WHERE lieferantnr= %s
-            """, (daten["name"], daten["portal_link"], daten["login"], daten["passwort"], lieferant["lieferantnr"]))
+                SET lieferantnr= %s, name= %s, portal_link= %s, login= %s, passwort= %s
+                WHERE id= %s
+            """, (daten["lieferantnr"], daten["name"], daten["portal_link"], daten["login"], daten["passwort"], lieferant["id"]))
             conn.commit()
             conn.close()
             self.lade_lieferanten()
@@ -243,36 +220,24 @@ class LieferantenTab(QWidget):
         if resp != QMessageBox.Yes:
             return
 
-        # DB-agnostisch löschen: wähle SQL/Platzhalter je nach Backend
         try:
             conn = get_db()
-            # Erkenne SQLite vs Postgres (Wrapper setzt ggf. Attribute)
             is_sqlite = getattr(conn, "is_sqlite", False) or getattr(conn, "is_sqlite_conn", False) or ("sqlite" in conn.__class__.__module__.lower())
             if is_sqlite:
-                sql = "DELETE FROM lieferanten WHERE id=? OR lieferantnr=?"
-                params = (id_val, id_val)
-                try:
-                    with conn.cursor() as cur:
-                        cur.execute(sql, params)
-                    conn.commit()
-                except Exception:
-                    # fallback: offener cursor
-                    cur = conn.cursor()
-                    cur.execute(sql, params)
-                    conn.commit()
-                    cur.close()
+                sql = "DELETE FROM lieferanten WHERE id=?"
+                params = (id_val,)
             else:
-                sql = "DELETE FROM public.lieferanten WHERE id=%s OR lieferantnr=%s"
-                params = (id_val, id_val)
-                try:
-                    with conn.cursor() as cur:
-                        cur.execute(sql, params)
-                    conn.commit()
-                except Exception:
-                    cur = conn.cursor()
+                sql = "DELETE FROM public.lieferanten WHERE id=%s"
+                params = (id_val,)
+            try:
+                with conn.cursor() as cur:
                     cur.execute(sql, params)
-                    conn.commit()
-                    cur.close()
+                conn.commit()
+            except Exception:
+                cur = conn.cursor()
+                cur.execute(sql, params)
+                conn.commit()
+                cur.close()
         finally:
             try:
                 conn.close()

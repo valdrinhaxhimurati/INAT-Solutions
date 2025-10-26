@@ -295,18 +295,12 @@ class RechnungDialog(QDialog):
         self.tbl_pos.cellChanged.connect(self._on_cell_changed)
         self.sb_mwst.valueChanged.connect(self._recalc_totals)
 
-        # --- Defaults setzen (nur bei neuer Rechnung) ---
-        if not self.rechnung:
-            # Zahlungsbedingungen: hart gewünschter Standardtext
-            self.text_zahlungskonditionen.setPlainText("Zahlbar inner 10 Tagen")
-            # Abschiedsgruss: Firmenname aus Einstellungen holen
-            firmenname = self._lade_firmenname_aus_einstellungen() or "INAT Performance GmbH"
-            self.text_abschluss.setPlainText(f"Freundliche grüsse {firmenname}")
+        # --- Defaults setzen (immer, für neue und bestehende Rechnungen) ---
+        self.text_zahlungskonditionen.setPlainText("Zahlbar inner 10 Tagen")
+        firmenname = self._lade_firmenname_aus_einstellungen() or "INAT Performance GmbH"
+        self.text_abschluss.setPlainText(f"Freundliche grüsse {firmenname}")
 
-        # Kunde -> Firma/Adresse initial
-        self._on_kunde_changed(self.cb_kunde.currentText())
-
-        # Falls Bearbeiten: bestehende Werte einfüllen (überschreibt defaults)
+        # Falls Bearbeiten: bestehende Werte einfüllen (überschreibt defaults, falls vorhanden)
         if isinstance(self.rechnung, dict):
             self._befuelle_von_rechnung(self.rechnung)
 

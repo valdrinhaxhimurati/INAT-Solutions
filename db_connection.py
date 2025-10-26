@@ -697,12 +697,12 @@ def ensure_app_schema():
         ],
         # Einstellungen (App-Settings) — wichtig für get_einstellungen / set_einstellungen
         "einstellungen": [
-            ("id", "BIGSERIAL PRIMARY KEY"),
-            ("data", "JSONB")
+            ("id", "BIGSERIAL PRIMARY KEY" if not _is_sqlite(get_db()) else "INTEGER PRIMARY KEY AUTOINCREMENT"),
+            ("data", "JSONB" if not _is_sqlite(get_db()) else "TEXT")
         ],
         "qr_daten": [
-            ("id", "BIGSERIAL PRIMARY KEY"),
-            ("data", "JSONB")
+            ("id", "BIGSERIAL PRIMARY KEY" if not _is_sqlite(get_db()) else "INTEGER PRIMARY KEY AUTOINCREMENT"),
+            ("data", "JSONB" if not _is_sqlite(get_db()) else "TEXT")
         ],
     }
 
