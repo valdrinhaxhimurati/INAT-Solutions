@@ -4,6 +4,7 @@ from PyQt5.QtWidgets import (
     QTableWidgetItem, QDialog, QMessageBox, QToolButton
 )
 from db_connection import get_db, dict_cursor_factory
+from gui.artikellager_dialog import ArtikellagerDialog
 
 
 class ArtikellagerTab(QWidget):
@@ -46,7 +47,9 @@ class ArtikellagerTab(QWidget):
                 artikelnummer  TEXT,
                 bezeichnung    TEXT,
                 bestand        INTEGER,
-                lagerort       TEXT
+                lagerort       TEXT,
+                preis          REAL,
+                waehrung       TEXT
             )
             """
         else:
@@ -56,7 +59,9 @@ class ArtikellagerTab(QWidget):
                 artikelnummer  TEXT,
                 bezeichnung    TEXT,
                 bestand        INTEGER,
-                lagerort       TEXT
+                lagerort       TEXT,
+                preis          REAL,
+                waehrung       TEXT
             )
             """
         try:
@@ -73,15 +78,16 @@ class ArtikellagerTab(QWidget):
         with get_db() as con:
             with con.cursor() as cur:
                 cur.execute("""
-                    SELECT artikel_id, artikelnummer, bezeichnung, COALESCE(bestand,0), COALESCE(lagerort,'')
+                    SELECT artikel_id, artikelnummer, bezeichnung, COALESCE(bestand,0), COALESCE(lagerort,''),
+                           COALESCE(preis,0), COALESCE(waehrung,'')
                     FROM public.artikellager
                     ORDER BY bezeichnung
                 """)
                 daten = cur.fetchall()
 
         self.table.setRowCount(len(daten))
-        self.table.setColumnCount(5)
-        self.table.setHorizontalHeaderLabels(["ID", "Artikelnummer", "Bezeichnung", "Bestand", "Lagerort"])
+        self.table.setColumnCount(7)
+        self.table.setHorizontalHeaderLabels(["ID", "Artikelnummer", "Bezeichnung", "Bestand", "Lagerort", "Preis", "Währung"])
         for r, row in enumerate(daten):
             for c, val in enumerate(row):
                 self.table.setItem(r, c, QTableWidgetItem(str(val)))
@@ -90,23 +96,23 @@ class ArtikellagerTab(QWidget):
         self.table.setColumnWidth(2, 260)
         self.table.setColumnWidth(3, 90)
         self.table.setColumnWidth(4, 120)
+        self.table.setColumnWidth(5, 100)  # Preis
+        self.table.setColumnWidth(6, 80)   # Währung
 
     def artikel_hinzufuegen(self):
-        from gui.lager_dialog import LagerDialog
-        dlg = LagerDialog(self, artikel=None)
+        dlg = ArtikellagerDialog(self, artikel=None)
         if dlg.exec_() == QDialog.Accepted:
             d = dlg.get_daten()
             with get_db() as con:
                 with con.cursor() as cur:
                     cur.execute("""
-                        INSERT INTO public.artikellager (artikelnummer, bezeichnung, bestand, lagerort)
-                        VALUES (%s, %s, %s, %s)
-                    """, (d["artikelnummer"], d["bezeichnung"], d["bestand"], d["lagerort"]))
+                        INSERT INTO public.artikellager (artikelnummer, bezeichnung, bestand, lagerort, preis, waehrung)
+                        VALUES (%s, %s, %s, %s, %s, %s)
+                    """, (d["artikelnummer"], d["bezeichnung"], d["bestand"], d["lagerort"], d["preis"], d["waehrung"]))
                 con.commit()
             self.lade_artikel()
 
     def artikel_bearbeiten(self):
-        from gui.lager_dialog import LagerDialog
         z = self.table.currentRow()
         if z < 0:
             return
@@ -115,18 +121,20 @@ class ArtikellagerTab(QWidget):
             "artikelnummer": self.table.item(z, 1).text(),
             "bezeichnung": self.table.item(z, 2).text(),
             "bestand": int(self.table.item(z, 3).text()),
-            "lagerort": self.table.item(z, 4).text()
+            "lagerort": self.table.item(z, 4).text(),
+            "preis": float(self.table.item(z, 5).text()),
+            "waehrung": self.table.item(z, 6).text()
         }
-        dlg = LagerDialog(self, artikel=artikel)
+        dlg = ArtikellagerDialog(self, artikel=artikel)
         if dlg.exec_() == QDialog.Accepted:
             d = dlg.get_daten()
             with get_db() as con:
                 with con.cursor() as cur:
                     cur.execute("""
                         UPDATE public.artikellager
-                           SET artikelnummer=%s, bezeichnung=%s, bestand=%s, lagerort=%s
+                           SET artikelnummer=%s, bezeichnung=%s, bestand=%s, lagerort=%s, preis=%s, waehrung=%s
                          WHERE artikel_id=%s
-                    """, (d["artikelnummer"], d["bezeichnung"], d["bestand"], d["lagerort"], artikel["artikel_id"]))
+                    """, (d["artikelnummer"], d["bezeichnung"], d["bestand"], d["lagerort"], d["preis"], d["waehrung"], artikel["artikel_id"]))
                 con.commit()
             self.lade_artikel()
 

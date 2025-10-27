@@ -87,8 +87,8 @@ class MateriallagerTab(QWidget):
                     cur.execute("""
                         SELECT m.material_id, m.materialnummer, m.bezeichnung, COALESCE(m.menge,0) AS menge,
                                COALESCE(m.einheit,'') AS einheit, COALESCE(m.lagerort,'') AS lagerort,
-                               COALESCE(l.name, '') AS lieferant_name,
-                               COALESCE(m.bemerkung,'') AS bemerkung
+                               COALESCE(l.name, '') AS lieferant_name, COALESCE(m.preis,0) AS preis,
+                               COALESCE(m.waehrung,'EUR') AS waehrung, COALESCE(m.bemerkung,'') AS bemerkung
                         FROM public.materiallager m
                         LEFT JOIN public.lieferanten l ON m.lieferantnr = l.id
                         ORDER BY m.bezeichnung
@@ -100,8 +100,8 @@ class MateriallagerTab(QWidget):
             cur.execute("""
                 SELECT m.material_id, m.materialnummer, m.bezeichnung, COALESCE(m.menge,0) AS menge,
                        COALESCE(m.einheit,'') AS einheit, COALESCE(m.lagerort,'') AS lagerort,
-                       COALESCE(l.name, '') AS lieferant_name,
-                       COALESCE(m.bemerkung,'') AS bemerkung
+                       COALESCE(l.name, '') AS lieferant_name, COALESCE(m.preis,0) AS preis,
+                       COALESCE(m.waehrung,'EUR') AS waehrung, COALESCE(m.bemerkung,'') AS bemerkung
                 FROM materiallager m
                 LEFT JOIN lieferanten l ON m.lieferantnr = l.id
                 ORDER BY m.bezeichnung
@@ -112,7 +112,7 @@ class MateriallagerTab(QWidget):
         print("Rows:", rows)
         # Normalisiere Reihen (dict oder sequence)
         daten = []
-        cols = ["material_id", "materialnummer", "bezeichnung", "menge", "einheit", "lagerort", "lieferant_name", "bemerkung"]
+        cols = ["material_id", "materialnummer", "bezeichnung", "menge", "einheit", "lagerort", "lieferant_name", "preis", "waehrung", "bemerkung"]
         for r in rows:
             if isinstance(r, dict):
                 daten.append(tuple(r.get(c) for c in cols))
@@ -124,8 +124,8 @@ class MateriallagerTab(QWidget):
                     daten.append(tuple(list(r)))
 
         self.table.setRowCount(len(daten))
-        self.table.setColumnCount(len(cols))
-        self.table.setHorizontalHeaderLabels(["ID", "Materialnr.", "Bezeichnung", "Menge", "Einheit", "Lagerort", "Lieferant", "Bemerkung"])
+        self.table.setColumnCount(10)
+        self.table.setHorizontalHeaderLabels(["ID", "Materialnr.", "Bezeichnung", "Menge", "Einheit", "Lagerort", "Lieferant", "Preis", "Währung", "Bemerkung"])
         self.table.setColumnWidth(0, 60)
         self.table.setColumnWidth(1, 140)
         self.table.setColumnWidth(2, 260)
@@ -133,7 +133,9 @@ class MateriallagerTab(QWidget):
         self.table.setColumnWidth(4, 80)
         self.table.setColumnWidth(5, 120)
         self.table.setColumnWidth(6, 120)  # angepasst für "Lieferant"
-        self.table.setColumnWidth(7, 180)
+        self.table.setColumnWidth(7, 100)  # Preis
+        self.table.setColumnWidth(8, 80)   # Währung
+        self.table.setColumnWidth(9, 180)  # Bemerkung
 
         for r_idx, row in enumerate(daten):
             for c_idx, val in enumerate(row):
@@ -148,17 +150,17 @@ class MateriallagerTab(QWidget):
                 with get_db() as con:
                     with con.cursor() as cur:
                         cur.execute("""
-                            INSERT INTO public.materiallager (materialnummer, bezeichnung, menge, einheit, lagerort, lieferantnr, bemerkung)
-                            VALUES (%s, %s, %s, %s, %s, %s, %s)
-                        """, (d["materialnummer"], d["bezeichnung"], d["menge"], d["einheit"], d["lagerort"], d["lieferantnr"], d["bemerkung"]))
+                            INSERT INTO public.materiallager (materialnummer, bezeichnung, menge, einheit, lagerort, lieferantnr, bemerkung, preis, waehrung)
+                            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+                        """, (d["materialnummer"], d["bezeichnung"], d["menge"], d["einheit"], d["lagerort"], d["lieferantnr"], d["bemerkung"], d["preis"], d["waehrung"]))
                     con.commit()
             except Exception:
                 conn = get_db()
                 cur = conn.cursor()
                 cur.execute("""
-                    INSERT INTO public.materiallager (materialnummer, bezeichnung, menge, einheit, lagerort, lieferantnr, bemerkung)
-                    VALUES (%s, %s, %s, %s, %s, %s, %s)
-                """, (d["materialnummer"], d["bezeichnung"], d["menge"], d["einheit"], d["lagerort"], d["lieferantnr"], d["bemerkung"]))
+                    INSERT INTO public.materiallager (materialnummer, bezeichnung, menge, einheit, lagerort, lieferantnr, bemerkung, preis, waehrung)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+                """, (d["materialnummer"], d["bezeichnung"], d["menge"], d["einheit"], d["lagerort"], d["lieferantnr"], d["bemerkung"], d["preis"], d["waehrung"]))
                 conn.commit()
                 conn.close()
             self.lade_material()
@@ -175,7 +177,8 @@ class MateriallagerTab(QWidget):
                     cur.execute("""
                         SELECT material_id, materialnummer, bezeichnung, COALESCE(menge,0) AS menge,
                                COALESCE(einheit,'') AS einheit, COALESCE(lagerort,'') AS lagerort,
-                               lieferantnr, COALESCE(bemerkung,'') AS bemerkung
+                               lieferantnr, COALESCE(bemerkung,'') AS bemerkung, COALESCE(preis,0) AS preis,
+                               COALESCE(waehrung,'EUR') AS waehrung
                         FROM public.materiallager WHERE material_id = %s
                     """, (material_id,))
                     row = cur.fetchone()
@@ -185,7 +188,8 @@ class MateriallagerTab(QWidget):
             cur.execute("""
                 SELECT material_id, materialnummer, bezeichnung, COALESCE(menge,0) AS menge,
                        COALESCE(einheit,'') AS einheit, COALESCE(lagerort,'') AS lagerort,
-                       lieferantnr, COALESCE(bemerkung,'') AS bemerkung
+                       lieferantnr, COALESCE(bemerkung,'') AS bemerkung, COALESCE(preis,0) AS preis,
+                       COALESCE(waehrung,'EUR') AS waehrung
                 FROM materiallager WHERE material_id = %s
             """, (material_id,))
             row = cur.fetchone()
@@ -203,7 +207,9 @@ class MateriallagerTab(QWidget):
                 "einheit": row[4],
                 "lagerort": row[5],
                 "lieferantnr": row[6],
-                "bemerkung": row[7]
+                "bemerkung": row[7],
+                "preis": row[8],
+                "waehrung": row[9]
             }
         dlg = MateriallagerDialog(self, material=material)
         if dlg.exec_() == QDialog.Accepted:
@@ -213,18 +219,18 @@ class MateriallagerTab(QWidget):
                     with con.cursor() as cur:
                         cur.execute("""
                             UPDATE public.materiallager
-                            SET materialnummer=%s, bezeichnung=%s, menge=%s, einheit=%s, lagerort=%s, lieferantnr=%s, bemerkung=%s
+                            SET materialnummer=%s, bezeichnung=%s, menge=%s, einheit=%s, lagerort=%s, lieferantnr=%s, bemerkung=%s, preis=%s, waehrung=%s
                             WHERE material_id=%s
-                        """, (d["materialnummer"], d["bezeichnung"], d["menge"], d["einheit"], d["lagerort"], d["lieferantnr"], d["bemerkung"], material["material_id"]))
+                        """, (d["materialnummer"], d["bezeichnung"], d["menge"], d["einheit"], d["lagerort"], d["lieferantnr"], d["bemerkung"], d["preis"], d["waehrung"], material["material_id"]))
                     con.commit()
             except Exception:
                 conn = get_db()
                 cur = conn.cursor()
                 cur.execute("""
                     UPDATE public.materiallager
-                    SET materialnummer=%s, bezeichnung=%s, menge=%s, einheit=%s, lagerort=%s, lieferantnr=%s, bemerkung=%s
+                    SET materialnummer=%s, bezeichnung=%s, menge=%s, einheit=%s, lagerort=%s, lieferantnr=%s, bemerkung=%s, preis=%s, waehrung=%s
                     WHERE material_id=%s
-                """, (d["materialnummer"], d["bezeichnung"], d["menge"], d["einheit"], d["lagerort"], d["lieferantnr"], d["bemerkung"], material["material_id"]))
+                """, (d["materialnummer"], d["bezeichnung"], d["menge"], d["einheit"], d["lagerort"], d["lieferantnr"], d["bemerkung"], d["preis"], d["waehrung"], material["material_id"]))
                 conn.commit()
                 conn.close()
             self.lade_material()

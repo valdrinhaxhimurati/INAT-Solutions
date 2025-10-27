@@ -94,7 +94,9 @@ class EinstellungenTab(QWidget):
         self.benutzer_button.clicked.connect(self._open_benutzer_dialog)
         self.qr_button = QPushButton("QR-Rechnungsdaten verwalten")
         self.qr_button.clicked.connect(self._open_qr_dialog)
-        for b in (self.kategorien_button, self.benutzer_button, self.qr_button):
+        self.module_button = QPushButton("Module verwalten")
+        self.module_button.clicked.connect(self._open_module_dialog)
+        for b in (self.kategorien_button, self.benutzer_button, self.qr_button, self.module_button):
             lay3.addWidget(b)
 
         main.addWidget(box3)
@@ -261,4 +263,25 @@ class EinstellungenTab(QWidget):
         from gui.benutzer_dialog import BenutzerVerwaltenDialog
         dlg = BenutzerVerwaltenDialog(self.login_db_path or USERS_DB_PATH, self)
         dlg.exec_()
+
+    def _open_module_dialog(self):
+        try:
+            from gui.lager_einstellungen_dialog import LagerEinstellungenDialog
+        except Exception as e:
+            QMessageBox.warning(self, "Module", f"Dialog nicht gefunden:\n{e}")
+            return
+        dlg = LagerEinstellungenDialog(self)
+        if dlg.exec_() == QDialog.Accepted:
+            QMessageBox.information(self, "Module", "Einstellungen gespeichert.")
+            # Lager-Tab aktualisieren
+            try:
+                stacked_widget = self.parent()  # EinstellungenTab -> QStackedWidget
+                tabs_widget = stacked_widget.parent()  # QStackedWidget -> QTabWidget
+                main_window = tabs_widget.parent()  # QTabWidget -> MainWindow
+                lager_tab = getattr(main_window, 'lager_tab', None)
+                if lager_tab:
+                    lager_tab.tabs.clear()
+                    lager_tab._load_aktive_lager()
+            except Exception as e:
+                print(f"Fehler beim Aktualisieren: {e}")
 

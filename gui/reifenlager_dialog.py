@@ -45,6 +45,16 @@ class ReifenlagerDialog(QDialog):
 
         self.bemerkung_input = QLineEdit()
 
+        self.preis_input = QLineEdit()
+        self.preis_input.setPlaceholderText("Preis")
+        layout.addWidget(QLabel("Preis:"))
+        layout.addWidget(self.preis_input)
+
+        self.waehrung_input = QComboBox()
+        self.waehrung_input.addItems(["EUR", "USD", "CHF"])
+        layout.addWidget(QLabel("Währung:"))
+        layout.addWidget(self.waehrung_input)
+
         layout.addWidget(QLabel("Fahrzeug:"))
         layout.addWidget(self.fahrzeug_input)
         layout.addWidget(QLabel("Dimension (z.B. 205/55 R16):"))
@@ -73,6 +83,10 @@ class ReifenlagerDialog(QDialog):
                 self.typ_input.setCurrentIndex(typ_idx)
             self.dot_input.setText(reifen.get("dot", ""))
             self.lagerort_input.setText(reifen.get("lagerort", ""))
+            self.preis_input.setText(str(reifen.get("preis", "")))
+            waehrung_idx = self.waehrung_input.findText(reifen.get("waehrung", "EUR"), Qt.MatchExactly)
+            if waehrung_idx >= 0:
+                self.waehrung_input.setCurrentIndex(waehrung_idx)
             # Datum für eingelagert_am
             eingelagert = reifen.get("eingelagert_am", "")
             if eingelagert:
@@ -199,7 +213,9 @@ class ReifenlagerDialog(QDialog):
             "lagerort": self.lagerort_input.text().strip(),
             "eingelagert_am": fmt_date(getattr(self, "eingelagert_am_input", None)),
             "ausgelagert_am": fmt_date(getattr(self, "ausgelagert_am_input", None)),
-            "bemerkung": self.bemerkung_input.text().strip()
+            "bemerkung": self.bemerkung_input.text().strip(),
+            "preis": self.preis_input.text().strip(),
+            "waehrung": self.waehrung_input.currentText()
         }
 
 

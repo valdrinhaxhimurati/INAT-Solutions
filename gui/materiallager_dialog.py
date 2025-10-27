@@ -23,6 +23,15 @@ class MateriallagerDialog(QDialog):
         for ln, name in self._lade_lieferanten():
             self.lieferant_box.addItem(name, ln)
         self.bemerkung_input = QLineEdit()
+        self.preis_input = QLineEdit()
+        self.preis_input.setPlaceholderText("Preis")
+        layout.addWidget(QLabel("Preis:"))
+        layout.addWidget(self.preis_input)
+
+        self.waehrung_input = QComboBox()
+        self.waehrung_input.addItems(["EUR", "USD", "CHF"])
+        layout.addWidget(QLabel("Währung:"))
+        layout.addWidget(self.waehrung_input)
 
         layout.addWidget(QLabel("Materialnummer:"))
         layout.addWidget(self.materialnummer_input)
@@ -57,6 +66,10 @@ class MateriallagerDialog(QDialog):
                 if idx >= 0:
                     self.lieferant_box.setCurrentIndex(idx)
             self.bemerkung_input.setText(material.get("bemerkung",""))
+            self.preis_input.setText(str(material.get("preis", "")))
+            waehrung_idx = self.waehrung_input.findText(material.get("waehrung", "EUR"), Qt.MatchExactly)
+            if waehrung_idx >= 0:
+                self.waehrung_input.setCurrentIndex(waehrung_idx)
 
         btn_layout = QHBoxLayout()
         btn_ok = QPushButton("OK")
@@ -106,5 +119,7 @@ class MateriallagerDialog(QDialog):
             "einheit": self.einheit_input.currentText(),
             "lagerort": self.lagerort_input.text().strip(),
             "lieferantnr": lf_val,
-            "bemerkung": self.bemerkung_input.text().strip()
+            "bemerkung": self.bemerkung_input.text().strip(),
+            "preis": self.preis_input.text().strip(),
+            "waehrung": self.waehrung_input.currentText()
         }

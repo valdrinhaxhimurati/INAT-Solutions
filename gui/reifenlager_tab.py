@@ -106,23 +106,21 @@ class ReifenlagerTab(QWidget):
             """)
         # Explizite Spalten in der gewünschten Reihenfolge (10 Spalten für die Tabelle)
         cursor.execute("""
-            SELECT reifen_id, kunde_anzeige, fahrzeug, dimension, typ, dot, lagerort, eingelagert_am, ausgelagert_am, bemerkung
-            FROM reifenlager
+            SELECT reifen_id, kundennr, kunde_anzeige, fahrzeug, dimension, typ, dot, lagerort, eingelagert_am, ausgelagert_am, preis, waehrung, bemerkung
+            FROM reifenlager ORDER BY dimension
         """)
         daten = cursor.fetchall()
 
         self.table.setRowCount(len(daten))
-        self.table.setColumnCount(10)
-        self.table.setHorizontalHeaderLabels([
-            "ID", "Kunde", "Fahrzeug", "Dimension", "Typ", "DOT",
-            "Lagerort", "Eingelagert am", "Ausgelagert am", "Bemerkung"
-        ])
+        self.table.setColumnCount(13)
+        self.table.setHorizontalHeaderLabels(["ID", "Kundennr", "Kunde", "Fahrzeug", "Dimension", "Typ", "DOT", "Lagerort", "Eingelagert", "Ausgelagert", "Preis", "Währung", "Bemerkung"])
         
         for row_idx, row in enumerate(daten):
             # Reihe als dict oder Sequence behandeln und Werte in festgelegter Reihenfolge holen
             if isinstance(row, dict):
                 vals = [
                     row.get("reifen_id"),
+                    row.get("kundennr"),
                     row.get("kunde_anzeige"),
                     row.get("fahrzeug"),
                     row.get("dimension"),
@@ -131,11 +129,13 @@ class ReifenlagerTab(QWidget):
                     row.get("lagerort"),
                     row.get("eingelagert_am"),
                     row.get("ausgelagert_am"),
+                    row.get("preis"),
+                    row.get("waehrung"),
                     row.get("bemerkung"),
                 ]
             else:
                 # Sequence / sqlite3.Row
-                vals = [row[i] for i in range(10)]
+                vals = [row[i] for i in range(13)]
 
             # --- DOT-Logik für Farbe ---
             dot_jahr = None
@@ -170,15 +170,18 @@ class ReifenlagerTab(QWidget):
                 
         #Alle Spaltenbreiten 
         self.table.setColumnWidth(0, 40)    # ID
-        self.table.setColumnWidth(1, 250)   # Kunde
-        self.table.setColumnWidth(2, 130)   # Fahrzeug
-        self.table.setColumnWidth(3, 90)   # Dimension
-        self.table.setColumnWidth(4, 80)   # Typ
-        self.table.setColumnWidth(5, 80)    # DOT
-        self.table.setColumnWidth(6, 120)   # Lagerort
-        self.table.setColumnWidth(7, 125)   # Eingelagert am
-        self.table.setColumnWidth(8, 125)   # Ausgelagert am
-        self.table.setColumnWidth(9, 170)   # Bemerkung        
+        self.table.setColumnWidth(1, 80)    # Kundennr
+        self.table.setColumnWidth(2, 250)   # Kunde
+        self.table.setColumnWidth(3, 130)   # Fahrzeug
+        self.table.setColumnWidth(4, 90)   # Dimension
+        self.table.setColumnWidth(5, 80)   # Typ
+        self.table.setColumnWidth(6, 80)    # DOT
+        self.table.setColumnWidth(7, 120)   # Lagerort
+        self.table.setColumnWidth(8, 125)   # Eingelagert am
+        self.table.setColumnWidth(9, 125)   # Ausgelagert am
+        self.table.setColumnWidth(10, 100)  # Preis
+        self.table.setColumnWidth(11, 80)   # Währung
+        self.table.setColumnWidth(12, 170)   # Bemerkung        
         # keine Zeilennummern (vertical header) anzeigen
         try:
             self.table.verticalHeader().setVisible(False)
@@ -195,12 +198,13 @@ class ReifenlagerTab(QWidget):
             cursor = conn.cursor(cursor_factory=dict_cursor_factory(conn))
             # IMPORTANT: reifen_id wird nicht übergeben — DB erzeugt sie automatisch
             cursor.execute("""
-                INSERT INTO reifenlager (kundennr, kunde_anzeige, fahrzeug, dimension, typ, dot, lagerort, eingelagert_am, ausgelagert_am, bemerkung)
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                INSERT INTO reifenlager (kundennr, kunde_anzeige, fahrzeug, dimension, typ, dot, lagerort, eingelagert_am, ausgelagert_am, bemerkung, preis, waehrung)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
             """, (
                 daten["kundennr"], daten["kunde_anzeige"], daten["fahrzeug"], daten["dimension"],
                 daten["typ"], daten["dot"], daten["lagerort"],
-                daten["eingelagert_am"], daten["ausgelagert_am"], daten["bemerkung"]
+                daten["eingelagert_am"], daten["ausgelagert_am"], daten["bemerkung"],
+                daten["preis"], daten["waehrung"]
             ))
             conn.commit()
             conn.close()
@@ -221,7 +225,9 @@ class ReifenlagerTab(QWidget):
             "lagerort": self.table.item(zeile, 6).text(),
             "eingelagert_am": self.table.item(zeile, 7).text(),
             "ausgelagert_am": self.table.item(zeile, 8).text(),
-            "bemerkung": self.table.item(zeile, 9).text()
+            "bemerkung": self.table.item(zeile, 9).text(),
+            "preis": self.table.item(zeile, 10).text(),
+            "waehrung": self.table.item(zeile, 11).text()
         }
         dialog = ReifenlagerDialog(self, reifen=reifen)
         if dialog.exec_() == QDialog.Accepted:
@@ -230,12 +236,12 @@ class ReifenlagerTab(QWidget):
             cursor = conn.cursor(cursor_factory=dict_cursor_factory(conn))
             cursor.execute("""
                 UPDATE reifenlager
-                SET kundennr= %s, kunde_anzeige= %s, fahrzeug= %s, dimension= %s, typ= %s, dot= %s, lagerort= %s, eingelagert_am= %s, ausgelagert_am= %s, bemerkung= %s
+                SET kundennr= %s, kunde_anzeige= %s, fahrzeug= %s, dimension= %s, typ= %s, dot= %s, lagerort= %s, eingelagert_am= %s, ausgelagert_am= %s, bemerkung= %s, preis= %s, waehrung= %s
                 WHERE reifen_id= %s
             """, (
                 daten["kundennr"], daten["kunde_anzeige"], daten["fahrzeug"], daten["dimension"],
                 daten["typ"], daten["dot"], daten["lagerort"],
-                daten["eingelagert_am"], daten["ausgelagert_am"], daten["bemerkung"], reifen["reifen_id"]
+                daten["eingelagert_am"], daten["ausgelagert_am"], daten["bemerkung"], daten["preis"], daten["waehrung"], reifen["reifen_id"]
             ))
             conn.commit()
             conn.close()

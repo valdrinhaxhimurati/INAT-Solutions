@@ -652,15 +652,20 @@ def ensure_app_schema():
             ("email", "TEXT"),
             ("bemerkung", "TEXT")
         ],
-        "artikellager": [
-            ("artikel_id", "BIGSERIAL PRIMARY KEY"),
-            ("artikelnummer", "TEXT"),
+        "materiallager": [
+            ("material_id", "BIGSERIAL PRIMARY KEY" if not _is_sqlite(get_db()) else "INTEGER PRIMARY KEY AUTOINCREMENT"),
+            ("materialnummer", "TEXT"),
             ("bezeichnung", "TEXT"),
-            ("bestand", "INTEGER"),
-            ("lagerort", "TEXT")
+            ("menge", "INTEGER"),
+            ("einheit", "TEXT"),
+            ("lagerort", "TEXT"),
+            ("lieferantnr", "INTEGER"),
+            ("preis", "NUMERIC"),
+            ("waehrung", "TEXT DEFAULT 'EUR'"),
+            ("bemerkung", "TEXT")
         ],
         "reifenlager": [
-            ("reifen_id", "BIGSERIAL PRIMARY KEY"),
+            ("reifen_id", "BIGSERIAL PRIMARY KEY" if not _is_sqlite(get_db()) else "INTEGER PRIMARY KEY AUTOINCREMENT"),
             ("kundennr", "INTEGER"),
             ("kunde_anzeige", "TEXT"),
             ("fahrzeug", "TEXT"),
@@ -670,29 +675,26 @@ def ensure_app_schema():
             ("lagerort", "TEXT"),
             ("eingelagert_am", "TEXT"),
             ("ausgelagert_am", "TEXT"),
+            ("preis", "NUMERIC"),
+            ("waehrung", "TEXT DEFAULT 'EUR'"),
             ("bemerkung", "TEXT")
         ],
-        "rechnung_layout": [
-            ("id", "BIGSERIAL PRIMARY KEY"),
-            ("name", "TEXT"),
-            ("layout_data", "TEXT"),
-            ("layout", "JSONB"),
-            ("kopfzeile", "TEXT"),
-            ("einleitung", "TEXT"),
-            ("fusszeile", "TEXT"),
-            ("logo", "BYTEA"),
-            ("logo_mime", "TEXT"),
-            ("logo_skala", "REAL"),
-            ("created_at", "TIMESTAMP DEFAULT CURRENT_TIMESTAMP")
-        ],
-        "materiallager": [
-            ("material_id", "BIGSERIAL PRIMARY KEY"),
-            ("materialnummer", "TEXT"),
+        "artikellager": [
+            ("artikel_id", "BIGSERIAL PRIMARY KEY" if not _is_sqlite(get_db()) else "INTEGER PRIMARY KEY AUTOINCREMENT"),
+            ("artikelnummer", "TEXT"),
             ("bezeichnung", "TEXT"),
-            ("menge", "INTEGER"),
-            ("einheit", "TEXT"),
+            ("bestand", "INTEGER"),
             ("lagerort", "TEXT"),
-            ("lieferantnr", "INTEGER"),
+            ("preis", "NUMERIC"),
+            ("waehrung", "TEXT DEFAULT 'EUR'")
+        ],
+        "dienstleistungen": [
+            ("dienstleistung_id", "BIGSERIAL PRIMARY KEY" if not _is_sqlite(get_db()) else "INTEGER PRIMARY KEY AUTOINCREMENT"),
+            ("name", "TEXT"),
+            ("beschreibung", "TEXT"),
+            ("preis", "NUMERIC"),
+            ("einheit", "TEXT"),
+            ("waehrung", "TEXT DEFAULT 'EUR'"),
             ("bemerkung", "TEXT")
         ],
         # Einstellungen (App-Settings) — wichtig für get_einstellungen / set_einstellungen
@@ -703,6 +705,22 @@ def ensure_app_schema():
         "qr_daten": [
             ("id", "BIGSERIAL PRIMARY KEY" if not _is_sqlite(get_db()) else "INTEGER PRIMARY KEY AUTOINCREMENT"),
             ("data", "JSONB" if not _is_sqlite(get_db()) else "TEXT")
+        ],
+        "lager_einstellungen": [
+            ("id", "BIGSERIAL PRIMARY KEY" if not _is_sqlite(get_db()) else "INTEGER PRIMARY KEY AUTOINCREMENT"),
+            ("lager_typ", "TEXT UNIQUE"),  # UNIQUE hinzufügen
+            ("aktiv", "BOOLEAN DEFAULT FALSE")
+        ],
+        "rechnung_layout": [
+            ("id", "BIGSERIAL PRIMARY KEY" if not _is_sqlite(get_db()) else "INTEGER PRIMARY KEY AUTOINCREMENT"),
+            ("name", "TEXT"),
+            ("layout", "TEXT"),
+            ("kopfzeile", "TEXT"),
+            ("einleitung", "TEXT"),
+            ("fusszeile", "TEXT"),
+            ("logo", "BYTEA" if not _is_sqlite(get_db()) else "BLOB"),
+            ("logo_mime", "TEXT"),
+            ("logo_skala", "NUMERIC")
         ],
     }
 

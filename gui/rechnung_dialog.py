@@ -13,8 +13,8 @@ import os, sys
 
 # Optional: „Aus Lager“-Dialog; wenn nicht vorhanden, bleibt der Button deaktiviert.
 try:
-    from gui.select_inventory_item import SelectInventoryItemDialog
-    HAS_LAGER = True
+    from gui.select_from_all_lager import SelectFromAllLagerDialog
+    HAS_LAGER = True  # Bleibt, aber Dialog ändert sich
 except Exception:
     HAS_LAGER = False
 
@@ -456,9 +456,9 @@ class RechnungDialog(QDialog):
         if not HAS_LAGER:
             QMessageBox.information(self, "Nicht verfügbar", "Der Lagerdialog ist nicht verfügbar.")
             return
-        dlg = SelectInventoryItemDialog(self)
+        dlg = SelectFromAllLagerDialog(self)
         if dlg.exec_() == QDialog.Accepted:
-            item = getattr(dlg, "selected_item", None) or {}
+            item = dlg.selected_item or {}
             beschr = item.get("name") or item.get("bezeichnung") or ""
             epreis = _to_float(item.get("price") or item.get("verkaufspreis") or item.get("preis") or 0.0, 0.0)
             self._add_position(beschr, 1.0, epreis)
