@@ -2,9 +2,10 @@
 from PyQt5.QtWidgets import (
     QDialog, QWidget, QVBoxLayout, QHBoxLayout, QGridLayout, QLabel, QLineEdit,
     QTextEdit, QPushButton, QComboBox, QDateEdit, QMessageBox, QTableWidget,
-    QTableWidgetItem, QDoubleSpinBox, QSizePolicy
+    QTableWidgetItem, QDoubleSpinBox, QSizePolicy, QAbstractButton
 )
 from PyQt5.QtCore import Qt, QDate
+from PyQt5.QtGui import QIcon
 from db_connection import get_db, get_config_value
 from reportlab.lib.utils import ImageReader
 from io import BytesIO
@@ -153,6 +154,9 @@ class RechnungDialog(QDialog):
         self.de_datum = QDateEdit(calendarPopup=True)
         self.de_datum.setDisplayFormat("yyyy-MM-dd")  # ISO wie in der neuen Version
         self.de_datum.setDate(QDate.currentDate())
+        # make date field wider so it's not too short in the layout
+        self.de_datum.setMinimumWidth(160)
+        self.de_datum.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Fixed)
         grid.addWidget(self.de_datum, row, 1)
 
         grid.addWidget(QLabel("UID:"), row, 2)
@@ -306,6 +310,25 @@ class RechnungDialog(QDialog):
 
         # Erste Summenberechnung
         self._recalc_totals()
+
+        # Debug: liste alle Button-Subcontrols der SpinBox auf, markiere sie visuell und versuche temporär ein Icon zu setzen
+        try:
+            print("DEBUG: Inspecting spinbox children for icons")
+            for i, btn in enumerate(self.sb_mwst.findChildren(QAbstractButton)):
+                geom = btn.geometry()
+                icon_null = btn.icon().isNull()
+                print(f"DEBUG: btn[{i}] type={type(btn).__name__} geom={geom} iconNull={icon_null}")
+                # Sichtbar machen (hält temporär die Farbe)
+                btn.setStyleSheet("background: rgba(255,0,0,0.12);")
+                # Versuche explizit Icon zu setzen (nur Test)
+                try:
+                    icon_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "icons", "Down_arrow.png"))
+                    btn.setIcon(QIcon(icon_path))
+                    print("DEBUG: setIcon ->", icon_path)
+                except Exception as e:
+                    print("DEBUG: setIcon failed:", e)
+        except Exception as e:
+            print("DEBUG: spinbox-inspect failed:", e)
 
     # -- Helpers --
     def _on_kunde_changed(self, name: str):

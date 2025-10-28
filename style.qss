@@ -315,7 +315,7 @@ QComboBox QAbstractItemView {
     padding: 4px;
 }
 
-/* Einheitliches Styling für SpinBoxes (Menge, Zahlenfelder) */
+/* Einheitliches Styling für SpinBoxes (Platz für Buttons) */
 QAbstractSpinBox,
 QSpinBox,
 QDoubleSpinBox {
@@ -327,22 +327,27 @@ QDoubleSpinBox {
     min-height: 28px;
 }
 
-/* Up/Down Buttons in SpinBox vereinheitlichen */
-QSpinBox::up-button, QDoubleSpinBox::up-button,
-QSpinBox::down-button, QDoubleSpinBox::down-button {
+/* Up/Down Buttons in SpinBox: nur Buttons mit qproperty-icon verwenden.
+   Entferne alle QSpinBox::up-arrow / QSpinBox::down-arrow { image: ... } Regeln! */
+QSpinBox::up-button, QDoubleSpinBox::up-button {
     subcontrol-origin: padding;
     subcontrol-position: right top;
-    width: 24px;
-    background: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #f9f9fb, stop:1 #eef2fa);
+    width: 18px;
+    height: 50%;
     border-left: 1px solid #c2c9d8;
+    background: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #f9f9fb, stop:1 #eef2fa);
+    qproperty-icon: url("icons/Up_arrow.png");
+    qproperty-iconSize: 14px 14px;
 }
-
-/* Pfeile in den Buttons (nur Größe definieren, Icons verwendet Qt-Default) */
-QSpinBox::up-arrow, QSpinBox::down-arrow,
-QDoubleSpinBox::up-arrow, QDoubleSpinBox::down-arrow {
-    width: 10px;
-    height: 10px;
-    image: url("data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCI+PHBhdGggZmlsbD0iIzJlNWFhMyIgZD0iTTcgMTRsNS01IDUgNXoiLz48L3N2Zz4=");
+QSpinBox::down-button, QDoubleSpinBox::down-button {
+    subcontrol-origin: padding;
+    subcontrol-position: right bottom;
+    width: 18px;
+    height: 50%;
+    border-left: 1px solid #c2c9d8;
+    background: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #f9f9fb, stop:1 #eef2fa);
+    qproperty-icon: url("icons/Down_arrow.png");
+    qproperty-iconSize: 14px 14px;
 }
 
 /* Datumseingaben (QDateEdit/QDateTimeEdit) mit Dropdown-Kalender */
@@ -430,6 +435,8 @@ QSpinBox::up-button, QDoubleSpinBox::up-button {
     height: 50%;
     border-left: 1px solid #c2c9d8;
     background: qlineargradient(x1:0,y1:0,x2:0,y2:1, stop:0 #f9f9fb, stop:1 #eef2fa);
+    qproperty-icon: url("icons/Up_arrow.png");
+    qproperty-iconSize: 14px 14px;
 }
 QSpinBox::down-button, QDoubleSpinBox::down-button {
     subcontrol-origin: padding;
@@ -438,38 +445,14 @@ QSpinBox::down-button, QDoubleSpinBox::down-button {
     height: 50%;
     border-left: 1px solid #c2c9d8;
     background: qlineargradient(x1:0,y1:0,x2:0,y2:1, stop:0 #f9f9fb, stop:1 #eef2fa);
+    qproperty-icon: url("icons/Down_arrow.png");
+    qproperty-iconSize: 14px 14px;
 }
 
-/* --- Einheitliche, moderne Pfeile für alle Dropdowns und Zähler --- */
+/* ---  Dropdowns  --- */
 
 /* ComboBox Dropdown-Pfeil */
 QComboBox::down-arrow {
-    image: url(icons/Down_arrow.png);
-    width: 16px;
-    height: 16px;
-}
-
-/* SpinBox Pfeile */
-QSpinBox::up-arrow, QDoubleSpinBox::up-arrow {
-    image: url(icons/Up_arrow.png);
-    width: 14px;
-    height: 14px;
-}
-QSpinBox::down-arrow, QDoubleSpinBox::down-arrow {
-    image: url(icons/Down_arrow.png);
-    width: 14px;
-    height: 14px;
-}
-
-/* DateEdit Dropdown-Pfeil */
-QDateEdit::down-arrow, QDateTimeEdit::down-arrow {
-    image: url(icons/Down_arrow.png);
-    width: 16px;
-    height: 16px;
-}
-
-/* ToolButton Menü-Indikator */
-QToolButton::menu-indicator {
     image: url(icons/Down_arrow.png);
     width: 16px;
     height: 16px;

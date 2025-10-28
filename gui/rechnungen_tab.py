@@ -164,15 +164,19 @@ class RechnungenTab(QWidget):
             self._lade_rechnungslayout()
 
     def _lade_einstellungen(self):
-        """MWST aus JSON-Konfig laden, Standard 7.7%"""
+        # MWST aus DB laden (config-Tabelle)
         try:
-            with open("config/einstellungen.json", "r", encoding="utf-8") as f:
-                daten = json.load(f)
-            self.mwst = float(daten.get("mwst", 7.7))
-            self.uid = daten.get("uid", "")
+            con = get_db()
+            with con.cursor() as cur:
+                cur.execute("SELECT value FROM config WHERE key = %s LIMIT 1", ["mwst_default"])
+                row = cur.fetchone()
+                if row:
+                    mwst = float(row["value"] if isinstance(row, dict) else row[0])
+                else:
+                    mwst = 0.0  # Fallback
         except Exception:
-            self.mwst = 7.7
-            self.uid = ""
+            mwst = 0.0  # Fallback bei Fehler
+        self.mwst_voreinstellung = mwst
 
     def _lade_rechnungslayout(self):
         import json, os, base64
@@ -463,7 +467,7 @@ class RechnungenTab(QWidget):
             self.kunden_firmen,
             self.kunden_adressen,
             {"rechnung_nr": vorschlag_nr},
-            mwst_voreinstellung=self.mwst
+            mwst_voreinstellung=self.mwst_voreinstellung
         )
         if dialog.exec_() == QDialog.Accepted:
             rechnung = dialog.get_rechnung()

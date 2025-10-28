@@ -12,6 +12,8 @@
     <file>icons/settings.svg</file>
     <file>icons/ok.svg</file>
     <file>icons/cancel.svg</file>
-      <file>icons/preview.svg</file>
+    <file>icons/preview.svg</file>
+    <file>icons/Up_arrow.png</file>
+    <file>icons/Down_arrow.png</file>
   </qresource>
 </RCC>
