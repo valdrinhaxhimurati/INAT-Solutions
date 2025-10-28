@@ -223,3 +223,6 @@ CREATE TABLE IF NOT EXISTS buchhaltung (
   kategorie TEXT,
   beschreibung TEXT
 );
+
+-- Beispiel-Insert für MWST-Default (nur einmalig ausführen, z.B. beim ersten DB-Setup)
+INSERT OR IGNORE INTO config (key, value) VALUES ('mwst_default', '0.0');
