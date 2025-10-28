@@ -13,7 +13,7 @@ from gui.lager_tab import LagerTab
 
 from version import __version__
 from PyQt5.QtGui import QIcon, QPainter, QPixmap
-from PyQt5.QtCore import Qt
+from PyQt5.QtCore import Qt, QPropertyAnimation, QEasingCurve
 
 import sys
 import os
@@ -74,4 +74,13 @@ class MainWindow(QMainWindow):
         self.status_bar.addWidget(user_label)
 
         self.setCentralWidget(self.tabs)
+
+    # Für einen Button
+    def animate_button(self, button):
+        anim = QPropertyAnimation(button, b"geometry")
+        anim.setDuration(300)
+        anim.setEasingCurve(QEasingCurve.InOutQuad)
+        anim.setStartValue(button.geometry())
+        anim.setEndValue(button.geometry().adjusted(0, -5, 0, -5))  # Leichter Lift
+        anim.start()
 

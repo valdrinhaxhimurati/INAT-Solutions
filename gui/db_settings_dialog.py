@@ -1,4 +1,4 @@
-﻿from PyQt5.QtWidgets import (
+from PyQt5.QtWidgets import (
     QDialog, QVBoxLayout, QGroupBox, QLabel, QLineEdit, QCheckBox,
     QPushButton, QWidget, QHBoxLayout, QFormLayout, QMessageBox, QRadioButton, QApplication
 )
@@ -50,8 +50,8 @@ class DBSettingsDialog(QDialog):
         url_row.setContentsMargins(0, 0, 0, 0)
         url_row.setSpacing(8)
 
+layout.addWidget(QLabel("Db url edit:"))
         self.db_url_edit = QLineEdit()
-        self.db_url_edit.setPlaceholderText("postgresql://user:pass@host:port/dbname")
         self.db_url_edit.setText(self._initial_url)
         self.db_url_edit.setMinimumWidth(360)
 
@@ -76,7 +76,7 @@ class DBSettingsDialog(QDialog):
         # Initial UI-State
         self._sync_mode_ui()
 
-        # 15% grÃ¶ÃŸer starten
+        # 15% größer starten
         self.resize(int(self.sizeHint().width() * 1.15), int(self.sizeHint().height() * 1.15))
 
     def _sync_mode_ui(self):
@@ -120,11 +120,11 @@ class DBSettingsDialog(QDialog):
 
         changed = (is_remote != self._initial_use_remote) or (is_remote and new_url != self._initial_url)
         if changed:
-            # Neustart vorschlagen und ggf. ausfÃ¼hren
+            # Neustart vorschlagen und ggf. ausführen
             res = QMessageBox.question(
                 self,
                 "Neustart erforderlich",
-                "Die Datenbank-Einstellungen wurden geÃ¤ndert. Anwendung jetzt neu starten?",
+                "Die Datenbank-Einstellungen wurden geändert. Anwendung jetzt neu starten?",
                 QMessageBox.Yes | QMessageBox.No,
                 QMessageBox.Yes
             )

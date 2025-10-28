@@ -1,6 +1,7 @@
 ﻿import os, sys, json, sqlite3
 from typing import Optional, Tuple, Any
 from db_connection import get_db
+import paths
 
 SQLITE_TABLE = """
 CREATE TABLE IF NOT EXISTS app_settings (
@@ -168,3 +169,15 @@ def save_logo_from_file(path: str) -> None:
     mime = "image/png" if ext == ".png" else "image/jpeg" if ext in (".jpg", ".jpeg") else "image/bmp" if ext == ".bmp" else "application/octet-stream"
     with open(path, "rb") as f:
         set_blob("invoice_logo", f.read(), mime)
+
+def load_config():
+    import os
+    import json
+    config_file = os.path.join(paths.get_app_data_dir(), "config.json")
+    if os.path.exists(config_file):
+        try:
+            with open(config_file, "r", encoding="utf-8") as f:
+                return json.load(f)
+        except Exception:
+            pass
+    return {"db_type": "sqlite"}  # Default

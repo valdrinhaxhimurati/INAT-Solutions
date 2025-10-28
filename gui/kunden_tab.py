@@ -5,6 +5,7 @@ from PyQt5.QtWidgets import (
 )
 from PyQt5.QtCore import Qt, pyqtSignal
 from db_connection import get_db, dict_cursor_factory
+from settings_store import load_config
 from gui.kunden_dialog import KundenDialog
 import sqlite3
 
@@ -151,7 +152,6 @@ class KundenTab(QWidget):
                 pass
 
     def lade_kunden(self):
-        import pprint
         conn = get_db()
         try:
             cols = self._detect_kunden_columns(conn)
@@ -171,27 +171,16 @@ class KundenTab(QWidget):
                 FROM kunden
                 ORDER BY {cols['kundennr']}
             """
-            print("\n--- lade_kunden DEBUG ---")
-            print("Spalten-Mapping:", cols)
-            print("SQL:\n", sql)
-            # Use the connection's cursor; normalize fetched rows to dicts regardless of backend
             with conn.cursor() as cur:
                 cur.execute(sql)
                 rows = cur.fetchall()
-                print("Rows (raw):")
-                pprint.pprint(rows[:3])
                 if rows and not isinstance(rows[0], dict):
                     desc = getattr(cur, "description", None)
                     if desc:
                         cols_desc = [d[0] for d in desc]
-                        print("Spalten aus DB:", cols_desc)
                         rows = [dict(zip(cols_desc, row)) for row in rows]
                     else:
-                        # fallback for sqlite3.Row or similar mapping rows
                         rows = [dict(r) if hasattr(r, "keys") else r for r in rows]
-
-            print("Rows (dict):")
-            pprint.pprint(rows[:3])
 
             col_order = ["kundennr", "anrede", "name", "firma", "plz", "strasse", "stadt", "email", "bemerkung"]
 
@@ -205,8 +194,6 @@ class KundenTab(QWidget):
                 if len(vals) < len(col_order):
                     vals += [None] * (len(col_order) - len(vals))
                 norm_rows.append(tuple(vals[:len(col_order)]))
-            print("Normierte rows (erste 3):")
-            pprint.pprint(norm_rows[:3])
 
             self.table.setRowCount(len(norm_rows))
             self.table.setColumnCount(len(col_order))
@@ -233,7 +220,6 @@ class KundenTab(QWidget):
                 pass
 
             self.table.resizeColumnsToContents()
-            print("--- lade_kunden DEBUG ENDE ---\n")
         finally:
             try:
                 conn.close()
@@ -263,7 +249,9 @@ class KundenTab(QWidget):
         if dlg.exec_() == QDialog.Accepted:
             d = dlg.get_daten()
             with get_db() as con:
-                is_sqlite = isinstance(con, sqlite3.Connection) or "sqlite" in con.__class__.__module__.lower()
+                config = load_config()
+                db_type = config.get("db_type", "sqlite")
+                is_sqlite = db_type == "sqlite"
                 cols = self._detect_kunden_columns(con)
                 field_map = {
                     "anrede": cols.get("anrede"),
@@ -283,12 +271,8 @@ class KundenTab(QWidget):
                     else:
                         placeholders = ", ".join(["%s"] * len(insert_cols))
                     sql = f"INSERT INTO kunden ({', '.join(insert_cols)}) VALUES ({placeholders})"
-                    print("DEBUG INSERT:", sql)
-                    print("DEBUG VALUES:", insert_vals)
                     with con.cursor() as cur:
                         cur.execute(sql, insert_vals)
-                        if is_sqlite:
-                            print("DEBUG lastrowid:", cur.lastrowid)
                 con.commit()
             self.lade_kunden()
             self.kunde_aktualisiert.emit()

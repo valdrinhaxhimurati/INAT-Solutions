@@ -9,7 +9,6 @@ class DienstleistungenDialog(QDialog):
         layout = QVBoxLayout()
 
         self.name_input = QLineEdit()
-        self.name_input.setPlaceholderText("Name der Dienstleistung")
         layout.addWidget(QLabel("Name:"))
         layout.addWidget(self.name_input)
 
@@ -18,7 +17,6 @@ class DienstleistungenDialog(QDialog):
         layout.addWidget(self.beschreibung_input)
 
         self.preis_input = QLineEdit()
-        self.preis_input.setPlaceholderText("Preis (z.B. 100.00)")
         layout.addWidget(QLabel("Preis:"))
         layout.addWidget(self.preis_input)
 

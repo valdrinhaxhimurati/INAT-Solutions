@@ -24,7 +24,6 @@ class MateriallagerDialog(QDialog):
             self.lieferant_box.addItem(name, ln)
         self.bemerkung_input = QLineEdit()
         self.preis_input = QLineEdit()
-        self.preis_input.setPlaceholderText("Preis")
         layout.addWidget(QLabel("Preis:"))
         layout.addWidget(self.preis_input)
 

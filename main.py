@@ -212,7 +212,6 @@ del "%~f0"
 
 def run():
     app = QApplication(sys.argv)
-    app.setStyle("Fusion")
     ss = lade_stylesheet("style.qss")
     if ss:
         app.setStyleSheet(ss)

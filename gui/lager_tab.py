@@ -22,6 +22,13 @@ class LagerTab(QWidget):
             if child.widget():
                 child.widget().setParent(None)
 
+        # Tabs leeren und entfernen, falls vorhanden
+        if hasattr(self, 'tabs'):
+            self.tabs.clear()
+            self.layout.removeWidget(self.tabs)
+            self.tabs.setParent(None)
+            self.tabs = None
+
         try:
             conn = get_db()
             cur = conn.cursor()
@@ -29,7 +36,7 @@ class LagerTab(QWidget):
             aktive = [row[0] for row in cur.fetchall()]
             conn.close()
         except Exception:
-            aktive = []  # Default alle deaktiviert
+            aktive = []
 
         if len(aktive) == 0:
             # Stretch oben

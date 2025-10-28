@@ -275,12 +275,14 @@ class EinstellungenTab(QWidget):
             QMessageBox.information(self, "Module", "Einstellungen gespeichert.")
             # Lager-Tab aktualisieren
             try:
-                stacked_widget = self.parent()  # EinstellungenTab -> QStackedWidget
-                tabs_widget = stacked_widget.parent()  # QStackedWidget -> QTabWidget
-                main_window = tabs_widget.parent()  # QTabWidget -> MainWindow
-                lager_tab = getattr(main_window, 'lager_tab', None)
-                if lager_tab:
-                    lager_tab.tabs.clear()
+                # Versuche, MainWindow zu finden
+                widget = self
+                while widget and not hasattr(widget, 'lager_tab'):
+                    widget = widget.parent()
+                if widget and hasattr(widget, 'lager_tab'):
+                    lager_tab = widget.lager_tab
+                    if hasattr(lager_tab, 'tabs') and lager_tab.tabs:
+                        lager_tab.tabs.clear()
                     lager_tab._load_aktive_lager()
             except Exception as e:
                 print(f"Fehler beim Aktualisieren: {e}")

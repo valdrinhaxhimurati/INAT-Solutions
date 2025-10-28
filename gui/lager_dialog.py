@@ -1,4 +1,4 @@
-﻿from PyQt5.QtWidgets import (
+from PyQt5.QtWidgets import (
     QDialog, QVBoxLayout, QHBoxLayout, QLabel, QLineEdit, QPushButton, QMessageBox
 )
 from db_connection import get_db, dict_cursor_factory
@@ -9,14 +9,14 @@ class LagerDialog(QDialog):
         self.resize(400, 200)
         layout = QVBoxLayout()
 
+        layout.addWidget(QLabel("Artikelnummer:"))
         self.artikelnummer_input = QLineEdit()
-        self.artikelnummer_input.setPlaceholderText("Artikelnummer")
+        layout.addWidget(QLabel("Bezeichnung:"))
         self.bezeichnung_input = QLineEdit()
-        self.bezeichnung_input.setPlaceholderText("Bezeichnung")
+        layout.addWidget(QLabel("Bestand:"))
         self.bestand_input = QLineEdit()
-        self.bestand_input.setPlaceholderText("Bestand (Zahl)")
+        layout.addWidget(QLabel("Lagerort:"))
         self.lagerort_input = QLineEdit()
-        self.lagerort_input.setPlaceholderText("Lagerort")
 
         if artikel:
             self.artikelnummer_input.setText(artikel.get("artikelnummer", ""))
@@ -24,13 +24,9 @@ class LagerDialog(QDialog):
             self.bestand_input.setText(str(artikel.get("bestand", "")))
             self.lagerort_input.setText(artikel.get("lagerort", ""))
 
-        layout.addWidget(QLabel("Artikelnummer:"))
         layout.addWidget(self.artikelnummer_input)
-        layout.addWidget(QLabel("Bezeichnung:"))
         layout.addWidget(self.bezeichnung_input)
-        layout.addWidget(QLabel("Bestand:"))
         layout.addWidget(self.bestand_input)
-        layout.addWidget(QLabel("Lagerort:"))
         layout.addWidget(self.lagerort_input)
 
         btn_layout = QHBoxLayout()
@@ -45,7 +41,7 @@ class LagerDialog(QDialog):
         self.setLayout(layout)
 
     def accept_dialog(self):
-        # Pflichtfelder prüfen
+        # Pflichtfelder pr�fen
         if not self.artikelnummer_input.text().strip():
             QMessageBox.warning(self, "Pflichtfeld", "Bitte Artikelnummer eingeben!")
             return
@@ -61,6 +57,7 @@ class LagerDialog(QDialog):
             "bestand": int(self.bestand_input.text().strip()),
             "lagerort": self.lagerort_input.text().strip()
         }
+
 
 
 

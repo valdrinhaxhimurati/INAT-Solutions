@@ -640,8 +640,7 @@ def ensure_app_schema():
             ("passwort", "TEXT"),
         ],
         "kunden": [
-            ("id", "BIGSERIAL PRIMARY KEY"),
-            ("kundennr", "BIGINT"),
+            ("kundennr", "BIGSERIAL PRIMARY KEY" if not _is_sqlite(get_db()) else "INTEGER PRIMARY KEY AUTOINCREMENT"),
             ("anrede", "TEXT"),
             ("name", "TEXT"),
             ("firma", "TEXT"),

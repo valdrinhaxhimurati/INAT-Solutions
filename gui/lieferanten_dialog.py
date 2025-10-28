@@ -9,13 +9,9 @@ class LieferantenDialog(QDialog):
         layout = QVBoxLayout()
 
         self.name_input = QLineEdit()
-        self.name_input.setPlaceholderText("Name")
         self.link_input = QLineEdit()
-        self.link_input.setPlaceholderText("Portal-Link")
         self.login_input = QLineEdit()
-        self.login_input.setPlaceholderText("Benutzername")
         self.pass_input = QLineEdit()
-        self.pass_input.setPlaceholderText("Passwort")
         self.pass_input.setEchoMode(QLineEdit.Password)
 
         if lieferant:

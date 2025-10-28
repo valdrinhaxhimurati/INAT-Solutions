@@ -21,3 +21,6 @@ def users_db_path() -> Path:
 
 def local_db_path() -> Path:
     return data_dir() / "datenbank.sqlite"
+
+def get_app_data_dir() -> Path:
+    return program_data()

@@ -8,27 +8,22 @@ class ArtikellagerDialog(QDialog):
         layout = QVBoxLayout()
 
         self.artikelnummer_input = QLineEdit()
-        self.artikelnummer_input.setPlaceholderText("Artikelnummer")
         layout.addWidget(QLabel("Artikelnummer:"))
         layout.addWidget(self.artikelnummer_input)
 
         self.bezeichnung_input = QLineEdit()
-        self.bezeichnung_input.setPlaceholderText("Bezeichnung")
         layout.addWidget(QLabel("Bezeichnung:"))
         layout.addWidget(self.bezeichnung_input)
 
         self.bestand_input = QLineEdit()
-        self.bestand_input.setPlaceholderText("Bestand")
         layout.addWidget(QLabel("Bestand:"))
         layout.addWidget(self.bestand_input)
 
         self.lagerort_input = QLineEdit()
-        self.lagerort_input.setPlaceholderText("Lagerort")
         layout.addWidget(QLabel("Lagerort:"))
         layout.addWidget(self.lagerort_input)
 
         self.preis_input = QLineEdit()
-        self.preis_input.setPlaceholderText("Preis")
         layout.addWidget(QLabel("Preis:"))
         layout.addWidget(self.preis_input)
 
