@@ -1,0 +1,58 @@
+
+/* MaterialLight.qss */
+QWidget {
+    background-color: #f5f5f5;
+    color: #212121;
+    font-family: 'Segoe UI', sans-serif;
+    font-size: 10pt;
+}
+
+QPushButton {
+    background-color: #ffffff;
+    border: 1px solid #cccccc;
+    border-radius: 6px;
+    padding: 6px 12px;
+    color: #212121;
+}
+
+QPushButton:hover {
+    background-color: #eaeaea;
+}
+
+QPushButton:pressed {
+    background-color: #0078d7;
+    color: white;
+}
+
+QLineEdit, QPlainTextEdit, QTextEdit, QComboBox {
+    background-color: #ffffff;
+    border: 1px solid #cccccc;
+    border-radius: 4px;
+    padding: 4px;
+    color: #212121;
+}
+
+QLineEdit:focus, QComboBox:focus {
+    border: 1px solid #0078d7;
+}
+
+QScrollBar:vertical {
+    background: #f0f0f0;
+    width: 10px;
+}
+
+QScrollBar::handle:vertical {
+    background: #c0c0c0;
+    border-radius: 5px;
+}
+
+QScrollBar::handle:vertical:hover {
+    background: #0078d7;
+}
+
+QTableWidget, QTreeWidget {
+    background-color: #ffffff;
+    gridline-color: #cccccc;
+    alternate-background-color: #f9f9f9;
+    selection-background-color: #0078d7;
+}

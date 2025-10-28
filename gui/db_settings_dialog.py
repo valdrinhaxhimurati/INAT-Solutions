@@ -50,7 +50,6 @@ class DBSettingsDialog(QDialog):
         url_row.setContentsMargins(0, 0, 0, 0)
         url_row.setSpacing(8)
 
-layout.addWidget(QLabel("Db url edit:"))
         self.db_url_edit = QLineEdit()
         self.db_url_edit.setText(self._initial_url)
         self.db_url_edit.setMinimumWidth(360)
@@ -135,9 +134,3 @@ layout.addWidget(QLabel("Db url edit:"))
                 return
 
         self.accept()
-
-from gui.db_settings_dialog import DBSettingsDialog
-
-def on_click_db_settings(self):
-    dlg = DBSettingsDialog(self)
-    dlg.exec_()

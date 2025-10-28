@@ -1,188 +1,144 @@
-﻿# -*- coding: utf-8 -*-
-from PyQt5.QtWidgets import (
-    QDialog, QVBoxLayout, QHBoxLayout, QLabel, QLineEdit,
-    QPushButton, QRadioButton, QFormLayout, QMessageBox, QWidget
+﻿from PyQt5.QtWidgets import (
+    QDialog, QVBoxLayout, QGroupBox, QLabel, QLineEdit, QCheckBox,
+    QPushButton, QWidget, QHBoxLayout, QFormLayout, QMessageBox, QRadioButton, QApplication
 )
-from PyQt5.QtCore import Qt
-from urllib.parse import quote
-import json, os, re, psycopg2, sys, sqlite3
-from paths import data_dir
-
-
-CONFIG_PATHS = [
-    str(data_dir() / "config.json"),
-]
-
-
-def _load_cfg_with_fallback():
-    """config.json robust laden (utf-8 -> cp1252 -> latin-1) und ggf. zurück auf utf-8 schreiben."""
-    for p in CONFIG_PATHS:
-        if os.path.exists(p):
-            for enc in ("utf-8", "cp1252", "latin-1"):
-                try:
-                    with open(p, "r", encoding=enc) as f:
-                        cfg = json.load(f)
-                    if enc != "utf-8":
-                        with open(p, "w", encoding="utf-8") as fw:
-                            json.dump(cfg, fw, indent=4, ensure_ascii=False)
-                    return cfg, p
-                except UnicodeDecodeError:
-                    continue
-                except Exception:
-                    break
-    return {}, CONFIG_PATHS[0]
-
-
-def _save_cfg(cfg: dict, path: str):
-    with open(path, "w", encoding="utf-8") as f:
-        json.dump(cfg, f, indent=4, ensure_ascii=False)
-
+from PyQt5.QtCore import Qt, QProcess
+from gui.utils import create_button_bar
+from db_connection import get_remote_status, test_remote_connection, enable_remote, disable_remote
 
 class DBSettingsDialog(QDialog):
-    """Dialog: Lokale vs. externe PostgreSQL-Verbindung konfigurieren."""
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setWindowTitle("Datenbank-Einstellungen")
-        self.setMinimumWidth(520)
-        self.setStyleSheet("""
-            QLineEdit { padding: 6px; border-radius: 6px; border: 1px solid #bfbfbf; font-size: 10pt; }
-            QPushButton { padding: 6px 14px; border-radius: 6px; background-color: #e6e6e6; }
-            QPushButton:hover { background-color: #dcdcdc; }
-            QPushButton:pressed { background-color: #cccccc; }
-            QRadioButton, QLabel { font-size: 10pt; }
-        """)
 
-        # Modus
-        self.radio_local = QRadioButton("Lokale PostgreSQL-Datenbank")
-        self.radio_remote = QRadioButton("Externe Verbindung (z. B. Aiven Cloud)")
-        self.radio_remote.setChecked(True)
-        self.radio_local.toggled.connect(self._toggle_mode)
+        status = get_remote_status()
+        self._initial_use_remote = bool(status.get("use_remote", False))
+        self._initial_url = (status.get("db_url") or "").strip()
 
-        mode_row = QHBoxLayout()
-        mode_row.addWidget(self.radio_local)
-        mode_row.addSpacing(10)
-        mode_row.addWidget(self.radio_remote)
+        # Root-Layout
+        root = QVBoxLayout(self)
+        root.setContentsMargins(16, 16, 16, 16)
+        root.setSpacing(12)
 
-        # Lokale Felder
-        self.local_host = QLineEdit("localhost")
-        self.local_port = QLineEdit("5432")
-        self.local_db   = QLineEdit("inatdb")
-        self.local_user = QLineEdit("inat_user")
-        self.local_pass = QLineEdit()
-        self.local_pass.setEchoMode(QLineEdit.Password)
+        # GroupBox + FormLayout
+        gb = QGroupBox("Datenbank")
+        form = QFormLayout()
+        form.setLabelAlignment(Qt.AlignLeft | Qt.AlignVCenter)
+        form.setFormAlignment(Qt.AlignLeft | Qt.AlignTop)
+        form.setHorizontalSpacing(12)
+        form.setVerticalSpacing(10)
+        gb.setLayout(form)
+        root.addWidget(gb)
 
-        form_local = QFormLayout()
-        form_local.addRow("Host:",      self.local_host)
-        form_local.addRow("Port:",      self.local_port)
-        form_local.addRow("Datenbank:", self.local_db)
-        form_local.addRow("Benutzer:",  self.local_user)
-        form_local.addRow("Passwort:",  self.local_pass)
-        self.local_form = QWidget(); self.local_form.setLayout(form_local)
+        # Modus: Lokal/Remote
+        self.lbl_modus = QLabel("Modus")
+        mode_field = QWidget()
+        mode_row = QHBoxLayout(mode_field)
+        mode_row.setContentsMargins(0, 0, 0, 0)
+        mode_row.setSpacing(16)
+        self.local_rb = QRadioButton("Lokal")
+        self.remote_rb = QRadioButton("Remote")
+        (self.remote_rb if self._initial_use_remote else self.local_rb).setChecked(True)
+        mode_row.addWidget(self.local_rb)
+        mode_row.addWidget(self.remote_rb)
+        form.addRow(self.lbl_modus, mode_field)
 
-        # Remote-URL
-        self.pg_url = QLineEdit()
-        self.pg_url.setPlaceholderText("postgresql://user:pass@host:port/dbname?sslmode=require")
+        # URL-Zeile: Label + (LineEdit + Test-Button)
+        self.url_label = QLabel("PostgreSQL-URL")
+        url_field = QWidget()
+        url_row = QHBoxLayout(url_field)
+        url_row.setContentsMargins(0, 0, 0, 0)
+        url_row.setSpacing(8)
 
-        # Buttons
-        self.test_btn   = QPushButton("Verbindung testen")
-        self.save_btn   = QPushButton("Speichern")
-        self.cancel_btn = QPushButton("Abbrechen")
-        self.test_btn.clicked.connect(self._test_connection)
-        self.save_btn.clicked.connect(self._save)
-        self.cancel_btn.clicked.connect(self.reject)
+        self.db_url_edit = QLineEdit()
+        self.db_url_edit.setPlaceholderText("postgresql://user:pass@host:port/dbname")
+        self.db_url_edit = QLineEdit()
+        self.db_url_edit.setText(self._initial_url)
+        self.db_url_edit.setMinimumWidth(360)
 
-        # Layout
-        layout = QVBoxLayout()
-        layout.addLayout(mode_row)
-        layout.addSpacing(8)
-        layout.addWidget(self.local_form)
-        layout.addWidget(self.pg_url)
-        layout.addSpacing(12)
+        self.btn_test = QPushButton("Verbindung testen")
 
-        btn_row = QHBoxLayout()
-        btn_row.addWidget(self.test_btn)
-        btn_row.addStretch(1)
-        btn_row.addWidget(self.cancel_btn)
-        btn_row.addWidget(self.save_btn)
-        layout.addLayout(btn_row)
+        url_row.addWidget(self.db_url_edit, 1)
+        url_row.addWidget(self.btn_test, 0)
+        form.addRow(self.url_label, url_field)
 
-        self.info_label = QLabel("")
-        self.info_label.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
-        self.info_label.setStyleSheet("color: gray; font-size: 9pt; margin-top: 8px;")
-        layout.addWidget(self.info_label)
+        # OK/Abbrechen
+        self.btn_speichern = QPushButton("Speichern")
+        self.btn_abbrechen = QPushButton("Abbrechen")
+        self.btn_speichern.clicked.connect(self._on_save)
+        self.btn_abbrechen.clicked.connect(self.reject)
+        root.addLayout(create_button_bar(self.btn_speichern, self.btn_abbrechen))
 
-        self.setLayout(layout)
-        self._load_into_ui()
-        self._toggle_mode()
+        # Events
+        self.local_rb.toggled.connect(self._sync_mode_ui)
+        self.remote_rb.toggled.connect(self._sync_mode_ui)
+        self.btn_test.clicked.connect(self._on_test)
 
-    # --- intern ---
-    def _toggle_mode(self):
-        is_local = self.radio_local.isChecked()
-        self.local_form.setVisible(is_local)
-        self.pg_url.setVisible(not is_local)
+        # Initial UI-State
+        self._sync_mode_ui()
 
-    def _load_into_ui(self):
-        cfg, path = _load_cfg_with_fallback()
-        self.info_label.setText(f"Gespeichert in: {os.path.abspath(path)}")
-        url = (cfg.get("postgres_url") or "").strip()
-        # einfache Heuristik: localhost -> lokaler Modus
-        if "localhost" in url or "127.0.0.1" in url:
-            self.radio_local.setChecked(True)
-            try:
-                m = re.match(r".*://(.*?):(.*?)@(.*?):(\d+)/(.*)", url)
-                if m:
-                    self.local_user.setText(m.group(1))
-                    self.local_pass.setText(m.group(2))
-                    self.local_host.setText(m.group(3))
-                    self.local_port.setText(m.group(4))
-                    self.local_db.setText(m.group(5))
-            except Exception:
-                pass
-        else:
-            self.radio_remote.setChecked(True)
-            self.pg_url.setText(url)
+        # 15% größer starten
+        self.resize(int(self.sizeHint().width() * 1.15), int(self.sizeHint().height() * 1.15))
 
-    def _current_url(self) -> str:
-        if self.radio_local.isChecked():
-            host = self.local_host.text().strip()
-            port = self.local_port.text().strip() or "5432"
-            db   = self.local_db.text().strip()
-            # user/pass percent-encoden (wichtig für Umlaute / Sonderzeichen)
-            user = quote(self.local_user.text().strip(), safe="")
-            pwd  = quote(self.local_pass.text().strip(), safe="")
-            return f"postgresql://{user}:{pwd}@{host}:{port}/{db}"
-        return self.pg_url.text().strip()
+    def _sync_mode_ui(self):
+        is_remote = self.remote_rb.isChecked()
+        self.url_label.setVisible(is_remote)
+        self.db_url_edit.parentWidget().setVisible(is_remote)
+        self.db_url_edit.setEnabled(is_remote)
+        self.btn_test.setEnabled(is_remote)
 
-    def _test_connection(self):
-        url = self._current_url()
+    def _on_test(self):
+        url = self.db_url_edit.text().strip()
         if not url:
-            QMessageBox.warning(self, "Fehler", "Bitte Verbindung eingeben.")
+            QMessageBox.warning(self, "Test fehlgeschlagen", "Bitte eine PostgreSQL-URL eingeben.")
             return
-        try:
-            with psycopg2.connect(url) as conn:
-                with conn.cursor() as cur:
-                    cur.execute("SELECT version()")
-                    v = cur.fetchone()[0]
-            QMessageBox.information(self, "Erfolg", f"Verbindung erfolgreich:\n{v}")
-        except Exception as e:
-            QMessageBox.critical(self, "Fehler", str(e))
-
-    def _save(self):
-        url = self._current_url()
-        if not url and not self.radio_local.isChecked():
-            QMessageBox.warning(self, "Fehler", "Bitte vollständige Daten eingeben.")
-            return
-        cfg, path = _load_cfg_with_fallback()
-        if self.radio_local.isChecked():
-            # SQLite-Modus aktivieren
-            cfg["db_backend"] = "sqlite"
-            cfg.pop("postgres_url", None)
-            cfg["pg_mode"] = "local"
+        ok, err = test_remote_connection(url)
+        if ok:
+            QMessageBox.information(self, "Erfolg", "Verbindung erfolgreich.")
         else:
-            cfg["db_backend"] = "postgres"
-            cfg["postgres_url"] = url
-            cfg["pg_mode"] = "remote"
-        _save_cfg(cfg, path)
-        QMessageBox.information(self, "Gespeichert", "Einstellungen gespeichert.")
+            QMessageBox.critical(self, "Fehler", f"Verbindung fehlgeschlagen:\n{err}")
+
+    def _on_save(self):
+        is_remote = self.remote_rb.isChecked()
+        new_url = self.db_url_edit.text().strip()
+
+        if is_remote:
+            if not new_url:
+                QMessageBox.warning(self, "Fehler", "Bitte eine PostgreSQL-URL eingeben.")
+                return
+            ok, err = test_remote_connection(new_url)
+            if not ok:
+                res = QMessageBox.question(
+                    self, "Trotzdem speichern?",
+                    f"Test fehlgeschlagen:\n{err}\n\nTrotzdem Remote aktivieren?",
+                    QMessageBox.Yes | QMessageBox.No
+                )
+                if res != QMessageBox.Yes:
+                    return
+            enable_remote(new_url)
+        else:
+            disable_remote()
+
+        changed = (is_remote != self._initial_use_remote) or (is_remote and new_url != self._initial_url)
+        if changed:
+            # Neustart vorschlagen und ggf. ausführen
+            res = QMessageBox.question(
+                self,
+                "Neustart erforderlich",
+                "Die Datenbank-Einstellungen wurden geändert. Anwendung jetzt neu starten?",
+                QMessageBox.Yes | QMessageBox.No,
+                QMessageBox.Yes
+            )
+            if res == QMessageBox.Yes:
+                import sys
+                QProcess.startDetached(sys.executable, sys.argv)
+                QApplication.instance().quit()
+                return
+
         self.accept()
 
+from gui.db_settings_dialog import DBSettingsDialog
+
+def on_click_db_settings(self):
+    dlg = DBSettingsDialog(self)
+    dlg.exec_()
