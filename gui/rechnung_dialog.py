@@ -2,7 +2,7 @@
 from PyQt5.QtWidgets import (
     QDialog, QWidget, QVBoxLayout, QHBoxLayout, QGridLayout, QLabel, QLineEdit,
     QTextEdit, QPushButton, QComboBox, QDateEdit, QMessageBox, QTableWidget,
-    QTableWidgetItem, QDoubleSpinBox, QSizePolicy, QAbstractButton
+    QTableWidgetItem, QSizePolicy, QAbstractButton
 )
 from PyQt5.QtCore import Qt, QDate
 from PyQt5.QtGui import QIcon
@@ -11,6 +11,7 @@ from reportlab.lib.utils import ImageReader
 from io import BytesIO
 import json
 import os, sys
+from gui.widgets import NumericLineEdit
 
 # Optional: „Aus Lager“-Dialog; wenn nicht vorhanden, bleibt der Button deaktiviert.
 try:
@@ -187,11 +188,10 @@ class RechnungDialog(QDialog):
 
         # MWST
         grid.addWidget(QLabel("MWST %:"), row, 0)
-        self.sb_mwst = QDoubleSpinBox()
-        self.sb_mwst.setDecimals(2)
+        # numeric text field replaces SpinBox (keine andere Logik ändern)
+        self.sb_mwst = NumericLineEdit(decimals=2)
         self.sb_mwst.setRange(0.0, 100.0)
-        self.sb_mwst.setSingleStep(0.1)
-        self.sb_mwst.setValue(self.mwst_voreinstellung)
+        self.sb_mwst.setValue(float(self.mwst_voreinstellung or 0.0))
         grid.addWidget(self.sb_mwst, row, 1)
         row += 1
 
@@ -297,6 +297,7 @@ class RechnungDialog(QDialog):
         self.btn_remove.clicked.connect(self._remove_selected_positions)
         self.btn_from_stock.clicked.connect(self._choose_from_stock)
         self.tbl_pos.cellChanged.connect(self._on_cell_changed)
+        # NumericLineEdit emits valueChanged(float), keep re-use of existing slot
         self.sb_mwst.valueChanged.connect(self._recalc_totals)
 
         # --- Defaults setzen (immer, für neue und bestehende Rechnungen) ---

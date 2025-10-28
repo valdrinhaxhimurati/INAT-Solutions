@@ -1,10 +1,11 @@
 ﻿# -*- coding: utf-8 -*-
 from PyQt5.QtWidgets import (
-    QDialog, QVBoxLayout, QHBoxLayout, QLabel, QLineEdit, QSpinBox,
+    QDialog, QVBoxLayout, QHBoxLayout, QLabel, QLineEdit,
     QComboBox, QPushButton
 )
 from db_connection import get_db, dict_cursor_factory
 from PyQt5.QtCore import Qt
+from gui.widgets import NumericLineEdit
 
 class MateriallagerDialog(QDialog):
     def __init__(self, parent=None, material=None):
@@ -15,7 +16,9 @@ class MateriallagerDialog(QDialog):
 
         self.materialnummer_input = QLineEdit()
         self.bezeichnung_input = QLineEdit()
-        self.menge_input = QSpinBox(); self.menge_input.setRange(0, 1_000_000)
+        # numeric text field statt SpinBox
+        self.menge_input = NumericLineEdit(decimals=0)
+        self.menge_input.setRange(0, 1_000_000)
         self.einheit_input = QComboBox(); self.einheit_input.addItems(["Stück","Meter","Kilogramm","Liter","Packung","Sonstiges"])
         self.lagerort_input = QLineEdit()
         self.lieferant_box = QComboBox()
