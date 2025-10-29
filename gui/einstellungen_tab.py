@@ -1,5 +1,6 @@
 ﻿# -*- coding: utf-8 -*-
 import os, json, csv, importlib
+import datetime
 from PyQt5.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QFrame, QLabel,
     QLineEdit, QSizePolicy, QFileDialog, QScrollArea, QMessageBox, QInputDialog, QDialog
@@ -96,9 +97,17 @@ class EinstellungenTab(QWidget):
         self.qr_button.clicked.connect(self._open_qr_dialog)
         self.module_button = QPushButton("Module verwalten")
         self.module_button.clicked.connect(self._open_module_dialog)
+
+        # Export aller Rechnungen (Steuerauszug)
+        self.export_invoices_button = QPushButton("Rechnungen exportieren")
+        self.export_invoices_button.clicked.connect(self._export_invoices_dialog)
+        
         for b in (self.kategorien_button, self.benutzer_button, self.qr_button, self.module_button):
             lay3.addWidget(b)
 
+        # export button zuletzt in Verwaltung
+        lay3.addWidget(self.export_invoices_button)
+        
         main.addWidget(box3)
         main.addStretch(1)
 
@@ -286,4 +295,124 @@ class EinstellungenTab(QWidget):
                     lager_tab._load_aktive_lager()
             except Exception as e:
                 print(f"Fehler beim Aktualisieren: {e}")
+
+    def _export_invoices_dialog(self):
+        """Exportiert alle Rechnungen (PDF) aus DB in einen Ordner.
+           Benutzer wählt ein Jahr aus Dropdown mit tatsächlich vorhandenen Jahren.
+        """
+        # Ermittele vorhandene Jahre (zuerst aus buchhaltung.datum, sonst Fallback auf invoices.created_at)
+        conn = None
+        try:
+            conn = get_db()
+            cur = conn.cursor()
+            years = []
+            try:
+                cur.execute("""
+                    SELECT DISTINCT substr(COALESCE(buchhaltung.datum, ''), 1, 4) AS y
+                    FROM invoices
+                    LEFT JOIN buchhaltung ON invoices.buchung_id = buchhaltung.id
+                    WHERE substr(COALESCE(buchhaltung.datum, ''), 1, 4) <> ''
+                    ORDER BY y DESC
+                """)
+                years = [r[0] for r in cur.fetchall() if r[0]]
+            except Exception:
+                years = []
+
+            # Fallback: falls keine Jahre in buchhaltung.datum gefunden, versuche invoices.created_at
+            if not years:
+                try:
+                    # sqlite: strftime('%Y', created_at); Postgres: EXTRACT(YEAR FROM created_at)
+                    try:
+                        cur.execute("SELECT DISTINCT strftime('%Y', created_at) FROM invoices WHERE created_at IS NOT NULL ORDER BY 1 DESC")
+                        years = [r[0] for r in cur.fetchall() if r[0]]
+                    except Exception:
+                        cur.execute("SELECT DISTINCT EXTRACT(YEAR FROM created_at)::text FROM invoices WHERE created_at IS NOT NULL ORDER BY 1 DESC")
+                        years = [str(r[0]) for r in cur.fetchall() if r[0]]
+                except Exception:
+                    years = []
+        finally:
+            try:
+                if conn:
+                    conn.close()
+            except Exception:
+                pass
+
+        if not years:
+            QMessageBox.information(self, "Keine Rechnungen", "Es wurden keine Rechnungen mit Jahresangaben gefunden.")
+            return
+
+        # sortiere Jahre absteigend (aktuelles Jahr oben) und zeige ein Dropdown für das Jahr
+        years = sorted(set(years), key=lambda x: int(x), reverse=True)
+        label = (
+            "Steuerauszug — Rechnungen exportieren\n\n"
+            "Wähle ein Jahr: Es werden alle in der Buchhaltung hinterlegten Rechnungen\n"
+            "für das gewählte Jahr exportiert. Die Dateinamen erhalten die Buchungsnummer\n"
+            "als Präfix (z.B. 1234_rechnung.pdf).\n\n"
+            "Jahr:"
+        )
+        year, ok = QInputDialog.getItem(self, "Rechnungen exportieren - Jahr wählen", label, years, 0, False)
+        if not ok or not year:
+            return
+
+        folder = QFileDialog.getExistingDirectory(self, "Zielordner auswählen", os.path.expanduser("~"))
+        if not folder:
+            return
+
+        # Query: hole Rechnungen für das ausgewählte Jahr (versuche Postgres-Variante, fallback auf SQLite)
+        conn = None
+        try:
+            conn = get_db()
+            cur = conn.cursor()
+            # Postgres variant (uses EXTRACT for created_at)
+            q_pg = """
+                SELECT invoices.buchung_id, invoices.filename, invoices.content
+                FROM invoices
+                LEFT JOIN buchhaltung ON invoices.buchung_id = buchhaltung.id
+                WHERE substr(COALESCE(buchhaltung.datum, ''),1,4) = %s
+                   OR EXTRACT(YEAR FROM invoices.created_at)::text = %s
+                ORDER BY invoices.buchung_id
+            """
+            try:
+                cur.execute(q_pg, (year, year))
+            except Exception:
+                # SQLite variant (uses strftime)
+                q_sqlite = """
+                    SELECT invoices.buchung_id, invoices.filename, invoices.content
+                    FROM invoices
+                    LEFT JOIN buchhaltung ON invoices.buchung_id = buchhaltung.id
+                    WHERE substr(COALESCE(buchhaltung.datum, ''),1,4) = ?
+                       OR strftime('%Y', invoices.created_at) = ?
+                    ORDER BY invoices.buchung_id
+                """
+                cur.execute(q_sqlite, (year, year))
+
+            rows = cur.fetchall()
+            count = 0
+            for r in rows:
+                bid = r[0] or 0
+                fname = r[1] or "rechnung.pdf"
+                data = r[2]
+                if data is None:
+                    continue
+                outname = f"{bid}_{fname}"
+                outpath = os.path.join(folder, outname)
+                # falls Datei existiert, erweitere Zähler
+                suffix = 1
+                base, ext = os.path.splitext(outpath)
+                while os.path.exists(outpath):
+                    outpath = f"{base}_{suffix}{ext}"
+                    suffix += 1
+                with open(outpath, "wb") as fo:
+                    fo.write(bytes(data))
+                count += 1
+
+            QMessageBox.information(self, "Export fertig", f"{count} Rechnungen exportiert nach:\n{folder}")
+        except Exception as e:
+            QMessageBox.critical(self, "Fehler beim Export", str(e))
+        finally:
+            try:
+                if conn:
+                    conn.close()
+            except Exception:
+                pass
 

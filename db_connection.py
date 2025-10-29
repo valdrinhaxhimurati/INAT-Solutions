@@ -624,6 +624,15 @@ def ensure_app_schema():
             ("betrag", "NUMERIC"),
             ("beschreibung", "TEXT")
         ],
+        "invoices": [
+            ("id", "BIGSERIAL PRIMARY KEY" if not _is_sqlite(get_db()) else "INTEGER PRIMARY KEY AUTOINCREMENT"),
+            ("buchung_id", "BIGINT"),
+            ("filename", "TEXT"),
+            ("content", "BYTEA" if not _is_sqlite(get_db()) else "BLOB"),
+            ("content_type", "TEXT"),
+            ("size", "INTEGER"),
+            ("created_at", "TIMESTAMP")
+        ],
         "lieferanten": [
             ("id", "BIGSERIAL PRIMARY KEY"),
             ("lieferantnr", "INTEGER"),

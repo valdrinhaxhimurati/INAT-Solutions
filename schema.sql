@@ -165,6 +165,17 @@ CREATE TABLE IF NOT EXISTS buchhaltung (
   beschreibung TEXT
 );
 
+-- Tabelle für zentrale gespeicherte Rechnungen (SQLite-Variante)
+CREATE TABLE IF NOT EXISTS invoices (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  buchung_id INTEGER,
+  filename TEXT NOT NULL,
+  content BLOB NOT NULL,
+  content_type TEXT DEFAULT 'application/pdf',
+  size INTEGER NOT NULL,
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
 -- ============================
 -- PATCH: Tabellen für Postgres
 -- ============================
@@ -222,6 +233,17 @@ CREATE TABLE IF NOT EXISTS buchhaltung (
   betrag REAL,
   kategorie TEXT,
   beschreibung TEXT
+);
+
+-- Tabelle für zentrale gespeicherte Rechnungen (Postgres-Variante)
+CREATE TABLE IF NOT EXISTS invoices (
+  id BIGSERIAL PRIMARY KEY,
+  buchung_id BIGINT,
+  filename TEXT NOT NULL,
+  content BYTEA NOT NULL,
+  content_type TEXT DEFAULT 'application/pdf',
+  size INTEGER NOT NULL,
+  created_at TIMESTAMPTZ DEFAULT now()
 );
 
 -- Beispiel-Insert für MWST-Default (nur einmalig ausführen, z.B. beim ersten DB-Setup)

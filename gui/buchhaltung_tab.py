@@ -13,8 +13,64 @@ import pandas as pd
 import datetime
 import os, shutil, glob  # <-- fehlten
 import sqlite3  # <-- fehlte
-
 from gui.buchhaltung_dialog import BuchhaltungDialog
+import hashlib, tempfile
+# --- Invoice DB helpers (works for SQLite and Postgres) ---
+def _execute_with_paramstyle(cur, query, params):
+    try:
+        cur.execute(query, params)
+    except Exception:
+        # fallback: replace %s with ? for sqlite3
+        cur.execute(query.replace("%s", "?"), params)
+
+def save_invoice_db(buchung_id: int, filename: str, data: bytes, content_type: str = "application/pdf"):
+    conn = get_db()
+    cur = conn.cursor()
+    size = len(data)
+    try:
+        _execute_with_paramstyle(cur,
+            "INSERT INTO invoices (buchung_id, filename, content, content_type, size) VALUES (%s,%s,%s,%s,%s)",
+            (buchung_id, filename, data, content_type, size))
+    except Exception:
+        conn.rollback()
+        conn.close()
+        raise
+    conn.commit()
+    conn.close()
+
+def get_invoices_for_buchung(buchung_id: int):
+    conn = get_db()
+    cur = conn.cursor()
+    try:
+        _execute_with_paramstyle(cur, "SELECT id, filename, size, created_at FROM invoices WHERE buchung_id = %s ORDER BY id ASC", (buchung_id,))
+    except Exception:
+        cur.execute("SELECT id, filename, size, created_at FROM invoices WHERE buchung_id = ? ORDER BY id ASC", (buchung_id,))
+    rows = cur.fetchall()
+    conn.close()
+    return rows
+
+def get_invoice_bytes(invoice_id: int):
+    conn = get_db()
+    cur = conn.cursor()
+    try:
+        _execute_with_paramstyle(cur, "SELECT filename, content, content_type FROM invoices WHERE id = %s", (invoice_id,))
+    except Exception:
+        cur.execute("SELECT filename, content, content_type FROM invoices WHERE id = ?", (invoice_id,))
+    row = cur.fetchone()
+    conn.close()
+    if not row:
+        return None
+    return {"filename": row[0], "data": bytes(row[1]), "content_type": row[2]}
+
+def delete_invoices_for_buchung(buchung_id: int):
+    conn = get_db()
+    cur = conn.cursor()
+    try:
+        _execute_with_paramstyle(cur, "DELETE FROM invoices WHERE buchung_id = %s", (buchung_id,))
+    except Exception:
+        cur.execute("DELETE FROM invoices WHERE buchung_id = ?", (buchung_id,))
+    conn.commit()
+    conn.close()
 
 # ----------------- Einfache, zentrale Helfer (einmalig, modul-level) -----------------
 def _is_sqlite_conn(conn) -> bool:
@@ -656,10 +712,15 @@ class BuchhaltungTab(QWidget):
 
             # Spalte "Rechnung" ganz am Ende hinzufügen
             eintrag_id = row[0]
-            pattern = os.path.join("rechnungen", "*", f"{eintrag_id}_*.pdf")
-            has_invoice = bool(glob.glob(pattern))
-            invoice_item = QTableWidgetItem("✔" if has_invoice else "")
-            invoice_item.setTextAlignment(Qt.AlignCenter)
+            inv_rows = get_invoices_for_buchung(eintrag_id)
+            if inv_rows:
+                names = [r[1] for r in inv_rows]
+                invoice_item = QTableWidgetItem(f"✔ {names[0]}")
+                invoice_item.setToolTip("\n".join(names))
+                invoice_item.setTextAlignment(Qt.AlignLeft | Qt.AlignVCenter)
+            else:
+                invoice_item = QTableWidgetItem("")
+                invoice_item.setTextAlignment(Qt.AlignCenter)
             self.table.setItem(row_idx, 6, invoice_item)
 
             # Typ und Farbe
@@ -708,32 +769,23 @@ class BuchhaltungTab(QWidget):
         # 2) Eintrags-ID und Datum auslesen
         eintrag_id = int(self.table.item(row, 0).text())
         datum_text = self.table.item(row, 1).text()
-        # parse/normalize Datum per zentralem Helper
         datum_qdate = to_qdate(datum_text)
         if not datum_qdate.isValid():
             QMessageBox.warning(self, "Fehler", f"Ungültiges Datum: {datum_text}")
             return
-        jahr = datum_qdate.toString("yyyy")
 
         # 3) PDF-Datei auswählen
         pfad_src, _ = QFileDialog.getOpenFileName(self, "PDF-Rechnung auswählen", "", "PDF-Dateien (*.pdf)")
         if not pfad_src:
             return
 
-        # 4) Zielordner und -datei bestimmen
-        # ALT: ordner_ziel = os.path.join("rechnungen", jahr)
-        # NEU: Zielordner unter ProgramData/data/rechnungen/Jahr
-        ordner_ziel = str(data_dir() / "rechnungen" / jahr)
-        os.makedirs(ordner_ziel, exist_ok=True)
-
-        dateiname_orig = os.path.basename(pfad_src)
-        dateiname_neu = f"{eintrag_id}_{dateiname_orig}"
-        pfad_dst = os.path.join(ordner_ziel, dateiname_neu)
-
-        # 5) Datei kopieren
+        # 4) Nur in DB speichern (keine lokale Kopie mehr)
         try:
-            shutil.copyfile(pfad_src, pfad_dst)
-            QMessageBox.information(self, "Erfolgreich", f"Rechnung gespeichert unter:\n{pfad_dst}")
+            with open(pfad_src, "rb") as f:
+                data = f.read()
+            filename = os.path.basename(pfad_src)
+            save_invoice_db(eintrag_id, filename, data)
+            QMessageBox.information(self, "Erfolgreich", f"Rechnung in Datenbank gespeichert: {filename}")
             self.lade_eintraege()
         except Exception as e:
             QMessageBox.critical(self, "Fehler", f"Rechnung konnte nicht gespeichert werden:\n{e}")
@@ -745,21 +797,31 @@ class BuchhaltungTab(QWidget):
             return
 
         eintrag_id = int(self.table.item(row, 0).text())
-        # nach allen PDFs suchen, die mit "<ID>_" anfangen
-        # ALT: pattern = os.path.join("rechnungen", "*", f"{eintrag_id}_*.pdf")
-        # NEU:
-        pattern = str(data_dir() / "rechnungen" / "*" / f"{eintrag_id}_*.pdf")
-        treffer = glob.glob(pattern)
-        if not treffer:
+
+        # Hole Rechnungen aus DB
+        inv_rows = get_invoices_for_buchung(eintrag_id)
+        if not inv_rows:
             QMessageBox.information(self, "Keine Rechnung", "Für diesen Eintrag wurde keine Rechnung gefunden.")
             return
 
-        # nimm die erste gefundene Datei (falls es mehrere sind)
-        pfad = treffer[0]
-        # im Standard-PDF-Viewer öffnen
-        from PyQt5.QtCore import QUrl
-        from PyQt5.QtGui import QDesktopServices
-        QDesktopServices.openUrl(QUrl.fromLocalFile(pfad))
+        # nimm die erste vorhandene Rechnung (oder implementiere Auswahl, falls mehrere)
+        invoice_id = inv_rows[0][0]
+        inv = get_invoice_bytes(invoice_id)
+        if not inv:
+            QMessageBox.critical(self, "Fehler", "Rechnung konnte nicht geladen werden.")
+            return
+
+        # Nur öffnen: temporäre Datei anlegen und im Standard-PDF-Viewer öffnen
+        try:
+            tmpf = tempfile.NamedTemporaryFile(suffix=".pdf", delete=False)
+            tmpf.write(inv["data"])
+            tmpf.flush()
+            tmpf.close()
+            from PyQt5.QtCore import QUrl
+            from PyQt5.QtGui import QDesktopServices
+            QDesktopServices.openUrl(QUrl.fromLocalFile(tmpf.name))
+        except Exception as e:
+            QMessageBox.critical(self, "Fehler", f"Rechnung konnte nicht geöffnet werden:\n{e}")
 
     def rechnung_loeschen(self):
         row = self.table.currentRow()
@@ -768,39 +830,23 @@ class BuchhaltungTab(QWidget):
             return
 
         eintrag_id = int(self.table.item(row, 0).text())
-        # Suche alle zugehörigen PDFs
-        pattern = str(data_dir() / "rechnungen" / "*" / f"{eintrag_id}_*.pdf")
-        files = glob.glob(pattern)
-        if not files:
-            QMessageBox.information(self, "Keine Rechnung", "Für diesen Eintrag wurde keine Rechnung gefunden.")
-            return
 
         # Bestätigung
         antwort = QMessageBox.question(
             self, "Rechnung löschen",
-            f"{len(files)} Datei(en) löschen?\n\n" + "\n".join(os.path.basename(f) for f in files),
+            "Alle in der Datenbank zu dieser Buchung gespeicherten Rechnungen löschen?",
             QMessageBox.Yes | QMessageBox.No
         )
         if antwort != QMessageBox.Yes:
             return
 
-        # Löschen
-        errors = []
-        for f in files:
-            try:
-                os.remove(f)
-            except Exception as e:
-                errors.append((f, str(e)))
-
-        if errors:
-            text = "Nicht alle Dateien konnten gelöscht werden:\n" + "\n".join(f"{os.path.basename(f)}: {err}" for f, err in errors)
-            QMessageBox.critical(self, "Fehler", text)
-        else:
-            QMessageBox.information(self, "Erfolgreich", "Rechnung(en) erfolgreich gelöscht.")
-            # Tabelle neu laden, damit das Häkchen verschwindet
+        # Lösche nur aus DB
+        try:
+            delete_invoices_for_buchung(eintrag_id)
+            QMessageBox.information(self, "Erfolgreich", "Rechnung(en) in der Datenbank erfolgreich gelöscht.")
             self.lade_eintraege()
-
-
+        except Exception as e:
+            QMessageBox.critical(self, "Fehler", f"Rechnung(en) konnten nicht gelöscht werden:\n{e}")
 
     def excel_importieren(self):
         excel_path, _ = QFileDialog.getOpenFileName(self, "Excel auswählen", "", "Excel-Dateien (*.xlsx *.xls)")

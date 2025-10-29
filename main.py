@@ -332,6 +332,15 @@ def run():
         splash = None
 
     def open_main():
+        # ensure DB schema (inkl. invoices) existiert bevor UI geladen wird
+        try:
+            from db_connection import ensure_app_schema
+            ensure_app_schema()
+        except Exception:
+            # bei Problemen weitermachen, konkrete Abfragefunktionen handhaben Fehler später
+            pass
+
+        # Fenster öffnen
         mw = MainWindow(benutzername=user, login_db_path=LOGIN_DB_PATH)
         app._main_window = mw
         mw.showMaximized()  # Öffne das Fenster maximiert
