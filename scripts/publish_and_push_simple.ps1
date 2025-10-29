@@ -1,66 +1,29 @@
-param(
-  [Parameter(Mandatory=$true)][string]$Version,
-  [string]$ExePath = "dist\INAT-Solutions.exe",
-  [string]$PublicRepo = "valdrinhaxhimurati/INAT-Solutions-Updates",
-  [string]$Branch = "gh-pages",
-  [string]$ExeName = "INAT-Solutions.exe",
-  [string]$PublishToken = $env:PUBLISH_TOKEN
-)
+# Arbeitsverzeichnis: Projekt-Root
+cd "C:\Users\V.Haxhimurati\Documents\GitHub Repository\INAT-Solutions"
 
-if (-not (Test-Path $ExePath)) {
-  Write-Error "Exe nicht gefunden: $ExePath"
-  exit 1
-}
+# Pfad zur EXE
+$exe = "C:\Users\V.Haxhimurati\Documents\GitHub Repository\INAT-Solutions\dist\INAT-Solutions\INAT-Solutions.exe"
 
-$scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
-$out = Join-Path $scriptDir "out"
-if (Test-Path $out) { Remove-Item $out -Recurse -Force }
-New-Item -Path $out -ItemType Directory | Out-Null
+# SHA256 berechnen
+$sha = (Get-FileHash -Path $exe -Algorithm SHA256).Hash
+Write-Host "SHA256:" $sha
 
-$targetExe = Join-Path $out $ExeName
-Copy-Item -Path $ExePath -Destination $targetExe -Force
-$hash = Get-FileHash -Path $targetExe -Algorithm SHA256
-$sha = $hash.Hash.ToUpper()
-Write-Host "SHA256: $sha"
+# gh-pages Repo klonen (einziger Branch gh-pages)
+git clone --single-branch --branch gh-pages https://github.com/valdrinhaxhimurati/INAT-Solutions-Updates.git tmp-gh
+if ($LASTEXITCODE -ne 0) { Write-Error "Clone fehlgeschlagen"; exit 1 }
 
-$parts = $PublicRepo.Split('/')
-if ($parts.Length -lt 2) { Write-Error "PublicRepo muss 'owner/repo' sein."; exit 1 }
-$owner = $parts[0]; $repo = $parts[1]
-$url = "https://$owner.github.io/$repo/$ExeName"
-$meta = @{ version = $Version; url = $url; sha256 = $sha }
-$meta | ConvertTo-Json -Depth 3 | Out-File -FilePath (Join-Path $out "version.json") -Encoding utf8
+# EXE kopieren und version.json erzeugen
+Copy-Item $exe -Destination ".\tmp-gh\INAT-Solutions.exe" -Force
+$version = "v0.8.3"   # passe an
+$json = @{ version = $version; url = "https://valdrinhaxhimurati.github.io/INAT-Solutions-Updates/INAT-Solutions.exe"; sha256 = $sha } | ConvertTo-Json
+$json | Out-File -Encoding utf8 ".\tmp-gh\version.json"
 
-$cloneUrl = if ($PublishToken) { "https://x-access-token:$PublishToken@github.com/$PublicRepo.git" } else { "https://github.com/$PublicRepo.git" }
-$pubdir = Join-Path $scriptDir "pubrepo"
-if (Test-Path $pubdir) { Remove-Item $pubdir -Recurse -Force }
+# Commit & Push
+Set-Location .\tmp-gh
+git add INAT-Solutions.exe version.json
+git commit -m "Publish $version"
+git push origin gh-pages
 
-Write-Host "Cloning $PublicRepo (branch $Branch)..."
-& git clone --single-branch --branch $Branch $cloneUrl $pubdir 2>$null
-if ($LASTEXITCODE -ne 0) {
-  Write-Host "Branch $Branch existiert vermutlich nicht — erstelle $Branch..."
-  & git clone $cloneUrl $pubdir
-  Push-Location $pubdir
-  & git checkout --orphan $Branch
-  & git rm -rf . 2>$null
-  & git commit --allow-empty -m "Create $Branch" 2>$null
-  & git push origin $Branch 2>$null
-  Pop-Location
-  Remove-Item -Recurse -Force $pubdir
-  & git clone --single-branch --branch $Branch $cloneUrl $pubdir
-}
-
-Copy-Item -Path (Join-Path $out "*") -Destination $pubdir -Recurse -Force
-Push-Location $pubdir
-& git config user.email "ci@github-actions"
-& git config user.name "CI Publisher"
-& git add -A
-
-# git commit returns non-zero when no changes; handle explicitly
-$null = & git commit -m "Publish $Version" 2>$null
-if ($LASTEXITCODE -ne 0) { Write-Host "Keine Änderungen zu committen" }
-
-& git push origin $Branch
-Pop-Location
-
-Remove-Item -Recurse -Force $out
-Write-Host "Fertig: https://$owner.github.io/$repo/version.json"
+# Aufräumen
+Set-Location ..
+Remove-Item -Recurse -Force .\tmp-gh

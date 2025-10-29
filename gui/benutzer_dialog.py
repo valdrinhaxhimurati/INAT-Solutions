@@ -148,7 +148,7 @@ class BenutzerVerwaltenDialog(QDialog):
 
         row = QHBoxLayout()
         self.ed_user = QLineEdit(); self.ed_user.setPlaceholderText("Benutzername")
-        self.ed_role = QLineEdit(); self.ed_role.setPlaceholderText("Passwort (optional)")
+        self.ed_role = QLineEdit(); self.ed_role.setPlaceholderText("Passwort")
         row.addWidget(self.ed_user); row.addWidget(self.ed_role)
         lay.addLayout(row)
 

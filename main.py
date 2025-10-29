@@ -32,12 +32,29 @@ LOGIN_DB_PATH = str(users_db_path())
 DEFAULT_DB_PATH = str(local_db_path())
 
 def lade_stylesheet(filename="style.qss") -> str:
-    p = resource_path(filename)
+    import re
+    # base_path: _MEIPASS (onefile) oder exe/working dir (onefolder / local)
+    base_path = getattr(sys, "_MEIPASS", os.path.dirname(sys.argv[0]) or os.path.abspath("."))
+    p = os.path.join(base_path, filename)
     try:
         with open(p, "r", encoding="utf-8") as f:
-            return f.read()
+            qss = f.read()
     except Exception:
         return ""
+
+    # Ersetze relative url(...) (keine :/ , file: , / oder http) mit absolutem, zitierten Pfad
+    def repl(m):
+        quote = m.group(1) or ""
+        path = m.group(2)
+        # belasse resource- oder absolute-URLs unverändert
+        if re.match(r'^(?:[:/\\]|file:|https?:)', path, flags=re.I):
+            return f'url({quote}{path}{quote})'
+        abs_path = os.path.join(base_path, path).replace("\\", "/")
+        # zitiere wegen Leerzeichen
+        return f'url("{abs_path}")'
+
+    qss = re.sub(r'url\((["\']?)([^"\')]+)(["\']?)\)', repl, qss)
+    return qss
 
 def benutzer_existieren(db_path: str) -> bool:
     try:
@@ -209,6 +226,37 @@ del "%~f0"
             QMessageBox.critical(None, "Update-Fehler", str(e))
         except Exception:
             pass
+
+def load_and_apply_qss(app, qss_filename="style.qss"):
+    import sys, os, re
+    base_path = getattr(sys, "_MEIPASS", os.path.dirname(__file__))
+
+    # mögliche Orte, an denen PyInstaller die icons ablegt
+    candidates = [
+        os.path.join(base_path, "icons"),
+        os.path.join(base_path, "_internal", "icons"),
+        (os.path.join(os.path.dirname(sys.executable), "icons") if getattr(sys, "frozen", False) else None),
+    ]
+    icons_dir = next((p for p in candidates if p and os.path.isdir(p)), None)
+    if icons_dir is None:
+        # Fallback: benutze base_path/icons (wird später erzeugt/gefunden oder führt zu Fehlersuche)
+        icons_dir = os.path.join(base_path, "icons")
+
+    qss_path = os.path.join(base_path, qss_filename)
+    if not os.path.exists(qss_path):
+        return
+    with open(qss_path, "r", encoding="utf-8") as f:
+        qss = f.read()
+
+    # Ersetze nur relative icons/... Pfade (lasse :/ und file: unverändert)
+    pattern = r'(?:image:\s*)?url\((["\']?)(?![:/]|file:)(?:icons/)?([^"\')]+)(["\']?)\)'
+    def repl(m):
+        icon_rel = m.group(2)
+        abs_path = os.path.join(icons_dir, icon_rel).replace("\\", "/")
+        return f'url("file:///{abs_path}")'  # Quotes wichtig bei Leerzeichen
+
+    qss_mod = re.sub(pattern, repl, qss)
+    app.setStyleSheet(qss_mod)
 
 def run():
     app = QApplication(sys.argv)

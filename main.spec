@@ -11,13 +11,13 @@ def maybe(path, dest):
     return (here(path), dest) if os.path.exists(path) else None
 
 datas_list = list(filter(None, [
-    maybe('style.qss', '.'),                      # landet in _internal, Hook kopiert ins Root
+    maybe('style.qss', '.'),
     maybe('INAT SOLUTIONS.png', '.'),
     maybe('config.json', '.'),
     maybe('schema.sql', '.'),
     maybe(os.path.join('config','rechnung_layout.json'), os.path.join('config')),
-    # maybe(os.path.join('config','qr_daten.json'), os.path.join('config')),
-    maybe('favicon.ico', '.'),   # <- .ico mitnehmen (liegt im Projekt-Root)
+    maybe('favicon.ico', '.'),
+    (here('icons'), 'icons'),   # <-- zwingend das icons-Verzeichnis einfügen
 ]))
 
 a = Analysis(
