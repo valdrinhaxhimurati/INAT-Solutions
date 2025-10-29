@@ -14,7 +14,7 @@ if ($LASTEXITCODE -ne 0) { Write-Error "Clone fehlgeschlagen"; exit 1 }
 
 # EXE kopieren und version.json erzeugen
 Copy-Item $exe -Destination ".\tmp-gh\INAT-Solutions.exe" -Force
-$version = "v0.8.3"   # passe an
+$version = "v0.8.6.3"   # passe an
 $json = @{ version = $version; url = "https://valdrinhaxhimurati.github.io/INAT-Solutions-Updates/INAT-Solutions.exe"; sha256 = $sha } | ConvertTo-Json
 $json | Out-File -Encoding utf8 ".\tmp-gh\version.json"
 

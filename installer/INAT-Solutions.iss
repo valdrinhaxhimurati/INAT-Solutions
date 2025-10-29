@@ -1,5 +1,5 @@
 #define MyAppName "INAT Solutions"
-#define MyAppVersion "0.8.2"
+#define MyAppVersion "0.8.6.2"
 #define MyAppPublisher "INAT Solutions"
 #define MyAppExeName "INAT-Solutions.exe"
 #define MySourceDir "..\dist\INAT-Solutions"
@@ -8,8 +8,8 @@
 [Setup]
 AppName={#MyAppName}
 AppVersion={#MyAppVersion}
-DefaultDirName={commonappdata}\{#MyAppName}  
-PrivilegesRequired=admin                    
+DefaultDirName={localappdata}\{#MyAppName}  
+PrivilegesRequired=lowest
 ArchitecturesAllowed=x64
 ArchitecturesInstallIn64BitMode=x64
 DisableDirPage=no

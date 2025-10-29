@@ -24,37 +24,12 @@ def resource_path(relative_path):
     try:
         base_path = sys._MEIPASS
     except AttributeError:
-        base_path = os.path.abspath(".")
+        base_path = os.path.dirname(__file__)
     return os.path.join(base_path, relative_path)
 
 CONFIG_PATH = str(data_dir() / "config.json")
 LOGIN_DB_PATH = str(users_db_path())
 DEFAULT_DB_PATH = str(local_db_path())
-
-def lade_stylesheet(filename="style.qss") -> str:
-    import re
-    # base_path: _MEIPASS (onefile) oder exe/working dir (onefolder / local)
-    base_path = getattr(sys, "_MEIPASS", os.path.dirname(sys.argv[0]) or os.path.abspath("."))
-    p = os.path.join(base_path, filename)
-    try:
-        with open(p, "r", encoding="utf-8") as f:
-            qss = f.read()
-    except Exception:
-        return ""
-
-    # Ersetze relative url(...) (keine :/ , file: , / oder http) mit absolutem, zitierten Pfad
-    def repl(m):
-        quote = m.group(1) or ""
-        path = m.group(2)
-        # belasse resource- oder absolute-URLs unverändert
-        if re.match(r'^(?:[:/\\]|file:|https?:)', path, flags=re.I):
-            return f'url({quote}{path}{quote})'
-        abs_path = os.path.join(base_path, path).replace("\\", "/")
-        # zitiere wegen Leerzeichen
-        return f'url("{abs_path}")'
-
-    qss = re.sub(r'url\((["\']?)([^"\')]+)(["\']?)\)', repl, qss)
-    return qss
 
 def benutzer_existieren(db_path: str) -> bool:
     try:
@@ -115,20 +90,54 @@ def sync_from_local():
         pass
 
     bat_path = os.path.join(tempfile.gettempdir(), "inat_update.bat")
-    with open(bat_path, "w", encoding="utf-8") as bat:
-        bat.write(f"""@echo off
-:WAIT
-tasklist /FI "IMAGENAME eq {os.path.basename(dst)}" | find /I "{os.path.basename(dst)}" >nul
+    logpath = os.path.join(tempfile.gettempdir(), "inat_update.bat.log")
+    dst_name = os.path.basename(dst).replace('"','')
+    # robustes Batch: wartet, versucht mehrfach zu kopieren, loggt Fehler und öffnet Pause bei Fehler
+    bat_contents = f'''@echo off
+echo update started at %DATE% %TIME% > "{logpath}"
+set "DST={dst}"
+set "SRC={candidate}"
+set "BACKUP=%DST%.old"
+echo dst=%DST% >> "{logpath}"
+echo src=%SRC% >> "{logpath}"
+:WAIT_PROC
+REM prüfe ob Prozess mit ImageName läuft
+tasklist /FI "IMAGENAME eq {dst_name}" 2>> "{logpath}" | find /I "{dst_name}" >nul
 if %ERRORLEVEL%==0 (
   timeout /t 1 >nul
-  goto WAIT
+  goto WAIT_PROC
 )
-if exist "{backup}" del /F /Q "{backup}"
-copy /Y "{candidate}" "{dst}"
-start "" "{dst}"
-del "%~f0"
-""")
-    subprocess.Popen(["cmd", "/c", bat_path], creationflags=subprocess.CREATE_NEW_CONSOLE)
+echo process not running, attempting copy >> "{logpath}"
+
+REM entferne altes Backup, versuche Copy mehrfach
+if exist "%BACKUP%" del /F /Q "%BACKUP%" >> "{logpath}" 2>&1
+set tries=0
+:TRY_COPY
+set /A tries+=1
+echo try %tries% >> "{logpath}"
+copy /Y "%SRC%" "%DST%" >> "{logpath}" 2>&1
+if %ERRORLEVEL%==0 (
+  echo copy succeeded >> "{logpath}"
+  start "" "%DST%"
+  del "%~f0"
+  exit /B 0
+) else (
+  echo copy failed (exit %ERRORLEVEL%) >> "{logpath}"
+  if %tries% GEQ 20 (
+    echo giving up after %tries% attempts >> "{logpath}"
+    echo Update failed. See "{logpath}"
+    pause
+    exit /B 1
+  )
+  timeout /t 1 >nul
+  goto TRY_COPY
+)
+'''
+    with open(bat_path, "w", encoding="utf-8") as bat:
+        bat.write(bat_contents)
+
+    # Start batch in neuer Konsole, dann beenden die App damit das Batch ersetzen kann
+    subprocess.Popen(["cmd", "/k", bat_path], creationflags=subprocess.CREATE_NEW_CONSOLE)
     sys.exit(0)
 
 def sync_from_remote():
@@ -227,42 +236,51 @@ del "%~f0"
         except Exception:
             pass
 
-def load_and_apply_qss(app, qss_filename="style.qss"):
+def apply_stylesheet(app, filename="style.qss"):
     import sys, os, re
     base_path = getattr(sys, "_MEIPASS", os.path.dirname(__file__))
 
-    # mögliche Orte, an denen PyInstaller die icons ablegt
+    # mögliche Orte für icons (einschließlich PyInstaller _internal)
     candidates = [
         os.path.join(base_path, "icons"),
         os.path.join(base_path, "_internal", "icons"),
-        (os.path.join(os.path.dirname(sys.executable), "icons") if getattr(sys, "frozen", False) else None),
     ]
+    if getattr(sys, "frozen", False):
+        candidates.append(os.path.join(os.path.dirname(sys.executable), "icons"))
     icons_dir = next((p for p in candidates if p and os.path.isdir(p)), None)
-    if icons_dir is None:
-        # Fallback: benutze base_path/icons (wird später erzeugt/gefunden oder führt zu Fehlersuche)
-        icons_dir = os.path.join(base_path, "icons")
 
-    qss_path = os.path.join(base_path, qss_filename)
+    qss_path = os.path.join(base_path, filename)
     if not os.path.exists(qss_path):
         return
+
     with open(qss_path, "r", encoding="utf-8") as f:
         qss = f.read()
 
-    # Ersetze nur relative icons/... Pfade (lasse :/ und file: unverändert)
-    pattern = r'(?:image:\s*)?url\((["\']?)(?![:/]|file:)(?:icons/)?([^"\')]+)(["\']?)\)'
+    # Ersetze nur relative url(...) Einträge für icons/ (lässt :/ und file: unverändert)
+    pattern = r'url\((["\']?)(?![:/]|file:)(?:icons/)?([^"\')]+)(["\']?)\)'
     def repl(m):
         icon_rel = m.group(2)
-        abs_path = os.path.join(icons_dir, icon_rel).replace("\\", "/")
-        return f'url("file:///{abs_path}")'  # Quotes wichtig bei Leerzeichen
+        if icons_dir:
+            abs_path = os.path.join(icons_dir, icon_rel).replace("\\", "/")
+        else:
+            abs_path = os.path.join(base_path, "icons", icon_rel).replace("\\", "/")
+        # zitierte Pfade, keine file:/// nötig wenn Pfad korrekt ist
+        return f'url("{abs_path}")'
 
     qss_mod = re.sub(pattern, repl, qss)
     app.setStyleSheet(qss_mod)
 
 def run():
     app = QApplication(sys.argv)
-    ss = lade_stylesheet("style.qss")
-    if ss:
-        app.setStyleSheet(ss)
+
+    # ensure compiled Qt resources are initialized (no harm if missing)
+    try:
+        import resources_rc  # optional, nur vorhanden wenn qrc kompiliert wurde
+    except Exception:
+        resources_rc = None
+
+    # Stylesheet anwenden (sucht icons im Bundle/_internal/usw.)
+    apply_stylesheet(app, "style.qss")
 
     # Update-Check NACH Erzeugen der QApplication
     # remote-first Update check (falls nicht erreichbar, optional lokalen Fallback nutzen)
