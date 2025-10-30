@@ -55,60 +55,119 @@ class EinstellungenTab(QWidget):
         self.btn_save_org = QPushButton("Speichern"); self.btn_save_org.clicked.connect(self._save_org)
         lay1.addWidget(self.btn_save_org)
 
-        main.addWidget(box1)
+        # Arrange sections in a 2-column grid: top row (Firma | Datenbank), bottom full-width Buchhaltung
+        from PyQt5.QtWidgets import QGridLayout
 
-        # --- Datenbank ---
+        grid = QGridLayout()
+        grid.setHorizontalSpacing(16)
+        grid.setVerticalSpacing(16)
+
+        # left-top: Firmeninformationen (box1)
+        grid.addWidget(box1, 0, 0)
+
+        # right-top: Datenbank (box2)
         box2 = QFrame(); box2.setFrameShape(QFrame.StyledPanel); box2.setObjectName("settingsBox")
         lay2 = QVBoxLayout(box2)
-
         title2 = QLabel("Datenbank"); title2.setObjectName("settingsTitle")
         lay2.addWidget(title2); lay2.addSpacing(8)
-
         # Modus-Anzeige (ohne URL)
         self.db_mode_label = QLabel("Modus:")  # wird in _refresh_db_label gesetzt
         lay2.addWidget(self.db_mode_label)
-
-        # Buttons linksbündig untereinander
         self.btn_db_settings = QPushButton("Datenbank-Einstellungen…"); self.btn_db_settings.clicked.connect(self.open_db_settings)
         self.export_button = QPushButton("CSV Export"); self.export_button.clicked.connect(self.csv_export_dialog)
         self.import_button = QPushButton("CSV Import"); self.import_button.clicked.connect(self.csv_import_dialog)
         self.clear_db_button = QPushButton("Datenbank löschen"); self.clear_db_button.clicked.connect(self._on_clear_database)
-        btn_col = QVBoxLayout()
-        btn_col.setSpacing(8)
+        btn_col = QVBoxLayout(); btn_col.setSpacing(8)
         btn_col.addWidget(self.btn_db_settings, alignment=Qt.AlignLeft)
         btn_col.addWidget(self.export_button, alignment=Qt.AlignLeft)
         btn_col.addWidget(self.import_button, alignment=Qt.AlignLeft)
         btn_col.addWidget(self.clear_db_button, alignment=Qt.AlignLeft)
         lay2.addLayout(btn_col)
+        # DB Sync launcher button
+        self.btn_open_db_sync = QPushButton("Datenbank synchronisieren")
+        self.btn_open_db_sync.clicked.connect(self._open_db_sync_dialog)
+        btn_col.addWidget(self.btn_open_db_sync, alignment=Qt.AlignLeft)
+        lay2.addSpacing(8)
+        grid.addWidget(box2, 0, 1)
 
-        main.addWidget(box2)
+        # bottom: Buchhaltung | Rechnungen  (gleich hohe eingerahmte Boxen), darunter Lager + Allgemein
+        # Buttons-Definitionen (ändert Reihenfolge/Zuordnung hier zentral)
+        buch_buttons = [
+            ("Kategorien verwalten", self._open_kategorien_dialog),
+            ("Rechnungen exportieren", self._export_invoices_dialog),
+        ]
+        rech_buttons = [
+            ("QR-Rechnungsdaten verwalten", self._open_qr_dialog),
+            ("Rechnungslayout bearbeiten", self._open_rechnungslayout_dialog),
+        ]
+        allgemein_buttons = [
+            ("Benutzer verwalten", self._open_benutzer_dialog),
+        ]
+        lager_buttons = [
+            ("Module verwalten", self._open_module_dialog),
+        ]
 
-        # --- Verwaltung ---
-        box3 = QFrame(); box3.setFrameShape(QFrame.StyledPanel); box3.setObjectName("settingsBox")
-        lay3 = QVBoxLayout(box3)
-        title3 = QLabel("Verwaltung"); title3.setObjectName("settingsTitle")
-        lay3.addWidget(title3); lay3.addSpacing(8)
+        # Berechne Höhe so, dass die Boxen Buchhaltung/Rechnungen gleich groß sind
+        max_rows = max(len(buch_buttons), len(rech_buttons), 1)
+        approx_button_h = 34
+        title_h = 36
+        min_box_h = title_h + max_rows * (approx_button_h + 6) + 20
 
-        self.kategorien_button = QPushButton("Kategorien verwalten")
-        self.kategorien_button.clicked.connect(self._open_kategorien_dialog)
-        self.benutzer_button = QPushButton("Benutzer verwalten")
-        self.benutzer_button.clicked.connect(self._open_benutzer_dialog)
-        self.qr_button = QPushButton("QR-Rechnungsdaten verwalten")
-        self.qr_button.clicked.connect(self._open_qr_dialog)
-        self.module_button = QPushButton("Module verwalten")
-        self.module_button.clicked.connect(self._open_module_dialog)
+        # Buchhaltung-Box (links)
+        box_buchhaltung = QFrame(); box_buchhaltung.setFrameShape(QFrame.StyledPanel); box_buchhaltung.setObjectName("settingsBox")
+        box_buchhaltung.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+        box_buchhaltung.setMinimumHeight(min_box_h)
+        lay_buchhaltung = QVBoxLayout(box_buchhaltung)
+        title_buch = QLabel("Buchhaltung"); title_buch.setObjectName("settingsTitle")
+        lay_buchhaltung.addWidget(title_buch); lay_buchhaltung.addSpacing(8)
+        # Buttons in einer Spalte
+        for text, handler in buch_buttons:
+            btn = QPushButton(text); btn.clicked.connect(handler)
+            lay_buchhaltung.addWidget(btn)
+        lay_buchhaltung.addStretch(1)
+        grid.addWidget(box_buchhaltung, 1, 0)
 
-        # Export aller Rechnungen (Steuerauszug)
-        self.export_invoices_button = QPushButton("Rechnungen exportieren")
-        self.export_invoices_button.clicked.connect(self._export_invoices_dialog)
-        
-        for b in (self.kategorien_button, self.benutzer_button, self.qr_button, self.module_button):
-            lay3.addWidget(b)
+        # Rechnungen-Box (rechts) - gleiche Höhe wie Buchhaltung
+        box_rechnungen = QFrame(); box_rechnungen.setFrameShape(QFrame.StyledPanel); box_rechnungen.setObjectName("settingsBox")
+        box_rechnungen.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+        box_rechnungen.setMinimumHeight(min_box_h)
+        lay_rechnungen = QVBoxLayout(box_rechnungen)
+        title_rech = QLabel("Rechnungen"); title_rech.setObjectName("settingsTitle")
+        lay_rechnungen.addWidget(title_rech); lay_rechnungen.addSpacing(8)
+        for text, handler in rech_buttons:
+            btn = QPushButton(text); btn.clicked.connect(handler)
+            lay_rechnungen.addWidget(btn)
+        lay_rechnungen.addStretch(1)
+        grid.addWidget(box_rechnungen, 1, 1)
 
-        # export button zuletzt in Verwaltung
-        lay3.addWidget(self.export_invoices_button)
-        
-        main.addWidget(box3)
+        # Lager (unterhalb, links)
+        box_lager = QFrame(); box_lager.setFrameShape(QFrame.StyledPanel); box_lager.setObjectName("settingsBox")
+        lay_lager = QVBoxLayout(box_lager)
+        title_lager = QLabel("Lager"); title_lager.setObjectName("settingsTitle")
+        lay_lager.addWidget(title_lager); lay_lager.addSpacing(8)
+        for text, handler in lager_buttons:
+            btn = QPushButton(text); btn.clicked.connect(handler)
+            lay_lager.addWidget(btn)
+        grid.addWidget(box_lager, 2, 0)
+
+        # Allgemein (unterhalb, rechts) - Benutzerverwaltungen separat
+        box_allgemein = QFrame(); box_allgemein.setFrameShape(QFrame.StyledPanel); box_allgemein.setObjectName("settingsBox")
+        lay_allgemein = QVBoxLayout(box_allgemein)
+        title_allg = QLabel("Allgemein"); title_allg.setObjectName("settingsTitle")
+        lay_allgemein.addWidget(title_allg); lay_allgemein.addSpacing(8)
+        for text, handler in allgemein_buttons:
+            btn = QPushButton(text); btn.clicked.connect(handler)
+            lay_allgemein.addWidget(btn)
+        grid.addWidget(box_allgemein, 2, 1)
+
+        # Spalten gleichmäßig dehnen
+        grid.setColumnStretch(0, 1)
+        grid.setColumnStretch(1, 1)
+        # Zeilenverteilung: damit die oberen Boxen gleiche Höhe bekommen
+        grid.setRowStretch(0, 0)
+        grid.setRowStretch(1, 0)
+        grid.setRowStretch(2, 0)
+        main.addLayout(grid)
         main.addStretch(1)
 
         container = QWidget(); container.setLayout(main)
@@ -259,6 +318,27 @@ class EinstellungenTab(QWidget):
             QMessageBox.warning(self, "QR-Daten", f"QR-Daten-Dialog nicht gefunden:\n{e}")
             return
         QRDatenDialog(self).exec_()
+
+    def _open_rechnungslayout_dialog(self):
+        try:
+            from gui.rechnung_layout_dialog import RechnungLayoutDialog
+        except Exception as e:
+            QMessageBox.warning(self, "Rechnungslayout", f"Dialog nicht gefunden:\n{e}")
+            return
+        dlg = RechnungLayoutDialog(self)
+        if dlg.exec_() == QDialog.Accepted:
+            QMessageBox.information(self, "Rechnungslayout", "Layout gespeichert.")
+            # Versuche, das Rechnungen-Tab zu benachrichtigen (wenn vorhanden)
+            try:
+                widget = self
+                while widget and not hasattr(widget, 'rechnungen_tab'):
+                    widget = widget.parent()
+                if widget and hasattr(widget, 'rechnungen_tab'):
+                    rt = widget.rechnungen_tab
+                    if hasattr(rt, '_lade_rechnungslayout'):
+                        rt._lade_rechnungslayout()
+            except Exception:
+                pass
 
     def _open_kategorien_dialog(self):
         try:
@@ -415,4 +495,10 @@ class EinstellungenTab(QWidget):
                     conn.close()
             except Exception:
                 pass
+
+    def _open_db_sync_dialog(self):
+        # öffnet den Dialog aus gui/db_sync_dialog.py
+        from gui.db_sync_dialog import DBSyncDialog
+        dlg = DBSyncDialog(self)
+        dlg.exec_()
 

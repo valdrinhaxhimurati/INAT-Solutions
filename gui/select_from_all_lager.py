@@ -42,21 +42,38 @@ class SelectFromAllLagerDialog(QDialog):
 
         if "material" in aktive:
             self.material_table = QTableWidget()
+            # make row-selection reliable and ensure full-row select on click
+            self.material_table.setSelectionBehavior(QTableWidget.SelectRows)
+            self.material_table.setSelectionMode(QTableWidget.SingleSelection)
+            self.material_table.setEditTriggers(QTableWidget.NoEditTriggers)
+            self.material_table.cellClicked.connect(lambda r, c, t=self.material_table: t.selectRow(r))
             self._load_materiallager()
             self.tabs.addTab(self.material_table, "Materiallager")
 
         if "reifen" in aktive:
             self.reifen_table = QTableWidget()
+            self.reifen_table.setSelectionBehavior(QTableWidget.SelectRows)
+            self.reifen_table.setSelectionMode(QTableWidget.SingleSelection)
+            self.reifen_table.setEditTriggers(QTableWidget.NoEditTriggers)
+            self.reifen_table.cellClicked.connect(lambda r, c, t=self.reifen_table: t.selectRow(r))
             self._load_reifenlager()
             self.tabs.addTab(self.reifen_table, "Reifenlager")
 
         if "artikel" in aktive:
             self.artikel_table = QTableWidget()
+            self.artikel_table.setSelectionBehavior(QTableWidget.SelectRows)
+            self.artikel_table.setSelectionMode(QTableWidget.SingleSelection)
+            self.artikel_table.setEditTriggers(QTableWidget.NoEditTriggers)
+            self.artikel_table.cellClicked.connect(lambda r, c, t=self.artikel_table: t.selectRow(r))
             self._load_artikellager()
             self.tabs.addTab(self.artikel_table, "Artikellager")
 
         if "dienstleistungen" in aktive:
             self.dienst_table = QTableWidget()
+            self.dienst_table.setSelectionBehavior(QTableWidget.SelectRows)
+            self.dienst_table.setSelectionMode(QTableWidget.SingleSelection)
+            self.dienst_table.setEditTriggers(QTableWidget.NoEditTriggers)
+            self.dienst_table.cellClicked.connect(lambda r, c, t=self.dienst_table: t.selectRow(r))
             self._load_dienstleistungen()
             self.tabs.addTab(self.dienst_table, "Dienstleistungen")
 
@@ -171,7 +188,15 @@ class SelectFromAllLagerDialog(QDialog):
         else:
             return
 
+        # robust row detection: try currentRow, then selectedRows(), then currentIndex()
         row = table.currentRow()
+        if row < 0:
+            sel = table.selectionModel().selectedRows()
+            if sel:
+                row = sel[0].row()
+            else:
+                idx = table.currentIndex()
+                row = idx.row() if idx.isValid() else -1
         if row < 0:
             QMessageBox.warning(self, "Keine Auswahl", "Bitte ein Item auswählen.")
             return

@@ -302,7 +302,8 @@ class RechnungDialog(QDialog):
 
         # --- Defaults setzen (immer, für neue und bestehende Rechnungen) ---
         self.text_zahlungskonditionen.setPlainText("Zahlbar inner 10 Tagen")
-        firmenname = self._lade_firmenname_aus_einstellungen() or "INAT Performance GmbH"
+        # Firmenname aus der Konfiguration/DB laden; Default "Firmenname" falls leer
+        firmenname = get_config_value("firmenname") or "Firmenname"
         self.text_abschluss.setPlainText(f"Freundliche grüsse {firmenname}")
 
         # Falls Bearbeiten: bestehende Werte einfüllen (überschreibt defaults, falls vorhanden)

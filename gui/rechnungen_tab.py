@@ -28,8 +28,10 @@ PASTELL_ROT    = QColor(255, 230, 230)   # überfällig
 PASTELL_ORANGE = QColor(255, 245, 230)   # offen
 
 class RechnungenTab(QWidget):
-    def __init__(self):
-        super().__init__()
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        # Default-MWST (Schutz falls importierte Daten keine mwst liefern)
+        self.mwst = 0.0
 
         self.initialisiere_datenbank()
 
@@ -59,11 +61,11 @@ class RechnungenTab(QWidget):
         self.btn_set_status = QToolButton();        self.btn_set_status.setText("Status ändern");       self.btn_set_status.setProperty("role", "refresh")
         self.btn_exportieren = QToolButton();       self.btn_exportieren.setText("Export PDF");         self.btn_exportieren.setProperty("role", "download")
         self.btn_vorschau = QToolButton();          self.btn_vorschau.setText("Vorschau PDF");         self.btn_vorschau.setProperty("role", "preview")
-        self.btn_layout_bearbeiten = QToolButton(); self.btn_layout_bearbeiten.setText("Rechnungslayout bearbeiten");      self.btn_layout_bearbeiten.setProperty("role", "edit")
+
 
         for btn in [
             self.btn_neu, self.btn_bearbeiten, self.btn_loeschen,
-            self.btn_set_status, self.btn_exportieren, self.btn_vorschau, self.btn_layout_bearbeiten
+            self.btn_set_status, self.btn_exportieren, self.btn_vorschau
         ]:
             btn_layout.addWidget(btn)
         btn_layout.addStretch()
@@ -77,7 +79,7 @@ class RechnungenTab(QWidget):
         self.btn_set_status.clicked.connect(self._status_aendern)
         self.btn_exportieren.clicked.connect(self.exportiere_ausgewaehlte_rechnung)
         self.btn_vorschau.clicked.connect(self.vorschau_ausgewaehlte_rechnung)
-        self.btn_layout_bearbeiten.clicked.connect(self.oeffne_rechnungslayout_dialog)
+
 
         # Rechnungen laden
         self.lade_rechnungen()
@@ -621,7 +623,7 @@ class RechnungenTab(QWidget):
         else:
             subprocess.Popen(["xdg-open", tmp_path])
 
-    def _exportiere_pdf(self, rechnung, dateipfad, logo_skala=100):
+    def _exportiere_pdf(self, rechnung, dateipfad, logo_skala=1.0):
         # Layout frisch laden, damit Vorschau das aktuelle Logo nutzt
         try:
             self._lade_rechnungslayout()

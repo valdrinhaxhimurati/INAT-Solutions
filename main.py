@@ -12,6 +12,12 @@ from db_connection import get_db, ensure_database_and_tables, ensure_app_schema
 from PyQt5.QtWidgets import QApplication, QMessageBox, QFileDialog, QDialog, QProgressDialog
 from PyQt5.QtCore import Qt
 from PyQt5.QtGui import QIcon
+from gui.main_window import resource_path
+
+app = QApplication(sys.argv)
+
+# setze globales App-Icon, damit alle Fenster/Dialogs das Favicon erben
+app.setWindowIcon(QIcon(resource_path("favicon.ico")))
 
 import resources_rc
 from gui.benutzer_dialog import BenutzerVerwaltenDialog
