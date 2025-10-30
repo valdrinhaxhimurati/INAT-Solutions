@@ -176,6 +176,19 @@ CREATE TABLE IF NOT EXISTS invoices (
   created_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 
+-- =========================
+-- Neu: Lager‑Module / Einstellungen (SQLite)
+-- =========================
+
+CREATE TABLE IF NOT EXISTS lager_einstellungen (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  lager_typ TEXT NOT NULL,
+  aktiv INTEGER DEFAULT 0
+);
+
+-- UNIQUE Index für lager_typ damit ON CONFLICT(lager_typ) funktioniert
+CREATE UNIQUE INDEX IF NOT EXISTS idx_lager_einstellungen_lager_typ_uniq ON lager_einstellungen (lager_typ);
+
 -- ============================
 -- PATCH: Tabellen für Postgres
 -- ============================
@@ -245,6 +258,16 @@ CREATE TABLE IF NOT EXISTS invoices (
   size INTEGER NOT NULL,
   created_at TIMESTAMPTZ DEFAULT now()
 );
+
+-- Tabelle für Lager‑Module / Einstellungen
+CREATE TABLE IF NOT EXISTS public.lager_einstellungen (
+  id BIGSERIAL PRIMARY KEY,
+  lager_typ TEXT NOT NULL,
+  aktiv BOOLEAN DEFAULT FALSE
+);
+
+-- Sicherstellen: UNIQUE constraint / index für ON CONFLICT (lager_typ)
+CREATE UNIQUE INDEX IF NOT EXISTS idx_lager_einstellungen_lager_typ_uniq ON public.lager_einstellungen (lager_typ);
 
 -- Beispiel-Insert für MWST-Default (nur einmalig ausführen, z.B. beim ersten DB-Setup)
 INSERT OR IGNORE INTO config (key, value) VALUES ('mwst_default', '0.0');
