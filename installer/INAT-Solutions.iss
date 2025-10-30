@@ -1,5 +1,5 @@
 #define MyAppName "INAT Solutions"
-#define MyAppVersion "0.8.6.2"
+#define MyAppVersion "0.8.6.5"
 #define MyAppPublisher "INAT Solutions"
 #define MyAppExeName "INAT-Solutions.exe"
 #define MySourceDir "..\dist\INAT-Solutions"

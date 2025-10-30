@@ -1,13 +1,27 @@
 # -*- coding: utf-8 -*-
 from PyQt5.QtWidgets import QDialog, QVBoxLayout, QLabel, QCheckBox, QPushButton, QHBoxLayout, QMessageBox
 from db_connection import get_db
+import sqlite3
+
+def _to_bool(val):
+    """Normalisiere DB-Werte zu bool. Akzeptiert bool, int, '0'/'1', 'true'/'false'."""
+    if isinstance(val, bool):
+        return val
+    if val is None:
+        return False
+    try:
+        return bool(int(val))
+    except Exception:
+        s = str(val).strip().lower()
+        return s in ("1", "true", "t", "yes", "y")
 
 class LagerEinstellungenDialog(QDialog):
-    def __init__(self, parent=None):
-        super().__init__(parent)
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
         self.setWindowTitle("Lager-Module aktivieren")
         layout = QVBoxLayout()
 
+        # Ein einziges Mapping für alle Checkboxen
         self.checkboxes = {}
         lager_typen = ["material", "reifen", "artikel", "dienstleistungen"]
         for typ in lager_typen:
@@ -35,48 +49,52 @@ class LagerEinstellungenDialog(QDialog):
             cur = conn.cursor()
             cur.execute("SELECT lager_typ, aktiv FROM lager_einstellungen")
             rows = cur.fetchall()
-            conn.close()
+            # rows können Tupel (lager_typ, aktiv) oder Dicts sein
             for row in rows:
-                typ, aktiv = row
-                if typ in self.checkboxes:
-                    self.checkboxes[typ].setChecked(aktiv)
+                if isinstance(row, dict):
+                    lager_typ = row.get('lager_typ')
+                    aktiv_val = row.get('aktiv')
+                else:
+                    # Tuple: index 0 = lager_typ, index 1 = aktiv
+                    if len(row) >= 2:
+                        lager_typ, aktiv_val = row[0], row[1]
+                    else:
+                        continue
+                chk = self.checkboxes.get(lager_typ)
+                if chk is not None:
+                    try:
+                        chk.setChecked(_to_bool(aktiv_val))
+                    except Exception:
+                        chk.setChecked(False)
+            conn.close()
         except Exception as e:
-            print(f"Fehler beim Laden der Einstellungen: {e}")
+            QMessageBox.warning(self, "Fehler", f"Fehler beim Laden der Einstellungen: {e}")
 
     def _save_einstellungen(self):
         try:
             conn = get_db()
             cur = conn.cursor()
-            for typ, cb in self.checkboxes.items():
-                aktiv = cb.isChecked()
-                # Prüfe, ob deaktiviert wird
-                cur.execute("SELECT aktiv FROM lager_einstellungen WHERE lager_typ = %s", (typ,))
-                row = cur.fetchone()
-                war_aktiv = row[0] if row else False
-                if war_aktiv and not aktiv:
-                    # Warnung für Deaktivierung
-                    msg = QMessageBox()
-                    msg.setWindowTitle("Modul deaktivieren")
-                    msg.setText(f"Modul '{typ}' deaktivieren? Alle Daten werden gelöscht!")
-                    msg.setStandardButtons(QMessageBox.Yes | QMessageBox.No)
-                    msg.button(QMessageBox.Yes).setText("Ja")
-                    msg.button(QMessageBox.No).setText("Nein")
-                    resp = msg.exec_()
-                    if resp != QMessageBox.Yes:
-                        # Nicht speichern, Checkbox zurücksetzen
-                        cb.setChecked(True)
-                        continue
-                    # Daten löschen
-                    tabelle = f"{typ}lager" if typ != "dienstleistungen" else "dienstleistungen"
-                    cur.execute(f"DELETE FROM {tabelle}")
-                # Speichere Einstellung
-                cur.execute("""
-                    INSERT INTO lager_einstellungen (lager_typ, aktiv)
-                    VALUES (%s, %s)
-                    ON CONFLICT (lager_typ) DO UPDATE SET aktiv = EXCLUDED.aktiv
-                """, (typ, aktiv))
+
+            # Detect sqlite connection to choose paramstyle / upsert
+            is_sqlite = isinstance(conn, sqlite3.Connection) or "sqlite" in conn.__class__.__module__.lower()
+
+            for lager_typ, chk in self.checkboxes.items():
+                aktiv_val = 1 if chk.isChecked() else 0
+                if is_sqlite:
+                    # SQLite: INSERT OR REPLACE works with UNIQUE index on lager_typ
+                    cur.execute(
+                        "INSERT OR REPLACE INTO lager_einstellungen (lager_typ, aktiv) VALUES (?, ?)",
+                        (lager_typ, aktiv_val)
+                    )
+                else:
+                    # Postgres (psycopg2): use %s placeholders and ON CONFLICT
+                    cur.execute(
+                        "INSERT INTO lager_einstellungen (lager_typ, aktiv) VALUES (%s, %s) "
+                        "ON CONFLICT (lager_typ) DO UPDATE SET aktiv = EXCLUDED.aktiv",
+                        (lager_typ, aktiv_val)
+                    )
             conn.commit()
             conn.close()
             self.accept()
         except Exception as e:
-            print(f"Fehler beim Speichern: {e}")
+            QMessageBox.critical(self, "Fehler", f"Fehler beim Speichern: {e}")

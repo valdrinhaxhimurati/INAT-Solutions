@@ -2,6 +2,18 @@
 from PyQt5.QtWidgets import QDialog, QVBoxLayout, QHBoxLayout, QTabWidget, QPushButton, QTableWidget, QTableWidgetItem, QMessageBox
 from PyQt5.QtCore import Qt
 from db_connection import get_db
+import sqlite3
+
+def _to_bool(val):
+    if isinstance(val, bool):
+        return val
+    if val is None:
+        return False
+    try:
+        return bool(int(val))
+    except Exception:
+        s = str(val).strip().lower()
+        return s in ("1", "true", "t", "yes", "y", "on")
 
 class SelectFromAllLagerDialog(QDialog):
     def __init__(self, parent=None):
@@ -34,9 +46,22 @@ class SelectFromAllLagerDialog(QDialog):
         try:
             conn = get_db()
             cur = conn.cursor()
-            cur.execute("SELECT lager_typ FROM lager_einstellungen WHERE aktiv = TRUE")
-            aktive = [row[0] for row in cur.fetchall()]
+            cur.execute("SELECT lager_typ, aktiv FROM lager_einstellungen ORDER BY lager_typ")
+            rows = cur.fetchall()
             conn.close()
+            aktive = []
+            for row in rows:
+                # row may be tuple or dict
+                if isinstance(row, dict):
+                    lt = row.get("lager_typ")
+                    av = row.get("aktiv")
+                else:
+                    if len(row) >= 2:
+                        lt, av = row[0], row[1]
+                    else:
+                        continue
+                if lt and _to_bool(av):
+                    aktive.append(lt)
         except Exception:
             aktive = []
 
@@ -163,9 +188,19 @@ class SelectFromAllLagerDialog(QDialog):
         try:
             conn = get_db()
             cur = conn.cursor()
-            cur.execute("SELECT lager_typ FROM lager_einstellungen WHERE aktiv = TRUE ORDER BY lager_typ")
-            aktive = [row[0] for row in cur.fetchall()]
+            cur.execute("SELECT lager_typ, aktiv FROM lager_einstellungen ORDER BY lager_typ")
+            rows = cur.fetchall()
             conn.close()
+            for row in rows:
+                if isinstance(row, dict):
+                    lt = row.get("lager_typ"); av = row.get("aktiv")
+                else:
+                    if len(row) >= 2:
+                        lt, av = row[0], row[1]
+                    else:
+                        continue
+                if lt and _to_bool(av):
+                    aktive.append(lt)
         except Exception:
             aktive = []
 

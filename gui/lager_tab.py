@@ -8,6 +8,17 @@ from gui.dienstleistungen_tab import DienstleistungenTab
 from gui.lager_einstellungen_dialog import LagerEinstellungenDialog
 from db_connection import get_db, dict_cursor_factory
 
+def _to_bool(val):
+    if isinstance(val, bool):
+        return val
+    if val is None:
+        return False
+    try:
+        return bool(int(val))
+    except Exception:
+        s = str(val).strip().lower()
+        return s in ("1", "true", "t", "yes", "y", "on")
+
 class LagerTab(QWidget):
     def __init__(self):
         super().__init__()
@@ -32,8 +43,20 @@ class LagerTab(QWidget):
         try:
             conn = get_db()
             cur = conn.cursor()
-            cur.execute("SELECT lager_typ FROM lager_einstellungen WHERE aktiv = TRUE")
-            aktive = [row[0] for row in cur.fetchall()]
+            # Wir lesen aktiv in Python aus, damit sowohl SQLite (0/1) als auch Postgres (TRUE/FALSE) funktionieren
+            cur.execute("SELECT lager_typ, aktiv FROM lager_einstellungen")
+            aktive = []
+            for row in cur.fetchall():
+                if isinstance(row, dict):
+                    lager_typ = row.get('lager_typ')
+                    aktiv_val = row.get('aktiv')
+                else:
+                    if len(row) >= 2:
+                        lager_typ, aktiv_val = row[0], row[1]
+                    else:
+                        continue
+                if lager_typ and _to_bool(aktiv_val):
+                    aktive.append(lager_typ)
             conn.close()
         except Exception:
             aktive = []

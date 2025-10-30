@@ -232,10 +232,96 @@ def apply_schema(app_url, schema_path=None):
                 except Exception:
                     pass
                 continue
+        # Stelle sicher, dass notwendige UNIQUE-Indexe existieren (idempotent)
+        try:
+            ensure_unique_indexes_postgres(app_url)
+        except Exception:
+            # nicht kritisch — protokolliert wird bereits oben
+            pass
     finally:
         try:
             cur.close()
             conn.close()
         except Exception:
             pass
+
+# Liste der benötigten Unique-Constraints, anpassbar
+# Format: "table": [["col1"], ["col_a","col_b"], ...]  (jede Liste = ein unique index / constraint)
+_REQUIRED_UNIQUE_INDEXES = {
+    "modules": [["name"]],
+    "config": [["key"]],
+    "app_settings": [["key"]],
+    "kunden": [["kundennr"]],        # Beispiel - passe an dein Schema an
+    "lieferanten": [["lieferantnr"]],
+    "lager_einstellungen": [["lager_typ"]]
+    # ... weitere Tabellen/Spalten hinzufügen ...
+}
+
+def ensure_unique_indexes_postgres(dsn: str, indexes: dict | None = None):
+    """
+    Connect to Postgres and create UNIQUE INDEX IF NOT EXISTS for required columns.
+    Call this after applying schema.sql / when preparing a fresh DB.
+    """
+    import psycopg2
+    from psycopg2 import sql
+
+    indexes = indexes or _REQUIRED_UNIQUE_INDEXES
+    if not indexes:
+        return
+
+    conn = psycopg2.connect(dsn)
+    try:
+        with conn.cursor() as cur:
+            for table, list_of_col_lists in indexes.items():
+                for cols in list_of_col_lists:
+                    # build safe index name and SQL
+                    idx_name = f"idx_{table}_{'_'.join(cols)}_uniq"
+                    cols_ident = sql.SQL(", ").join(sql.Identifier(c) for c in cols)
+                    stmt = sql.SQL("CREATE UNIQUE INDEX IF NOT EXISTS {} ON {} ({})").format(
+                        sql.Identifier(idx_name),
+                        sql.Identifier('public', table),
+                        cols_ident
+                    )
+                    cur.execute(stmt)
+        conn.commit()
+    finally:
+        try:
+            conn.close()
+        except Exception:
+            pass
+
+def ensure_unique_indexes_sqlite(db_path: str, indexes: dict | None = None):
+    """
+    Create UNIQUE INDEXes in local sqlite database if needed.
+    Useful for local DBs to mirror constraints.
+    """
+    import sqlite3
+    indexes = indexes or _REQUIRED_UNIQUE_INDEXES
+    if not indexes:
+        return
+    con = sqlite3.connect(db_path)
+    try:
+        cur = con.cursor()
+        for table, list_of_col_lists in indexes.items():
+            for cols in list_of_col_lists:
+                idx_name = f"idx_{table}_{'_'.join(cols)}_uniq"
+                cols_sql = ", ".join([f'"{c}"' for c in cols])
+                stmt = f'CREATE UNIQUE INDEX IF NOT EXISTS "{idx_name}" ON "{table}" ({cols_sql});'
+                cur.execute(stmt)
+        con.commit()
+    finally:
+        try:
+            con.close()
+        except Exception:
+            pass
+
+# Wenn ihr eine Funktion habt, die schema.sql auf die Remote DB anwendet,
+# ruft ensure_unique_indexes_postgres(remote_dsn) danach auf.
+# Beispiel: (füge diesen Aufruf dort ein, wo das Schema angewendet wird)
+#
+# apply_schema_sql_to_remote(remote_dsn)
+# ensure_unique_indexes_postgres(remote_dsn)
+#
+# Ebenso nach dem Erstellen einer neuen lokalen DB:
+# ensure_unique_indexes_sqlite(local_db_path)
 
