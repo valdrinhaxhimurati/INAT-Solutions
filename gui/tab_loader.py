@@ -3,17 +3,18 @@ import traceback
 from datetime import datetime
 
 class TabLoader(QObject):
-    chunk_ready = pyqtSignal(str, list)     # key, list_of_rows (dicts)
-    total_rows = pyqtSignal(str, int)       # key, total_count (or -1)
-    finished = pyqtSignal(str)              # key
-    error = pyqtSignal(str, str)            # key, errmsg
+    chunk_ready = pyqtSignal(str, list)
+    finished = pyqtSignal(str)
+    error = pyqtSignal(str, str)
+    total_rows = pyqtSignal(str, int)
 
-    def __init__(self, key: str, table: str = None, query: str | None = None, chunk_size: int = 500):
+    def __init__(self, key: str, table: str = "", query: str = "", params: list = None, chunk_size: int = 100):
         super().__init__()
         self.key = key
-        self.table = table or key
+        self.table = table
         self.query = query
-        self.chunk_size = int(chunk_size)
+        self.params = params or []
+        self.chunk_size = chunk_size
 
     def _parse_year_from_value(self, val):
         """Try some common date formats and return year as int or None."""
@@ -44,7 +45,6 @@ class TabLoader(QObject):
         return None
 
     def run(self):
-        # import inside run to avoid import-time DB side-effects
         try:
             from db_connection import get_db
         except Exception as e:
@@ -57,31 +57,31 @@ class TabLoader(QObject):
             conn = get_db()
             cur = conn.cursor()
 
-            # total rows (best effort)
+            if self.query:
+                sql = self.query
+            else:
+                sql = f"SELECT * FROM {self.table}"
+
+            # Detect if SQLite and adapt placeholders
+            is_sqlite = False
             try:
-                if self.query:
-                    count_sql = f"SELECT COUNT(*) FROM ({self.query}) AS _cnt"
-                else:
-                    count_sql = f"SELECT COUNT(*) FROM {self.table}"
-                cur.execute(count_sql)
-                row = cur.fetchone()
-                total = int(row[0]) if row and row[0] is not None else -1
-            except Exception:
-                total = -1
-            try:
-                self.total_rows.emit(self.key, total)
+                import sqlite3
+                if isinstance(conn, sqlite3.Connection):
+                    is_sqlite = True
+                elif "sqlite" in str(type(conn)).lower():
+                    is_sqlite = True
             except Exception:
                 pass
 
-            # For buchhaltung, prefer DB-side ordering newest-first to reduce client work
-            if self.key == "buchhaltung" and not self.query:
-                try:
-                    sql = f"SELECT * FROM {self.table} ORDER BY datum DESC"
-                except Exception:
-                    sql = f"SELECT * FROM {self.table}"
+            # Execute with parameters if provided
+            if self.params:
+                # For SQLite, replace %s with ?
+                if is_sqlite:
+                    sql = sql.replace("%s", "?")
+                cur.execute(sql, tuple(self.params))
             else:
-                sql = self.query or f"SELECT * FROM {self.table}"
-            cur.execute(sql)
+                cur.execute(sql)
+
             cols = [d[0] for d in (getattr(cur, "description", None) or [])]
 
             current_year = datetime.now().year

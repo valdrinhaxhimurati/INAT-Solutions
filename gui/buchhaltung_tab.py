@@ -141,6 +141,8 @@ class BuchhaltungTab(QWidget):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.init_ui()
+        # --- NEU: Temporäre Liste für initiales Laden ---
+        self._initial_load_rows = []
         # blocking initial load - REMOVE or comment out
         # self.lade_eintraege()
 
@@ -182,9 +184,7 @@ class BuchhaltungTab(QWidget):
         filter_layout.addWidget(self.filter_bis)
 
         self.btn_filter = QPushButton("Filter anwenden")
-
-
-        self.btn_filter.clicked.connect(self.lade_eintraege)
+        self.btn_filter.clicked.connect(self.filter_anwenden_async)
         filter_layout.addWidget(self.btn_filter)
 
         left_layout.addLayout(filter_layout)
@@ -997,6 +997,22 @@ class BuchhaltungTab(QWidget):
 
     def append_rows(self, rows):
         """Append a chunk of rows (dicts or sequences) into QTableWidget with fixed column order and coloring."""
+        # --- NEU: Logik zum Sammeln der initialen Daten ---
+        # Wenn der Filter-Prozess aktiv ist (erkennbar an _temp_filtered_rows),
+        # soll diese Funktion nichts tun, da die Daten dort gesammelt werden.
+        if hasattr(self, '_temp_filtered_rows') and self._temp_filtered_rows is not None:
+             # Wenn display_collected_rows aufgerufen wird, ist die Liste nicht mehr None
+            if rows == self._temp_filtered_rows:
+                pass # Fortfahren, da dies der beabsichtigte Aufruf ist
+            else:
+                return # Ignorieren, da der Filter-Prozess die Kontrolle hat
+
+        # Wenn es der initiale Ladevorgang ist, Daten sammeln
+        elif hasattr(self, '_initial_load_rows') and self._initial_load_rows is not None:
+            self._initial_load_rows.extend(rows)
+            return # Noch nicht anzeigen, nur sammeln
+
+        # --- Ab hier beginnt die eigentliche Anzeige-Logik ---
         try:
             if not rows:
                 return
@@ -1027,9 +1043,10 @@ class BuchhaltungTab(QWidget):
             except Exception:
                 pass
 
-            # Insert newest entries at the top.
+            # Data is already sorted by SQL (ORDER BY id DESC).
+            # We just need to append it to the end of the table.
             try:
-                for r in reversed(rows):
+                for r in rows:  # <-- KEIN reversed()
                     if isinstance(r, dict):
                         values = [r.get(c, "") for c in expected_cols]
                     else:
@@ -1049,8 +1066,10 @@ class BuchhaltungTab(QWidget):
                     except Exception:
                         numeric_id = None
 
-                    # insert a new top row
-                    self.table.insertRow(0)
+                    # Append row at the END of the table
+                    row_position = self.table.rowCount()
+                    self.table.insertRow(row_position)
+                    
                     for col_idx, val in enumerate(values):
                         if col_idx == 1:
                             text = normalize_date_for_display(val)
@@ -1061,7 +1080,7 @@ class BuchhaltungTab(QWidget):
                                 text = "" if val is None else str(val)
                         else:
                             text = "" if val is None else str(val)
-                        # For the ID column, force the id_text (so column 0 always contains the id text)
+                        
                         if col_idx == 0:
                             item = QTableWidgetItem(id_text)
                             if numeric_id is not None:
@@ -1071,13 +1090,13 @@ class BuchhaltungTab(QWidget):
                                     pass
                         else:
                             item = QTableWidgetItem(text)
-                        self.table.setItem(0, col_idx, item)
+                        self.table.setItem(row_position, col_idx, item)
 
                     # invoice column (last)
                     invoice_col = self.table.columnCount() - 1
                     inv_item = QTableWidgetItem("")
                     inv_item.setTextAlignment(Qt.AlignCenter)
-                    self.table.setItem(0, invoice_col, inv_item)
+                    self.table.setItem(row_position, invoice_col, inv_item)
 
                     # apply color by typ (column index 2)
                     try:
@@ -1089,7 +1108,7 @@ class BuchhaltungTab(QWidget):
                         else:
                             color = QColor(255, 255, 255)
                         for c in range(self.table.columnCount()):
-                            it = self.table.item(0, c)
+                            it = self.table.item(row_position, c)
                             if it:
                                 it.setBackground(color)
                     except Exception:
@@ -1148,6 +1167,7 @@ class BuchhaltungTab(QWidget):
             try:
                 self.table.setUpdatesEnabled(True)
                 self.table.setSortingEnabled(True)
+                self.table.sortItems(0, Qt.DescendingOrder)
                 self.table.resizeColumnsToContents()
             except Exception:
                 pass
@@ -1163,6 +1183,14 @@ class BuchhaltungTab(QWidget):
 
     def load_finished(self):
         """Call when loader finished. Show 'Keine Einträge' if nothing loaded."""
+        # --- NEU: Gesammelte initiale Daten jetzt anzeigen ---
+        if hasattr(self, '_initial_load_rows') and self._initial_load_rows is not None:
+            # Rufe append_rows mit den gesammelten Daten auf und setze die Sammelliste auf None,
+            # um den Sammel-Modus zu beenden und die Anzeige zu erlauben.
+            collected_rows = self._initial_load_rows
+            self._initial_load_rows = None # WICHTIG: Sammelmodus beenden
+            self.append_rows(collected_rows)
+
         try:
             if self.table.rowCount() == 0:
                 try:
@@ -1221,6 +1249,81 @@ class BuchhaltungTab(QWidget):
             self.append_rows([row])
         except Exception as e:
             print(f"[DBG] BuchhaltungTab.append_row error: {e}", flush=True)
+
+    def filter_anwenden_async(self):
+        """Apply filter asynchronously (non-blocking)."""
+        try:
+            # Show loading indicator
+            if hasattr(self, "_loading_label"):
+                self._loading_label.setText("Lädt gefilterte Daten...")
+                self._loading_label.show()
+
+            # Clear table
+            self.table.setRowCount(0)
+            
+            # --- NEU: Temporäre Liste zum Sammeln ---
+            self._temp_filtered_rows = []
+
+            # Build filter query
+            query = "SELECT id, datum, typ, kategorie, betrag, beschreibung FROM buchhaltung WHERE 1=1"
+            params = []
+
+            typ = self.filter_typ.currentText()
+            if typ != "Alle":
+                query += " AND typ = %s"
+                params.append(typ)
+
+            kategorie = self.filter_kategorie.currentText()
+            if kategorie != "Alle":
+                query += " AND kategorie = %s"
+                params.append(kategorie)
+
+            von = self.filter_von.date().toString("yyyy-MM-dd")
+            bis = self.filter_bis.date().toString("yyyy-MM-dd")
+            query += " AND datum BETWEEN %s AND %s"
+            params.extend([von, bis])
+            query += " ORDER BY id DESC"
+
+            # Start async loader
+            from gui.tab_loader import TabLoader
+            from PyQt5.QtCore import QThread
+
+            loader = TabLoader(
+                key="buchhaltung_filtered",
+                query=query,
+                params=params,  # Pass filter parameters
+                chunk_size=100
+            )
+            thread = QThread()
+            loader.moveToThread(thread)
+
+            # --- NEU: An temporäre Liste anhängen ---
+            loader.chunk_ready.connect(lambda key, chunk: self._temp_filtered_rows.extend(chunk))
+            loader.finished.connect(self.display_collected_rows) # <-- NEUE Funktion aufrufen
+            loader.error.connect(lambda k, msg: QMessageBox.critical(self, "Fehler", f"Filter-Fehler:\n{msg}"))
+
+            thread.started.connect(loader.run)
+            thread.start()
+
+            # Keep thread reference (cleanup on finished)
+            if not hasattr(self, "_filter_threads"):
+                self._filter_threads = []
+            # Clean up old threads
+            self._filter_threads = [(t, l) for t, l in self._filter_threads if t.isRunning()]
+            self._filter_threads.append((thread, loader))
+
+        except Exception as e:
+            print(f"[DBG] filter_anwenden_async error: {e}", flush=True)
+            QMessageBox.critical(self, "Fehler", f"Filter konnte nicht angewendet werden:\n{e}")
+
+    def display_collected_rows(self):
+        """NEU: Diese Funktion wird aufgerufen, wenn ALLE Chunks geladen sind."""
+        # Rufe append_rows mit der kompletten, sortierten Liste auf
+        collected_rows = self._temp_filtered_rows
+        self._temp_filtered_rows = collected_rows # Setze es auf sich selbst, damit append_rows es erkennt
+        self.append_rows(collected_rows)
+        self.load_finished() # Rufe finished manuell auf
+        self._temp_filtered_rows = None # Speicher leeren und Filter-Modus beenden
 
 
 
