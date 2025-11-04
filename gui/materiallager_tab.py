@@ -14,8 +14,7 @@ class MateriallagerTab(QWidget):
         self.table.setSelectionBehavior(QTableWidget.SelectRows)
         self.table.setSelectionMode(QTableWidget.SingleSelection)
 
-        self._ensure_table()
-        self.lade_material()
+        # Schema is managed centrally; data loaded asynchronously
 
         btn_layout = QVBoxLayout()
         btn_hinzufuegen = QToolButton(); btn_hinzufuegen.setText('Material hinzufügen'); btn_hinzufuegen.setProperty("role", "add")
@@ -35,50 +34,6 @@ class MateriallagerTab(QWidget):
         btn_hinzufuegen.clicked.connect(self.material_hinzufuegen)
         btn_bearbeiten.clicked.connect(self.material_bearbeiten)
         btn_loeschen.clicked.connect(self.material_loeschen)
-
-    def _ensure_table(self):
-        conn = get_db()
-        is_sqlite = getattr(conn, "is_sqlite", False) or getattr(conn, "is_sqlite_conn", False)
-        if is_sqlite:
-            sql = """
-            CREATE TABLE IF NOT EXISTS materiallager (
-                material_id     INTEGER PRIMARY KEY AUTOINCREMENT,
-                materialnummer  TEXT,
-                bezeichnung     TEXT,
-                menge           INTEGER,
-                einheit         TEXT,
-                lagerort        TEXT,
-                lieferantnr     INTEGER,
-                bemerkung       TEXT
-            )
-            """
-        else:
-            sql = """
-            CREATE TABLE IF NOT EXISTS materiallager (
-                material_id     BIGSERIAL PRIMARY KEY,
-                materialnummer  TEXT,
-                bezeichnung     TEXT,
-                menge           INTEGER,
-                einheit         TEXT,
-                lagerort        TEXT,
-                lieferantnr     INTEGER,
-                bemerkung       TEXT
-            )
-            """
-        try:
-            with conn.cursor() as cur:
-                cur.execute(sql)
-            conn.commit()
-        except Exception:
-            try:
-                conn.rollback()
-            except Exception:
-                pass
-        finally:
-            try:
-                conn.close()
-            except Exception:
-                pass
 
     def lade_material(self):
         try:

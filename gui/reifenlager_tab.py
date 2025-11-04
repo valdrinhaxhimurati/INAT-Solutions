@@ -259,5 +259,51 @@ class ReifenlagerTab(QWidget):
         conn.close()
         self.lade_reifen()
 
+    def _berechne_dot_farbe(self, dot_wert) -> QColor:
+        """Berechne Zeilenfarbe basierend auf DOT-Alter (grün/orange/rot)."""
+        import datetime
+        dot_jahr = None
+        dot_str = "" if dot_wert is None else str(dot_wert).strip()
+        if len(dot_str) == 4 and dot_str.isdigit():
+            if dot_str.startswith("19") or dot_str.startswith("20"):
+                dot_jahr = int(dot_str)
+            else:
+                try:
+                    dot_jahr = 2000 + int(dot_str[2:])
+                except:
+                    pass
+        
+        if dot_jahr:
+            alter = datetime.datetime.now().year - dot_jahr
+            if alter >= 6:
+                return QColor(255, 230, 230)  # rot
+            elif alter >= 5:
+                return QColor(255, 230, 179)  # orange
+        return QColor(230, 255, 230)  # grün
+
+    def append_rows(self, rows):
+        try:
+            self.table.setSortingEnabled(False)
+            for row_data in reversed(rows):
+                if isinstance(row_data, dict):
+                    vals = [row_data.get(c) for c in ["reifen_id", "kundennr", "kunde_anzeige", "fahrzeug", "dimension", "typ", "dot", "lagerort", "eingelagert_am", "ausgelagert_am", "preis", "waehrung", "bemerkung"]]
+                else:
+                    vals = list(row_data)
+                
+                farbe = self._berechne_dot_farbe(vals[6] if len(vals) > 6 else None)  # DOT ist Index 6
+                
+                row_position = 0
+                self.table.insertRow(row_position)
+                for col_idx, value in enumerate(vals):
+                    item = QTableWidgetItem(str(value or ''))
+                    item.setBackground(farbe)
+                    self.table.setItem(row_position, col_idx, item)
+            self.table.setSortingEnabled(True)
+        except Exception as e:
+            print(f"[DBG] ReifenlagerTab.append_rows error: {e}", flush=True)
+
+    def load_finished(self):
+        pass
+
 
 

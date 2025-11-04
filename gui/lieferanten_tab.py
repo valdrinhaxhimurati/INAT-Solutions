@@ -14,13 +14,12 @@ class LieferantenTab(QWidget):
         self.table = QTableWidget()
         self.table.setSelectionBehavior(QTableWidget.SelectRows)
         self.table.setSelectionMode(QTableWidget.SingleSelection)
-        # Keine Zeilennummern anzeigen
         try:
             self.table.verticalHeader().setVisible(False)
         except Exception:
             pass
 
-        self.lade_lieferanten()
+        # Data will be loaded asynchronously via TabLoader
 
         btn_layout = QVBoxLayout()
 
@@ -65,8 +64,6 @@ class LieferantenTab(QWidget):
             except Exception:
                 cur = conn.cursor()
 
-            # Entferne CREATE TABLE (wird von ensure_app_schema() gehandhabt)
-            # Hole alle Spalten
             cur.execute("SELECT * FROM lieferanten")
             rows = cur.fetchall()
             desc = getattr(cur, "description", None)
@@ -82,7 +79,6 @@ class LieferantenTab(QWidget):
             except Exception:
                 pass
 
-        # Verwende id als ID (konsistent mit Schema)
         id_candidates = ("id", "lieferant_id")
         daten = []
         for r in rows:
@@ -107,7 +103,6 @@ class LieferantenTab(QWidget):
                 ))
                 continue
 
-            # sequence fallback
             try:
                 seq = list(r)
             except Exception:
@@ -133,7 +128,6 @@ class LieferantenTab(QWidget):
                     seq.append(None)
                 daten.append((seq[0], seq[1], seq[2], seq[3], seq[4], seq[5]))
 
-        # UI: 6 Spalten (ID, LieferantNr, Name, Portal-Link, Login, Passwort)
         self.table.setRowCount(len(daten))
         self.table.setColumnCount(6)
         self.table.setHorizontalHeaderLabels(["ID", "LieferantNr", "Name", "Portal-Link", "Login", "Passwort"])
@@ -260,6 +254,39 @@ class LieferantenTab(QWidget):
             webbrowser.open(link)
         else:
             QMessageBox.information(self, "Kein Link", "Kein Link hinterlegt.")
+
+    def get_row_id(self, row_index) -> int | None:
+        try:
+            item = self.table.item(row_index, 0)
+            if item:
+                data = item.data(Qt.UserRole)
+                if isinstance(data, int):
+                    return data
+                return int(item.text()) if item.text().strip() else None
+        except Exception:
+            pass
+        return None
+
+    def append_rows(self, rows):
+        try:
+            self.table.setSortingEnabled(False)
+            for row_data in reversed(rows):
+                row_position = 0
+                self.table.insertRow(row_position)
+                for col, value in enumerate(row_data):
+                    item = QTableWidgetItem(str(value or ''))
+                    if col == 0:  # ID column
+                        try:
+                            item.setData(Qt.UserRole, int(value) if value else None)
+                        except:
+                            pass
+                    self.table.setItem(row_position, col, item)
+            self.table.setSortingEnabled(True)
+        except Exception as e:
+            print(f"[DBG] LieferantenTab.append_rows error: {e}", flush=True)
+
+    def load_finished(self):
+        self.table.resizeColumnsToContents()
 
 
 

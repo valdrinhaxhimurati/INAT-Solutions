@@ -198,3 +198,35 @@ class MainWindow(QMainWindow):
         except Exception as e:
             print(f"[DBG] start kunden loader failed: {e}", flush=True)
 
+        # start lieferanten loader
+        try:
+            loader_l = TabLoader(
+                key="lieferanten",
+                table="lieferanten",
+                query="SELECT id, lieferantnr, name, portal_link, login, passwort FROM lieferanten ORDER BY name",
+                chunk_size=100
+            )
+            t_l = QThread()
+            loader_l.moveToThread(t_l)
+
+            if hasattr(self, "lieferanten_tab") and self.lieferanten_tab is not None:
+                loader_l.chunk_ready.connect(lambda k, chunk, w=self.lieferanten_tab: w.append_rows(chunk))
+                try:
+                    loader_l.finished.connect(lambda k, w=self.lieferanten_tab: w.load_finished())
+                except Exception:
+                    pass
+
+            loader_l.total_rows.connect(lambda k, total: print(f"[DBG] lieferanten total={total}", flush=True))
+            loader_l.finished.connect(lambda k: print(f"[DBG] lieferanten loader finished: {k}", flush=True))
+            loader_l.error.connect(lambda k, msg: print(f"[DBG] lieferanten loader error {k}: {msg}", flush=True))
+
+            t_l.started.connect(loader_l.run)
+            t_l.start()
+
+            if not hasattr(self, "_tab_loader_threads"):
+                self._tab_loader_threads = []
+            self._tab_loader_threads.append((t_l, loader_l))
+            print("[DBG] started lieferanten TabLoader", flush=True)
+        except Exception as e:
+            print(f"[DBG] start lieferanten loader failed: {e}", flush=True)
+
