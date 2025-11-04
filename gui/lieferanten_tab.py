@@ -14,6 +14,11 @@ class LieferantenTab(QWidget):
         self.table = QTableWidget()
         self.table.setSelectionBehavior(QTableWidget.SelectRows)
         self.table.setSelectionMode(QTableWidget.SingleSelection)
+        # Keine Zeilennummern anzeigen
+        try:
+            self.table.verticalHeader().setVisible(False)
+        except Exception:
+            pass
 
         self.lade_lieferanten()
 

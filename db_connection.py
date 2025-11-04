@@ -7,6 +7,7 @@ import traceback
 from typing import Iterable, List
 import psycopg2
 from paths import data_dir, local_db_path
+import time
 
 CONFIG_PATH = str(data_dir() / "config.json")
 
@@ -64,18 +65,43 @@ class CursorWrapper:
         self._cur = cur
         self._is_sqlite = is_sqlite
 
-    def execute(self, sql, params=None):
-        if _is_sqlite_cursor(self._cur):
-            sql = _normalize_sql_for_sqlite(sql)
-            if params is not None:
-                sql = sql.replace("%s", "?")  # Platzhalter an SQLite anpassen
-        return self._cur.execute(sql, params or ())
+    # slow query threshold in milliseconds
+    SLOW_QUERY_MS = 100
 
+    def execute(self, sql, params=None):
+        start = time.time()
+        try:
+            if _is_sqlite_cursor(self._cur):
+                sql = _normalize_sql_for_sqlite(sql)
+                if params is not None:
+                    sql = sql.replace("%s", "?")  # Platzhalter an SQLite anpassen
+            res = self._cur.execute(sql, params or ())
+            return res
+        finally:
+            try:
+                dur = (time.time() - start) * 1000.0
+                if dur >= self.SLOW_QUERY_MS:
+                    # log SQL snippet, duration and short stacktrace for origin
+                    stack = traceback.format_list(traceback.extract_stack()[:-1])[-6:]
+                    print(f"[SLOW-DB] {dur:.0f}ms SQL: {str(sql)[:300]!r}", flush=True)
+                    print("".join(stack), flush=True)
+            except Exception:
+                pass
 
     def executemany(self, sql, seq_of_params):
-        if _is_sqlite_cursor(self._cur):
-            sql = _normalize_sql_for_sqlite(sql).replace("%s", "?")
-        return self._cur.executemany(sql, seq_of_params or [])
+        start = time.time()
+        try:
+            if _is_sqlite_cursor(self._cur):
+                sql = _normalize_sql_for_sqlite(sql).replace("%s", "?")
+            res = self._cur.executemany(sql, seq_of_params or [])
+            return res
+        finally:
+            try:
+                dur = (time.time() - start) * 1000.0
+                if dur >= CursorWrapper.SLOW_QUERY_MS:
+                    print(f"[SLOW-DB] {dur:.0f}ms executemany SQL: {str(sql)[:300]!r}", flush=True)
+            except Exception:
+                pass
 
     def fetchall(self):
         return self._cur.fetchall()
@@ -801,13 +827,36 @@ def ensure_app_schema():
                 except Exception:
                     pass
 
+        # --- PERFORMANCE: best-effort CREATE INDEX für häufige Abfragen ---
         try:
-            conn.commit()
+            with conn.cursor() as cur_idx:
+                stmts = [
+                    "CREATE INDEX IF NOT EXISTS idx_rechnungen_datum ON rechnungen(datum)",
+                    "CREATE INDEX IF NOT EXISTS idx_rechnungen_kunde ON rechnungen(kunde)",
+                    "CREATE INDEX IF NOT EXISTS idx_kunden_name ON kunden(name)",
+                    "CREATE INDEX IF NOT EXISTS idx_artikellager_bezeichnung ON artikellager(bezeichnung)",
+                    "CREATE INDEX IF NOT EXISTS idx_reifenlager_dimension ON reifenlager(dimension)",
+                    "CREATE INDEX IF NOT EXISTS idx_buchhaltung_datum ON buchhaltung(datum)"
+                ]
+                for s in stmts:
+                    try:
+                        cur_idx.execute(s)
+                    except Exception:
+                        # ignore individual failures (DB type differences / permission issues)
+                        pass
+            try:
+                conn.commit()
+            except Exception:
+                try:
+                    conn.rollback()
+                except Exception:
+                    pass
         except Exception:
             try:
                 conn.rollback()
             except Exception:
                 pass
+        # Ende Index-Erzeugung / commit
     finally:
         try:
             conn.close()

@@ -1,9 +1,10 @@
 ﻿# -*- coding: utf-8 -*-
 from PyQt5.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QToolButton, QTableWidget, QTableWidgetItem,
-    QMessageBox, QDialog, QFileDialog, QInputDialog
+    QMessageBox, QDialog, QFileDialog, QInputDialog, QLabel, QHeaderView
 )
 from PyQt5.QtGui import QBrush, QColor
+from PyQt5.QtCore import Qt
 from reportlab.lib.utils import ImageReader
 import io
 from db_connection import get_db, dict_cursor_factory, get_rechnung_layout
@@ -81,8 +82,9 @@ class RechnungenTab(QWidget):
         self.btn_vorschau.clicked.connect(self.vorschau_ausgewaehlte_rechnung)
 
 
-        # Rechnungen laden
-        self.lade_rechnungen()
+        # Data will be loaded asynchronously via TabLoader.
+        # Keep attribute for compatibility but do not show any loading label.
+        self._loading_label = None
 
     def aktualisiere_kunden_liste(self):
         """Vom Kunden-Tab getriggert: Kunden-Cache + Tabelle neu laden."""
@@ -323,6 +325,11 @@ class RechnungenTab(QWidget):
         self.table.setColumnWidth(4, 100)
         self.table.setSelectionBehavior(self.table.SelectRows)
         self.table.setEditTriggers(self.table.NoEditTriggers)
+        # Keine Zeilennummern anzeigen
+        try:
+            self.table.verticalHeader().setVisible(False)
+        except Exception:
+            pass
 
     def _setze_zeilenfarbe(self, row_idx, farbe: QColor):
         """Färbt die komplette Tabellenzeile ein."""
@@ -934,6 +941,161 @@ class RechnungenTab(QWidget):
         except Exception:
             pass
 
+     # ---------------- Async UI helpers (moved inside class) ----------------
+    def get_row_id(self, row_index) -> int | None:
+        """Return numeric ID for given row or None if not found."""
+        try:
+            if row_index < 0 or row_index >= self.table.rowCount():
+                return None
+            it = self.table.item(row_index, 0)
+            if it is not None:
+                d = it.data(Qt.UserRole)
+                if isinstance(d, int):
+                    return d
+                txt = (it.text() or "").strip()
+                if txt.lstrip("-").isdigit():
+                    return int(txt)
+            for c in range(self.table.columnCount()):
+                it = self.table.item(row_index, c)
+                if it:
+                    txt = (it.text() or "").strip()
+                    if txt.lstrip("-").isdigit():
+                        return int(txt)
+        except Exception:
+            pass
+        return None
+
+    def append_rows(self, rows):
+        """Append a chunk of rows (dicts or sequences) into the Rechnungen table (newest first)."""
+        try:
+            if not rows:
+                return
+            try:
+                if hasattr(self, "_loading_label") and self._loading_label:
+                    self._loading_label.hide()
+            except Exception:
+                pass
+
+            expected_cols = ["id", "rechnung_nr", "kunde", "firma", "adresse", "datum", "mwst",
+                             "zahlungskonditionen", "positionen", "uid", "abschluss", "abschluss_text"]
+
+            if self.table.columnCount() == 0:
+                try:
+                    self._setup_table()
+                    header = self.table.horizontalHeader()
+                    header.setSectionResizeMode(2, QHeaderView.Stretch)
+                except Exception:
+                    pass
+
+            try:
+                self.table.setSortingEnabled(False)
+                self.table.setUpdatesEnabled(False)
+            except Exception:
+                pass
+
+            # insert newest-first: loader expected to deliver ORDER BY datum DESC
+            for r in reversed(rows):
+                if isinstance(r, dict):
+                    values = [r.get(c, "") for c in expected_cols]
+                else:
+                    seq = list(r)
+                    if len(seq) >= len(expected_cols):
+                        values = seq[:len(expected_cols)]
+                    else:
+                        while len(seq) < len(expected_cols):
+                            seq.append("")
+                        values = seq[:len(expected_cols)]
+
+                # insert a new top row
+                try:
+                    self.table.insertRow(0)
+                    insert_index = 0
+                except Exception:
+                    start = self.table.rowCount()
+                    self.table.setRowCount(start + 1)
+                    insert_index = start
+
+                id_val = values[0]
+                id_text = "" if id_val is None else str(id_val)
+                item_id = QTableWidgetItem(id_text)
+                try:
+                    if isinstance(id_val, int) or (isinstance(id_val, str) and id_text.lstrip("-").isdigit()):
+                        item_id.setData(Qt.UserRole, int(id_text))
+                except Exception:
+                    pass
+                self.table.setItem(insert_index, 0, item_id)
+
+                # fill a few visible columns (keep existing UI layout)
+                try:
+                    self.table.setItem(insert_index, 1, QTableWidgetItem(str(values[1] or "")))
+                    self.table.setItem(insert_index, 2, QTableWidgetItem(str(values[2] or "")))
+                    self.table.setItem(insert_index, 3, QTableWidgetItem(str(values[5] or "")))
+                except Exception:
+                    pass
+
+                # status column and color if helper exists
+                try:
+                    status_text, farbe = self._berechne_status(str(values[5] or ""), values[7] or "", values[10] or "")
+                    self.table.setItem(insert_index, 4, QTableWidgetItem(status_text))
+                    self._setze_zeilenfarbe(insert_index, farbe)
+                except Exception:
+                    pass
+
+                # keep internal cache consistent (prepend)
+                try:
+                    rec = {
+                        "id": values[0],
+                        "rechnung_nr": values[1],
+                        "kunde": values[2],
+                        "firma": values[3],
+                        "adresse": values[4],
+                        "datum": values[5],
+                        "mwst": values[6],
+                        "zahlungskonditionen": values[7],
+                        "positionen": json.loads(values[8]) if isinstance(values[8], str) and values[8] else (values[8] if isinstance(values[8], list) else []),
+                        "uid": values[9],
+                        "abschluss": values[10],
+                        "abschluss_text": values[11] if len(values) > 11 else ""
+                    }
+                except Exception:
+                    rec = {}
+                try:
+                    self.rechnungen.insert(0, rec)
+                except Exception:
+                    self.rechnungen = [rec] + getattr(self, "rechnungen", [])
+
+            # restore updates and one resize
+            try:
+                self.table.setUpdatesEnabled(True)
+                self.table.setSortingEnabled(True)
+                self.table.resizeColumnsToContents()
+            except Exception:
+                pass
+
+        except Exception as e:
+            print(f"[DBG] RechnungenTab.append_rows error: {e}", flush=True)
+
+    def load_finished(self):
+        """Called when loader finished. Show 'Keine Rechnungen' if empty."""
+        try:
+            if self.table.rowCount() == 0:
+                try:
+                    if hasattr(self, "_loading_label") and self._loading_label:
+                        self._loading_label.setText("Keine Rechnungen")
+                        self._loading_label.show()
+                except Exception:
+                    pass
+            else:
+                try:
+                    if hasattr(self, "_loading_label") and self._loading_label:
+                        self._loading_label.hide()
+                except Exception:
+                    pass
+        except Exception as e:
+            print(f"[DBG] RechnungenTab.load_finished error: {e}", flush=True)
+    # ------------------------------------------------------------------------
+
+
     def draw_logo_from_db_or_path(c, x, y, w, h, file_path=None):
         """
         Zeichnet das Logo an (x,y) mit Breite w und HÃ¶he h.
@@ -961,3 +1123,4 @@ def _get_qr_daten():
             qr = import_json_if_missing("qr_daten", "config/qr_daten.json") or {}
         return qr
 
+   

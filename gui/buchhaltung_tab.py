@@ -5,7 +5,7 @@ from PyQt5.QtWidgets import (
     QHeaderView  # <-- fehlte
 )
 from PyQt5.QtCore import Qt, QDate
-from PyQt5.QtGui import QColor, QFont  # <-- fehlten
+from PyQt5.QtGui import QColor, QFont, QStandardItemModel, QStandardItem, QIcon
 from fpdf import FPDF
 from db_connection import get_db, dict_cursor_factory, get_einstellungen, get_config_value
 from paths import data_dir, local_db_path  # <-- fehlte
@@ -138,10 +138,11 @@ def to_db_date(val) -> str:
 # ------------------------------------------------------------------------------------
 
 class BuchhaltungTab(QWidget):
-    def __init__(self):
-        super().__init__()
+    def __init__(self, parent=None):
+        super().__init__(parent)
         self.init_ui()
-        self.lade_eintraege()
+        # blocking initial load - REMOVE or comment out
+        # self.lade_eintraege()
 
     def init_ui(self):
         main_layout = QHBoxLayout()
@@ -275,10 +276,22 @@ class BuchhaltungTab(QWidget):
 
 
         main_layout.addLayout(button_layout, 1)
+        # loading indicator label (shown until first chunk or finished)
+        self._loading_label = QLabel("Lädt... Bitte warten", self)
+        self._loading_label.setObjectName("buchhaltung_loading_label")
+        self._loading_label.setAlignment(Qt.AlignCenter)
+        # insert the label above the table in the layout if possible
+        try:
+            main_layout.insertWidget(0, self._loading_label)
+        except Exception:
+            try:
+                main_layout.addWidget(self._loading_label)
+            except Exception:
+                pass
+        self._loading_label.show()
         self.setLayout(main_layout)
-
-        self.lade_eintraege()
-
+        # DO NOT load data here (blocking). Data will be loaded asynchronously.
+        # self.lade_eintrage()  # <- removed to avoid UI blocking on construction
 
     def lade_firmenname(self):
         """
@@ -352,13 +365,42 @@ class BuchhaltungTab(QWidget):
             self.speichere_eintrag_aus_dialog(dialog)
             self.lade_eintraege()
 
+    def get_row_id(self, row_index) -> int | None:
+        """Return numeric ID for given row or None if not found."""
+        try:
+            if row_index < 0 or row_index >= self.table.rowCount():
+                return None
+            # try UserRole on first cell
+            it = self.table.item(row_index, 0)
+            if it is not None:
+                d = it.data(Qt.UserRole)
+                if isinstance(d, int):
+                    return d
+                txt = (it.text() or "").strip()
+                if txt.lstrip("-").isdigit():
+                    return int(txt)
+            # fallback: scan row for any numeric-looking cell
+            for c in range(self.table.columnCount()):
+                it = self.table.item(row_index, c)
+                if it:
+                    txt = (it.text() or "").strip()
+                    if txt.lstrip("-").isdigit():
+                        return int(txt)
+        except Exception:
+            pass
+        return None
+
     def eintrag_bearbeiten(self):
         selected = self.table.currentRow()
         if selected < 0:
             QMessageBox.warning(self, "Keine Auswahl", "Bitte zuerst einen Eintrag auswählen.")
             return
 
-        eintrag_id = int(self.table.item(selected, 0).text())
+        eintrag_id = self.get_row_id(selected)
+        if eintrag_id is None:
+            QMessageBox.warning(self, "Fehler", "Kann ID der ausgewählten Zeile nicht bestimmen.")
+            return
+
         eintrag = self.lade_eintrag_aus_db(eintrag_id)
         if not eintrag:
             QMessageBox.warning(self, "Fehler", "Eintrag nicht gefunden.")
@@ -375,7 +417,11 @@ class BuchhaltungTab(QWidget):
             QMessageBox.warning(self, "Keine Auswahl", "Bitte zuerst einen Eintrag auswählen.")
             return
 
-        eintrag_id = int(self.table.item(selected, 0).text())
+        eintrag_id = self.get_row_id(selected)
+        if eintrag_id is None:
+            QMessageBox.warning(self, "Fehler", "Kann ID der ausgewählten Zeile nicht bestimmen.")
+            return
+
         antwort = QMessageBox.question(
             self, "Eintrag löschen", f"Eintrag mit ID {eintrag_id} wirklich löschen?",
             QMessageBox.Yes | QMessageBox.No
@@ -760,26 +806,26 @@ class BuchhaltungTab(QWidget):
             self.table.setRowHidden(row, not match)
 
     def rechnung_hinzufuegen(self):
-        # 1) Prüfen, ob eine Zeile ausgewählt ist
         row = self.table.currentRow()
         if row < 0:
             QMessageBox.warning(self, "Keine Auswahl", "Bitte zuerst einen Eintrag auswählen.")
             return
 
-        # 2) Eintrags-ID und Datum auslesen
-        eintrag_id = int(self.table.item(row, 0).text())
-        datum_text = self.table.item(row, 1).text()
+        eintrag_id = self.get_row_id(row)
+        if eintrag_id is None:
+            QMessageBox.warning(self, "Fehler", "Kann ID der ausgewählten Zeile nicht bestimmen.")
+            return
+
+        datum_text = self.table.item(row, 1).text() if self.table.item(row, 1) else ""
         datum_qdate = to_qdate(datum_text)
         if not datum_qdate.isValid():
             QMessageBox.warning(self, "Fehler", f"Ungültiges Datum: {datum_text}")
             return
 
-        # 3) PDF-Datei auswählen
         pfad_src, _ = QFileDialog.getOpenFileName(self, "PDF-Rechnung auswählen", "", "PDF-Dateien (*.pdf)")
         if not pfad_src:
             return
 
-        # 4) Nur in DB speichern (keine lokale Kopie mehr)
         try:
             with open(pfad_src, "rb") as f:
                 data = f.read()
@@ -796,22 +842,22 @@ class BuchhaltungTab(QWidget):
             QMessageBox.warning(self, "Keine Auswahl", "Bitte zuerst einen Eintrag auswählen.")
             return
 
-        eintrag_id = int(self.table.item(row, 0).text())
+        eintrag_id = self.get_row_id(row)
+        if eintrag_id is None:
+            QMessageBox.warning(self, "Fehler", "Kann ID der ausgewählten Zeile nicht bestimmen.")
+            return
 
-        # Hole Rechnungen aus DB
         inv_rows = get_invoices_for_buchung(eintrag_id)
         if not inv_rows:
             QMessageBox.information(self, "Keine Rechnung", "Für diesen Eintrag wurde keine Rechnung gefunden.")
             return
 
-        # nimm die erste vorhandene Rechnung (oder implementiere Auswahl, falls mehrere)
         invoice_id = inv_rows[0][0]
         inv = get_invoice_bytes(invoice_id)
         if not inv:
             QMessageBox.critical(self, "Fehler", "Rechnung konnte nicht geladen werden.")
             return
 
-        # Nur öffnen: temporäre Datei anlegen und im Standard-PDF-Viewer öffnen
         try:
             tmpf = tempfile.NamedTemporaryFile(suffix=".pdf", delete=False)
             tmpf.write(inv["data"])
@@ -829,9 +875,11 @@ class BuchhaltungTab(QWidget):
             QMessageBox.warning(self, "Keine Auswahl", "Bitte zuerst einen Eintrag auswählen.")
             return
 
-        eintrag_id = int(self.table.item(row, 0).text())
+        eintrag_id = self.get_row_id(row)
+        if eintrag_id is None:
+            QMessageBox.warning(self, "Fehler", "Kann ID der ausgewählten Zeile nicht bestimmen.")
+            return
 
-        # Bestätigung
         antwort = QMessageBox.question(
             self, "Rechnung löschen",
             "Alle in der Datenbank zu dieser Buchung gespeicherten Rechnungen löschen?",
@@ -840,7 +888,6 @@ class BuchhaltungTab(QWidget):
         if antwort != QMessageBox.Yes:
             return
 
-        # Lösche nur aus DB
         try:
             delete_invoices_for_buchung(eintrag_id)
             QMessageBox.information(self, "Erfolgreich", "Rechnung(en) in der Datenbank erfolgreich gelöscht.")
@@ -947,6 +994,233 @@ class BuchhaltungTab(QWidget):
         conn.close()
         QMessageBox.information(self, "Fertig", f"{len(daten)} Buchungen importiert!")
         self.lade_eintraege()
+
+    def append_rows(self, rows):
+        """Append a chunk of rows (dicts or sequences) into QTableWidget with fixed column order and coloring."""
+        try:
+            if not rows:
+                return
+
+            # hide loading label once data arrives
+            try:
+                if hasattr(self, "_loading_label") and self._loading_label.isVisible():
+                    self._loading_label.hide()
+            except Exception:
+                pass
+
+            expected_cols = ["id", "datum", "typ", "kategorie", "betrag", "beschreibung"]
+            headers = ["Nr", "Datum", "Typ", "Kategorie", "Betrag (CHF)", "Beschreibung", "Rechnung"]
+
+            if self.table.columnCount() == 0:
+                self.table.setColumnCount(len(headers))
+                self.table.setHorizontalHeaderLabels(headers)
+                self.table.verticalHeader().setVisible(False)
+                header = self.table.horizontalHeader()
+                header.setSectionResizeMode(5, QHeaderView.Stretch)
+                header.setSectionResizeMode(6, QHeaderView.ResizeToContents)
+                self.table.setAlternatingRowColors(True)
+
+            # suspend updates for speed
+            try:
+                self.table.setSortingEnabled(False)
+                self.table.setUpdatesEnabled(False)
+            except Exception:
+                pass
+
+            # Insert newest entries at the top.
+            try:
+                for r in reversed(rows):
+                    if isinstance(r, dict):
+                        values = [r.get(c, "") for c in expected_cols]
+                    else:
+                        seq = list(r)
+                        if len(seq) >= len(expected_cols):
+                            values = seq[:len(expected_cols)]
+                        else:
+                            while len(seq) < len(expected_cols):
+                                seq.append("")
+                            values = seq[:len(expected_cols)]
+
+                    # ensure id_text and numeric id
+                    id_val = values[0]
+                    id_text = "" if id_val is None else str(id_val)
+                    try:
+                        numeric_id = int(id_val) if (isinstance(id_val, int) or (isinstance(id_val, str) and id_text.lstrip("-").isdigit())) else None
+                    except Exception:
+                        numeric_id = None
+
+                    # insert a new top row
+                    self.table.insertRow(0)
+                    for col_idx, val in enumerate(values):
+                        if col_idx == 1:
+                            text = normalize_date_for_display(val)
+                        elif col_idx == 4:
+                            try:
+                                text = f"{float(val):.2f}"
+                            except Exception:
+                                text = "" if val is None else str(val)
+                        else:
+                            text = "" if val is None else str(val)
+                        # For the ID column, force the id_text (so column 0 always contains the id text)
+                        if col_idx == 0:
+                            item = QTableWidgetItem(id_text)
+                            if numeric_id is not None:
+                                try:
+                                    item.setData(Qt.UserRole, numeric_id)
+                                except Exception:
+                                    pass
+                        else:
+                            item = QTableWidgetItem(text)
+                        self.table.setItem(0, col_idx, item)
+
+                    # invoice column (last)
+                    invoice_col = self.table.columnCount() - 1
+                    inv_item = QTableWidgetItem("")
+                    inv_item.setTextAlignment(Qt.AlignCenter)
+                    self.table.setItem(0, invoice_col, inv_item)
+
+                    # apply color by typ (column index 2)
+                    try:
+                        typ_text = (values[2] or "").strip().lower()
+                        if typ_text == "einnahme":
+                            color = QColor(230, 255, 230)
+                        elif typ_text == "ausgabe":
+                            color = QColor(255, 230, 230)
+                        else:
+                            color = QColor(255, 255, 255)
+                        for c in range(self.table.columnCount()):
+                            it = self.table.item(0, c)
+                            if it:
+                                it.setBackground(color)
+                    except Exception:
+                        pass
+
+            except Exception:
+                # fallback: append if insert fails for any reason
+                start_row = self.table.rowCount()
+                self.table.setRowCount(start_row + len(rows))
+                for r_idx, r in enumerate(rows):
+                    rownum = start_row + r_idx
+                    if isinstance(r, dict):
+                        values = [r.get(c, "") for c in expected_cols]
+                    else:
+                        seq = list(r)
+                        while len(seq) < len(expected_cols):
+                            seq.append("")
+                        values = seq[:len(expected_cols)]
+
+                    id_val = values[0]
+                    id_text = "" if id_val is None else str(id_val)
+                    try:
+                        numeric_id = int(id_val) if (isinstance(id_val, int) or (isinstance(id_val, str) and id_text.lstrip("-").isdigit())) else None
+                    except Exception:
+                        numeric_id = None
+
+                    for col_idx, val in enumerate(values):
+                        if col_idx == 1:
+                            text = normalize_date_for_display(val)
+                        elif col_idx == 4:
+                            try:
+                                text = f"{float(val):.2f}"
+                            except Exception:
+                                text = "" if val is None else str(val)
+                        else:
+                            text = "" if val is None else str(val)
+
+                        if col_idx == 0:
+                            item = QTableWidgetItem(id_text)
+                            if numeric_id is not None:
+                                try:
+                                    item.setData(Qt.UserRole, numeric_id)
+                                except Exception:
+                                    pass
+                        else:
+                            item = QTableWidgetItem(text)
+                        self.table.setItem(rownum, col_idx, item)
+
+                    # invoice column (last)
+                    invoice_col = self.table.columnCount() - 1
+                    inv_item = QTableWidgetItem("")
+                    inv_item.setTextAlignment(Qt.AlignCenter)
+                    self.table.setItem(rownum, invoice_col, inv_item)
+
+            # restore updates and do a single resize for visible columns
+            try:
+                self.table.setUpdatesEnabled(True)
+                self.table.setSortingEnabled(True)
+                self.table.resizeColumnsToContents()
+            except Exception:
+                pass
+
+            # update Gesamtbilanz based on current table contents
+            try:
+                self._recalc_gesamtbilanz_from_table()
+            except Exception:
+                pass
+
+        except Exception as e:
+            print(f"[DBG] BuchhaltungTab.append_rows error: {e}", flush=True)
+
+    def load_finished(self):
+        """Call when loader finished. Show 'Keine Einträge' if nothing loaded."""
+        try:
+            if self.table.rowCount() == 0:
+                try:
+                    if hasattr(self, "_loading_label"):
+                        self._loading_label.setText("Keine Einträge")
+                        self._loading_label.show()
+                except Exception:
+                    pass
+            else:
+                try:
+                    if hasattr(self, "_loading_label"):
+                        self._loading_label.hide()
+                except Exception:
+                    pass
+        except Exception as e:
+            print(f"[DBG] BuchhaltungTab.load_finished error: {e}", flush=True)
+
+        # ensure Gesamtbilanz is up-to-date when loading finished
+        try:
+            self._recalc_gesamtbilanz_from_table()
+        except Exception:
+            pass
+
+    def _recalc_gesamtbilanz_from_table(self):
+        """Recalculate the total balance from table rows and update the label."""
+        try:
+            gesamt = 0.0
+            for row in range(self.table.rowCount()):
+                typ_it = self.table.item(row, 2)
+                betrag_it = self.table.item(row, 4)
+                if betrag_it is None:
+                    continue
+                txt = betrag_it.text().strip()
+                if not txt:
+                    continue
+                # normalize number: allow commas/apostrophes
+                norm = txt.replace("'", "").replace("’", "").replace(" ", "").replace(",", ".")
+                try:
+                    wert = float(norm)
+                except Exception:
+                    continue
+                typ = (typ_it.text().strip().lower() if typ_it else "")
+                if typ == "einnahme":
+                    gesamt += wert
+                elif typ == "ausgabe":
+                    gesamt -= wert
+            self.zeige_gesamtbilanz(gesamt)
+        except Exception as e:
+            print(f"[DBG] _recalc_gesamtbilanz_from_table error: {e}", flush=True)
+
+    def append_row(self, row):
+        """Compat wrapper: single-row convenience."""
+        try:
+            if row is None:
+                return
+            self.append_rows([row])
+        except Exception as e:
+            print(f"[DBG] BuchhaltungTab.append_row error: {e}", flush=True)
 
 
 

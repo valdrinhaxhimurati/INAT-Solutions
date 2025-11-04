@@ -1,7 +1,7 @@
 ﻿# -*- coding: utf-8 -*-
 from PyQt5.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QTableWidget, QTableWidgetItem,
-    QToolButton, QDialog, QMessageBox
+    QToolButton, QDialog, QMessageBox, QLabel, QHeaderView
 )
 from PyQt5.QtCore import Qt, pyqtSignal
 from db_connection import get_db, dict_cursor_factory
@@ -48,7 +48,13 @@ class KundenTab(QWidget):
         btn_del.clicked.connect(self.kunde_loeschen)
 
         self._ensure_table()
-        self.lade_kunden()
+        # DON'T load synchronously here — data will be loaded asynchronously via TabLoader.
+        # No loading placeholder shown in KundenTab (consistent with other tabs).
+        # Keine Zeilennummern anzeigen
+        try:
+            self.table.verticalHeader().setVisible(False)
+        except Exception:
+            pass
 
     # --- Helpers: Spalten erkennen und Adressausdruck bauen ---
     def _detect_kunden_columns(self, conn):
@@ -219,13 +225,126 @@ class KundenTab(QWidget):
             except Exception:
                 pass
 
+            # set header to size columns to content (do not stretch)
+            try:
+                header = self.table.horizontalHeader()
+                header.setSectionResizeMode(QHeaderView.ResizeToContents)
+                header.setStretchLastSection(False)
+            except Exception:
+                pass
+            # ensure a one-time adjust based on current contents
             self.table.resizeColumnsToContents()
         finally:
+             try:
+                 conn.close()
+             except Exception:
+                 pass
+
+    # ---------------- Async UI helpers (like Buchhaltung/Rechnungen) ----------------
+    def get_row_id(self, row_index) -> int | None:
+        try:
+            if row_index < 0 or row_index >= self.table.rowCount():
+                return None
+            it = self.table.item(row_index, 0)
+            if it is not None:
+                d = it.data(Qt.UserRole)
+                if isinstance(d, int):
+                    return d
+                txt = (it.text() or "").strip()
+                if txt.lstrip("-").isdigit():
+                    return int(txt)
+        except Exception:
+            pass
+        return None
+
+    def append_rows(self, rows):
+        """Append rows (dict or sequence) into table. Newest-first by default (insert at top)."""
+        try:
+            if not rows:
+                return
+            # no loading label in KundenTab; append rows directly
+
+            expected_cols = ["kundennr", "anrede", "name", "firma", "plz", "strasse", "stadt", "email", "bemerkung"]
+
+            # ensure table headers
             try:
-                conn.close()
+                self._ensure_table()
+                header = self.table.horizontalHeader()
+                header.setSectionResizeMode(QHeaderView.ResizeToContents)
+                header.setStretchLastSection(False)
             except Exception:
                 pass
 
+            try:
+                self.table.setSortingEnabled(False)
+                self.table.setUpdatesEnabled(False)
+            except Exception:
+                pass
+
+            for r in reversed(rows):
+                if isinstance(r, dict):
+                    vals = [r.get(c, "") for c in expected_cols]
+                else:
+                    seq = list(r)
+                    if len(seq) < len(expected_cols):
+                        seq += [""] * (len(expected_cols) - len(seq))
+                    vals = seq[:len(expected_cols)]
+
+                # insert row at top
+                try:
+                    self.table.insertRow(0)
+                    idx = 0
+                except Exception:
+                    idx = self.table.rowCount()
+                    self.table.setRowCount(idx + 1)
+
+                for ci, val in enumerate(vals):
+                    txt = "" if val is None else str(val)
+                    item = QTableWidgetItem(txt)
+                    if ci == 0:
+                        item.setFlags(item.flags() & ~Qt.ItemIsEditable)
+                        try:
+                            item.setData(Qt.UserRole, int(val) if val is not None and str(val).strip() != "" else None)
+                        except Exception:
+                            item.setData(Qt.UserRole, None)
+                    item.setTextAlignment(Qt.AlignLeft | Qt.AlignVCenter)
+                    self.table.setItem(idx, ci, item)
+
+                # keep internal cache consistent
+                try:
+                    rec = {
+                        "kundennr": vals[0],
+                        "anrede": vals[1],
+                        "name": vals[2],
+                        "firma": vals[3],
+                        "plz": vals[4],
+                        "strasse": vals[5],
+                        "stadt": vals[6],
+                        "email": vals[7],
+                        "bemerkung": vals[8]
+                    }
+                except Exception:
+                    rec = {}
+                try:
+                    self.kunden.insert(0, rec)
+                except Exception:
+                    self.kunden = [rec] + getattr(self, "kunden", [])
+
+            try:
+                self.table.setUpdatesEnabled(True)
+                self.table.setSortingEnabled(True)
+                self.table.resizeColumnsToContents()
+            except Exception:
+                pass
+
+        except Exception as e:
+            print(f"[DBG] KundenTab.append_rows error: {e}", flush=True)
+
+    def load_finished(self):
+        """Called when loader finished. No UI placeholder for this tab."""
+        return
+
+    # ------------------------------------------------------------------------
     def _get_selected_id(self):
         row = self.table.currentRow()
         if row < 0:

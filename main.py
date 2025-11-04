@@ -7,7 +7,7 @@ import subprocess
 import tempfile
 import traceback
 import logging
-from db_connection import get_db, ensure_database_and_tables, ensure_app_schema
+from db_connection import get_db, ensure_database_and_tables
 
 from PyQt5.QtWidgets import QApplication, QMessageBox, QFileDialog, QDialog, QProgressDialog
 from PyQt5.QtCore import Qt
@@ -288,23 +288,65 @@ def run():
     # Stylesheet anwenden (sucht icons im Bundle/_internal/usw.)
     apply_stylesheet(app, "style.qss")
 
-    # Update-Check NACH Erzeugen der QApplication
-    # remote-first Update check (falls nicht erreichbar, optional lokalen Fallback nutzen)
-    sync_from_remote()
-    # optionaler Fallback zu lokaler Prüfung:
-    # sync_from_local()
+    import threading
+    def _bg_run(fn, *a, **kw):
+        try:
+            fn(*a, **kw)
+        except Exception as e:
+            print(f"[BG] {fn.__name__} failed: {e}", flush=True)
 
-    # DB-Verbindung sicherstellen (Postgres falls konfiguriert, sonst automatisch SQLite)
+
+    threading.Thread(target=_bg_run, args=(sync_from_remote,), daemon=True).start()
+
     try:
-        # ensure schema/tables exist for the configured backend (idempotent)
-        ensure_app_schema()
+     pass   
     except Exception as e:
         QMessageBox.critical(None, "Abbruch", f"Datenbank/Schema Fehler: {e}")
         return 1
 
     # Login-DB initialisieren
     init_login_db(LOGIN_DB_PATH)
-    ensure_database_and_tables()
+
+    from db_connection import get_db, ensure_database_and_tables  # ensure_database_and_tables will run in background
+    import threading
+
+    def ensure_minimal_login_schema():
+        """Create only the minimal tables required for login quickly."""
+        conn = None
+        try:
+            conn = get_db()
+            cur = conn.cursor()
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS users (
+                    id INTEGER PRIMARY KEY,
+                    username TEXT UNIQUE NOT NULL,
+                    password_hash TEXT NOT NULL,
+                    role TEXT DEFAULT 'user'
+                )
+            """)
+            conn.commit()
+        except Exception as e:
+            print(f"[FAST-SCHEMA] ensure_minimal_login_schema failed: {e}", flush=True)
+        finally:
+            try:
+                if conn:
+                    cur.close()
+                    conn.close()
+            except Exception:
+                pass
+
+    # run minimal schema synchronously so login can proceed immediately
+    ensure_minimal_login_schema()
+
+    # Run the full schema/migrations in background (non-blocking).
+    def _bg_full_schema():
+        try:
+            ensure_database_and_tables()
+            print("[BG] ensure_database_and_tables finished", flush=True)
+        except Exception as e:
+            print(f"[BG] ensure_database_and_tables failed: {e}", flush=True)
+
+    threading.Thread(target=_bg_full_schema, daemon=True).start()
 
     # Benutzer sicherstellen
     while not benutzer_existieren(LOGIN_DB_PATH):
@@ -339,12 +381,8 @@ def run():
 
     def open_main():
         # ensure DB schema (inkl. invoices) existiert bevor UI geladen wird
-        try:
-            from db_connection import ensure_app_schema
-            ensure_app_schema()
-        except Exception:
-            # bei Problemen weitermachen, konkrete Abfragefunktionen handhaben Fehler später
-            pass
+      
+  
 
         # Fenster öffnen
         mw = MainWindow(benutzername=user, login_db_path=LOGIN_DB_PATH)
