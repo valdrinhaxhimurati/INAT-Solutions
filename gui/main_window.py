@@ -10,6 +10,8 @@ from gui.buchhaltung_tab import BuchhaltungTab
 from gui.einstellungen_tab import EinstellungenTab
 from gui.lieferanten_tab import LieferantenTab
 from gui.lager_tab import LagerTab
+from gui.auftragskalender_tab import AuftragskalenderTab 
+
 
 from version import __version__
 from PyQt5.QtGui import QIcon, QPainter, QPixmap
@@ -44,7 +46,8 @@ class MainWindow(QMainWindow):
         self.rechnungen_tab = RechnungenTab()
         self.buchhaltung_tab = BuchhaltungTab()
         self.lieferanten_tab = LieferantenTab()
-        self.lager_tab = LagerTab()  
+        self.lager_tab = LagerTab() 
+        self.auftragskalender_tab = AuftragskalenderTab()  # <-- NEU
         self.einstellungen_tab = EinstellungenTab(self)
         self.kunden_tab.kunde_aktualisiert.connect(self.rechnungen_tab.aktualisiere_kunden_liste)
 
@@ -53,6 +56,7 @@ class MainWindow(QMainWindow):
         self.tabs.addTab(self.buchhaltung_tab, "Buchhaltung")
         self.tabs.addTab(self.lieferanten_tab, "Lieferanten")
         self.tabs.addTab(self.lager_tab, "Lager")
+        self.tabs.addTab(self.auftragskalender_tab, "Auftragskalender")  # <-- NEU
         self.tabs.addTab(self.einstellungen_tab, "Einstellungen")
 
         self.status_bar = self.statusBar()

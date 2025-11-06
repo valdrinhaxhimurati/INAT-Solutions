@@ -41,7 +41,6 @@ QPushButton {
     max-width: 220px;
     min-height: 34px;
     max-height: 34px;
-    cursor: pointer;
 }
 
 QPushButton:hover {
@@ -107,6 +106,166 @@ QScrollBar::handle:vertical:hover {
     background: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #5a7fb5, stop:1 #4a6fa5);
 }
 
+/* ========== KALENDER WIDGET STYLES ========== */
+
+/* Navigationsleiste (Monat/Jahr) */
+QCalendarWidget QWidget#qt_calendar_navigationbar {
+    background-color: #f0f4fb;
+    border-bottom: 1px solid #e0e4ec;
+    padding: 4px 0;
+}
+
+/* Monat-Button */
+QCalendarWidget QToolButton#qt_calendar_monthbutton {
+    font-size: 14pt;
+    font-weight: 600;
+    color: #2e5aa3;
+    margin: 0 4px;
+    padding: 2px 5px;
+    border: none;
+    background: transparent;
+}
+
+/* Jahr-SpinBox so stylen, dass sie wie ein Label aussieht */
+QCalendarWidget QSpinBox#qt_calendar_yearbutton {
+    border: none;
+    background: transparent;
+    margin: 0 4px;
+    padding: 2px 5px;
+    /* WICHTIG: Verhindert, dass der Rahmen beim Fokussieren erscheint */
+    border-style: none;
+}
+/* Textfeld innerhalb der Jahr-SpinBox */
+QCalendarWidget QSpinBox#qt_calendar_yearbutton QLineEdit {
+    font-size: 14pt;
+    font-weight: 600;
+    color: #2e5aa3;
+    background: transparent;
+    border: none;
+    padding: 0;
+    margin: 0;
+    /* Verhindert den blauen Fokus-Rahmen */
+    border-color: transparent; 
+}
+
+/* Pfeile der Jahres-SpinBox komplett ausblenden */
+QCalendarWidget QSpinBox::up-button,
+QCalendarWidget QSpinBox::down-button {
+    width: 0px;
+    border: none;
+    background: none;
+}
+QCalendarWidget QSpinBox::up-arrow,
+QCalendarWidget QSpinBox::down-arrow {
+    image: none;
+}
+
+/* Navigationspfeile (links/rechts) */
+QCalendarWidget QToolButton#qt_calendar_prevmonth,
+QCalendarWidget QToolButton#qt_calendar_nextmonth {
+    font-size: 14pt;
+    color: #4a6fa5;
+    background-color: transparent;
+    border: none;
+    border-radius: 4px;
+    padding: 4px 10px;
+    min-height: 32px;
+    min-width: 32px;
+}
+
+QCalendarWidget QToolButton#qt_calendar_prevmonth:hover,
+QCalendarWidget QToolButton#qt_calendar_nextmonth:hover {
+    background-color: #d9e3f5;
+}
+
+QCalendarWidget QToolButton#qt_calendar_prevmonth:pressed,
+QCalendarWidget QToolButton#qt_calendar_nextmonth:pressed {
+    background-color: #c2c9d8;
+}
+
+
+/* ========== KALENDER TAB STYLES ========== */
+
+/* Kalender Container - abgerundete bläuliche Rahmen */
+QFrame#calendarContainer {
+    background: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #ffffff, stop:1 #f8f9fa);
+    border: 1px solid #c2c9d8;
+    border-radius: 10px;
+}
+
+/* Termin-Karten */
+QFrame[cardType="termin"] {
+    background: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #ffffff, stop:1 #f8f9fa);
+    border: 1px solid #c2c9d8;
+    border-radius: 8px;
+    padding: 12px;
+}
+
+QFrame[cardType="termin"][selected="true"] {
+    background: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #e8ecf0, stop:1 #d9e3f5);
+    border: 2px solid #4a6fa5;
+    border-radius: 8px;
+    padding: 12px;
+}
+
+/* Kalender-Überschriften */
+QLabel[labelType="calendarTitle"] {
+    font-size: 18pt;
+    font-weight: bold;
+    color: #4a6fa5;
+    background: transparent;
+}
+
+QLabel[labelType="calendarSubtitle"] {
+    font-size: 16pt;
+    font-weight: bold;
+    color: #4a6fa5;
+    background: transparent;
+}
+
+/* Termin-Karten Labels */
+QLabel[labelType="terminWeekday"] {
+    color: #4a6fa5;
+    font-size: 11pt;
+    font-weight: bold;
+    background: transparent;
+}
+
+QLabel[labelType="terminTime"] {
+    color: #555555;
+    font-size: 11pt;
+    font-weight: 600;
+    background: transparent;
+}
+
+QLabel[labelType="terminTitle"] {
+    color: #2e5aa3;
+    font-size: 14pt;
+    font-weight: bold;
+    background: transparent;
+}
+
+QLabel[labelType="terminMeta"] {
+    color: #555555;
+    font-size: 10pt;
+    background: transparent;
+}
+
+QLabel[labelType="terminDesc"] {
+    color: #555555;
+    font-size: 10pt;
+    background: transparent;
+}
+
+QLabel[labelType="noData"] {
+    color: #999;
+    font-size: 11pt;
+    padding: 20px;
+    background: transparent;
+}
+
+/* ========== RESTLICHE STYLES ========== */
+
 QProgressBar {
     border: 1px solid #555;
     border-radius: 8px;
@@ -120,7 +279,6 @@ QProgressBar::chunk {
     border-radius: 6px;
 }
 
-/* Restliche Styles */
 QProgressDialog {
   background-color: #f0f0f0;
   border: 1px solid #aaa;
@@ -130,18 +288,6 @@ QProgressDialog {
   font-size: 12pt;
 }
 
-QProgressBar {
-  border: 1px solid #555;
-  border-radius: 4px;
-  text-align: center;
-  min-height: 20px;
-}
-
-QProgressBar::chunk {
-  background-color: #007acc;
-  border-radius: 4px;
-}
-
 QLabel#settingsTitle {
     font-size: 18px;
     color: #2274a5;
@@ -149,7 +295,6 @@ QLabel#settingsTitle {
     margin-bottom: 14px;
     background: transparent;  
     border-radius: 8px;
-    box-shadow: none;
 }
 
 QFrame#settingsBox {
@@ -177,8 +322,15 @@ QToolButton:hover {
     border-color: #2e5aa3; 
     background: #eef2fa;
 }
+
 QToolButton:pressed {
     background: #d9e3f5;
+}
+
+QToolButton:disabled {
+    color: #9aa7bd;
+    border-color: #e0e5ef;
+    background: #f3f5f9;
 }
 
 QPushButton[role="add"], QToolButton[role="add"] { qproperty-icon: url(:/icons/icons/add.svg); }
@@ -195,12 +347,8 @@ QPushButton[role="settings"], QToolButton[role="settings"] { qproperty-icon: url
 QPushButton[role="ok"], QToolButton[role="ok"] { qproperty-icon: url(:/icons/icons/ok.svg); }
 QPushButton[role="cancel"], QToolButton[role="cancel"] { qproperty-icon: url(:/icons/icons/cancel.svg); }
 
-QToolButton:disabled {
-    color: #9aa7bd;
-    border-color: #e0e5ef;
-    background: #f3f5f9;
-}
-
+/* Dieser generische Selektor wird entfernt, da er die spezifischen überschreibt. */
+/*
 QCalendarWidget QToolButton {
     padding: 0px;
     min-height: 18px;
@@ -210,6 +358,7 @@ QCalendarWidget QToolButton {
     background: #ffffff;
     color: #000000;
 }
+*/
 
 QGroupBox#dbSettings {
     margin-top: 18px;
@@ -217,6 +366,7 @@ QGroupBox#dbSettings {
     border-radius: 8px;
     background: #2b2d30;
 }
+
 QGroupBox#dbSettings::title {
     subcontrol-origin: margin;
     left: 10px;
@@ -229,6 +379,7 @@ QGroupBox#dbSettings::title {
 QGroupBox#dbSettings QLabel {
     color: #d7d7d7;
 }
+
 QCheckBox#dbRemoteCheck {
     color: #d7d7d7;
     font-weight: 500;
@@ -242,6 +393,7 @@ QLineEdit#dbUrlEdit {
     padding: 6px 8px;
     selection-background-color: #3b6ea5;
 }
+
 QLineEdit#dbUrlEdit:disabled {
     color: #9a9a9a;
     background: #232528;
@@ -256,10 +408,12 @@ QPushButton[type="primary"] {
     padding: 6px 12px;
     font-weight: 600;
 }
+
 QPushButton[type="primary"]:hover {
     background: #4a7fba;
     border-color: #4a7fba;
 }
+
 QPushButton[type="primary"]:pressed {
     background: #345f8a;
     border-color: #345f8a;
@@ -272,19 +426,20 @@ QPushButton[type="secondary"] {
     border-radius: 6px;
     padding: 6px 12px;
 }
+
 QPushButton[type="secondary"]:hover {
     background: #26292c;
 }
+
 QPushButton[type="secondary"]:pressed {
     background: #1b1d20;
 }
 
-/* Einheitliches Styling für ComboBox (Eingabefeld + Dropdown-Liste) */
 QComboBox {
     background: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #fafafa, stop:1 #f0f0f0);
     border: 1.2px solid #c2c9d8;
     border-radius: 8px;
-    padding: 6px 30px 6px 12px; /* Platz für Pfeil */
+    padding: 6px 34px 6px 12px;
     color: #555555;
     min-height: 30px;
 }
@@ -292,65 +447,58 @@ QComboBox {
 QComboBox::drop-down {
     subcontrol-origin: padding;
     subcontrol-position: right center;
-    width: 28px;
-    border-left: 1px solid #c2c9d8;
-    background: qlineargradient(x1:0,y1:0,x2:0,y2:1, stop:0 #f9f9fb, stop:1 #eef2fa);
+    width: 34px;
+    border-left: 1px solid rgba(0,0,0,0.04);
+    background: transparent;
 }
 
-/* Falls du eigene Arrow-Icons hast, setze image: url(...); ansonsten benutzt Qt das Standard-Pfeilsymbol */
 QComboBox::down-arrow {
     image: url(icons/Down_arrow.png);
     width: 16px;
     height: 16px;
 }
 
-/* Styling der Popup-Liste */
 QComboBox QAbstractItemView {
-    background: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #ffffff, stop:1 #f8f9fa);
+    padding: 4px;
+    border-radius: 6px;
     border: 1px solid #c2c9d8;
-    border-radius: 8px;
+    background: qlineargradient(x1:0,y1:0,x2:0,y2:1, stop:0 #ffffff, stop:1 #f8f9fa);
     selection-background-color: #4a6fa5;
     selection-color: #e8eaf6;
     color: #555555;
-    padding: 4px;
 }
 
-/* Einheitliches Styling für SpinBoxes (Platz für Buttons) */
-QAbstractSpinBox,
-QSpinBox,
-QDoubleSpinBox {
+QAbstractSpinBox, QSpinBox, QDoubleSpinBox {
     background: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #fafafa, stop:1 #f0f0f0);
     border: 1.2px solid #c2c9d8;
     border-radius: 6px;
-    padding: 4px 28px 4px 8px; /* Platz rechts für Buttons */
+    padding: 4px 36px 4px 8px;
     color: #111;
     min-height: 28px;
 }
 
-/* Up/Down Buttons in SpinBox: nur Buttons mit qproperty-icon verwenden.
-   Entferne alle QSpinBox::up-arrow / QSpinBox::down-arrow { image: ... } Regeln! */
 QSpinBox::up-button, QDoubleSpinBox::up-button {
     subcontrol-origin: padding;
     subcontrol-position: right top;
     width: 18px;
     height: 50%;
     border-left: 1px solid #c2c9d8;
-    background: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #f9f9fb, stop:1 #eef2fa);
+    background: qlineargradient(x1:0,y1:0,x2:0,y2:1, stop:0 #f9f9fb, stop:1 #eef2fa);
     qproperty-icon: url("icons/Up_arrow.png");
     qproperty-iconSize: 14px 14px;
 }
+
 QSpinBox::down-button, QDoubleSpinBox::down-button {
     subcontrol-origin: padding;
     subcontrol-position: right bottom;
     width: 18px;
     height: 50%;
     border-left: 1px solid #c2c9d8;
-    background: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #f9f9fb, stop:1 #eef2fa);
+    background: qlineargradient(x1:0,y1:0,x2:0,y2:1, stop:0 #f9f9fb, stop:1 #eef2fa);
     qproperty-icon: url("icons/Down_arrow.png");
     qproperty-iconSize: 14px 14px;
 }
 
-/* Datumseingaben (QDateEdit/QDateTimeEdit) mit Dropdown-Kalender */
 QDateEdit, QDateTimeEdit {
     background: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #fafafa, stop:1 #f0f0f0);
     border: 1.2px solid #c2c9d8;
@@ -359,7 +507,6 @@ QDateEdit, QDateTimeEdit {
     color: #111;
 }
 
-/* Drop-down für DateEdit (Kalender-Pfeil) */
 QDateEdit::drop-down, QDateTimeEdit::drop-down {
     subcontrol-origin: padding;
     subcontrol-position: right center;
@@ -367,31 +514,31 @@ QDateEdit::drop-down, QDateTimeEdit::drop-down {
     background: transparent;
     border-left: 1px solid rgba(0,0,0,0.04);
 }
+
 QDateEdit::down-arrow, QDateTimeEdit::down-arrow {
     image: url(icons/Down_arrow.png);
     width: 16px;
     height: 16px;
 }
 
-/* Kalender-Popup (Tage-Feld) hell und lesbar */
 QCalendarWidget {
     background: #ffffff;
     color: #111;
     border: 1px solid #c2c9d8;
     border-radius: 6px;
 }
-QCalendarWidget QWidget { /* Tagesfelder */
+
+QCalendarWidget QWidget {
     background: #ffffff;
     color: #111;
 }
 
-/* Wenn noch spezielle kleine ToolButtons als Dropdown-Pfeile verwendet werden:
-   gleiche Optik wie andere Buttons */
 QToolButton {
     background: transparent;
     border: none;
     padding: 4px;
 }
+
 QToolButton::menu-indicator {
     image: url(icons/Down_arrow.png);
     width: 16px;
@@ -414,14 +561,6 @@ QComboBox::down-arrow {
     image: url(icons/Down_arrow.png);
     width: 16px;
     height: 16px;
-}
-
-/* Popup-Liste (sichtbar, Radius, Farben) */
-QComboBox QAbstractItemView {
-    padding: 4px;
-    border-radius: 6px;
-    border: 1px solid #c2c9d8;
-    background: qlineargradient(x1:0,y1:0,x2:0,y2:1, stop:0 #ffffff, stop:1 #f8f9fa);
 }
 
 /* SpinBox: Buttons und Pfeile sichtbar machen */

@@ -2187,6 +2187,10 @@
    'C:\\Users\\V.Haxhimurati\\Documents\\GitHub '
    'Repository\\INAT-Solutions\\gui\\select_from_all_lager.py',
    'PYMODULE'),
+  ('gui.tab_loader',
+   'C:\\Users\\V.Haxhimurati\\Documents\\GitHub '
+   'Repository\\INAT-Solutions\\gui\\tab_loader.py',
+   'PYMODULE'),
   ('gui.utils',
    'C:\\Users\\V.Haxhimurati\\Documents\\GitHub '
    'Repository\\INAT-Solutions\\gui\\utils.py',

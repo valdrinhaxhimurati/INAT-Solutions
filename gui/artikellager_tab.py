@@ -13,6 +13,7 @@ class ArtikellagerTab(QWidget):
         self.table = QTableWidget()
         self.table.setSelectionBehavior(self.table.SelectRows)
         self.table.setSelectionMode(self.table.SingleSelection)
+        self.table.verticalHeader().setVisible(False)
 
         self._ensure_table()
         self.lade_artikel()

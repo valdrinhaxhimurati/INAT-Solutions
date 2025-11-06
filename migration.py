@@ -47,6 +47,29 @@ def _apply_app_migrations(conn: sqlite3.Connection) -> None:
     # Platz für spätere Migrationen (CREATE/ALTER/INDEX ...)
     # Beispiel:
     # conn.execute("CREATE TABLE IF NOT EXISTS users (id INTEGER PRIMARY KEY, name TEXT NOT NULL);")
+    migrations = [
+        {
+            "version": 9,
+            "description": "Auftragskalender-Tabelle hinzufügen",
+            "sql": """
+                CREATE TABLE IF NOT EXISTS auftraege (
+                    id BIGSERIAL PRIMARY KEY,
+                    titel VARCHAR(255) NOT NULL,
+                    beschreibung TEXT,
+                    start_zeit TIMESTAMPTZ NOT NULL,
+                    end_zeit TIMESTAMPTZ NOT NULL,
+                    ort VARCHAR(255),
+                    kunden_id INTEGER,
+                    rechnung_id INTEGER,
+                    outlook_event_id VARCHAR(255) UNIQUE,
+                    created_at TIMESTAMPTZ DEFAULT now()
+                );
+            """
+        }
+    ]
+    for m in migrations:
+        conn.executescript(m["sql"])
+        print(f"Migration angewendet: {m['description']} (Version {m['version']})")
     conn.commit()
 
 def ensure_database() -> None:

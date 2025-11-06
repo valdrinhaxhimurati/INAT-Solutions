@@ -30,6 +30,7 @@ class SelectInventoryItemDialog(QtWidgets.QDialog):
         self.table.setHorizontalHeaderLabels(["Artikelnummer", "Bezeichnung", "Bestand", "Lagerort", "Preis"])
         self.table.setSelectionBehavior(QtWidgets.QAbstractItemView.SelectRows)
         self.table.setEditTriggers(QtWidgets.QAbstractItemView.NoEditTriggers)
+        self.table.verticalHeader().setVisible(False)
         self.table.doubleClicked.connect(self.accept_selection)
 
         # Buttons

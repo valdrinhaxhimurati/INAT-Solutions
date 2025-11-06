@@ -13,9 +13,9 @@ class MateriallagerTab(QWidget):
         self.table = QTableWidget()
         self.table.setSelectionBehavior(QTableWidget.SelectRows)
         self.table.setSelectionMode(QTableWidget.SingleSelection)
+        self.table.verticalHeader().setVisible(False)
 
-        # Schema is managed centrally; data loaded asynchronously
-
+ 
         btn_layout = QVBoxLayout()
         btn_hinzufuegen = QToolButton(); btn_hinzufuegen.setText('Material hinzufügen'); btn_hinzufuegen.setProperty("role", "add")
         btn_bearbeiten = QToolButton(); btn_bearbeiten.setText('Material bearbeiten'); btn_bearbeiten.setProperty("role", "edit")

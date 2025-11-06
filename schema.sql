@@ -271,3 +271,35 @@ CREATE UNIQUE INDEX IF NOT EXISTS idx_lager_einstellungen_lager_typ_uniq ON publ
 
 -- Beispiel-Insert für MWST-Default (nur einmalig ausführen, z.B. beim ersten DB-Setup)
 INSERT OR IGNORE INTO config (key, value) VALUES ('mwst_default', '0.0');
+
+-- ============================
+-- NEU: Auftragskalender (SQLite)
+-- ============================
+CREATE TABLE IF NOT EXISTS auftraege (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    titel TEXT NOT NULL,
+    beschreibung TEXT,
+    start_zeit DATETIME NOT NULL,
+    end_zeit DATETIME NOT NULL,
+    ort TEXT,
+    kunden_id INTEGER,
+    rechnung_id INTEGER,
+    outlook_event_id TEXT UNIQUE,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
+-- ============================
+-- NEU: Auftragskalender (PostgreSQL)
+-- ============================
+CREATE TABLE IF NOT EXISTS public.auftraege (
+    id BIGSERIAL PRIMARY KEY,
+    titel VARCHAR(255) NOT NULL,
+    beschreibung TEXT,
+    start_zeit TIMESTAMPTZ NOT NULL,
+    end_zeit TIMESTAMPTZ NOT NULL,
+    ort VARCHAR(255),
+    kunden_id INTEGER,
+    rechnung_id INTEGER,
+    outlook_event_id VARCHAR(255) UNIQUE,
+    created_at TIMESTAMPTZ DEFAULT now()
+);

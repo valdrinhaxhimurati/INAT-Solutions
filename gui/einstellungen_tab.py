@@ -5,10 +5,33 @@ from PyQt5.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QFrame, QLabel,
     QLineEdit, QSizePolicy, QFileDialog, QScrollArea, QMessageBox, QInputDialog, QDialog
 )
-from PyQt5.QtCore import Qt
+from PyQt5.QtCore import Qt, QObject, pyqtSignal, QThread
 from db_connection import get_db, get_remote_status, clear_business_database, get_config_value, set_config_value
 from gui.clear_database_dialog import ClearDatabaseDialog
+from gui.kategorien_dialog import KategorienDialog
+
+from gui.rechnung_layout_dialog import RechnungLayoutDialog
 from paths import data_dir
+from gui.device_login_dialog import DeviceLoginDialog  # <-- NEUER IMPORT
+
+def get_current_theme():
+    try:
+        from PyQt5 import QtGui
+        app = QtGui.QGuiApplication.instance()
+        if app:
+            palette = app.palette()
+            if palette:
+                color = palette.color(palette.Window)
+                if color:
+                    r, g, b, _ = color.getRgb()
+                    # Helligkeit berechnen (Durchschnitt von R, G, B)
+                    brightness = (r + g + b) / 3
+                    # Schwellenwert für den Wechsel zwischen hell und dunkel
+                    threshold = 200
+                    return "dark" if brightness < threshold else "light"
+    except Exception:
+        pass
+    return "light"  # Fallback-Wert
 
 # Standardpfad für die Benutzer-DB (Dev: .var, Build: ProgramData)
 USERS_DB_PATH = str(data_dir() / "users.db")
@@ -29,6 +52,28 @@ def _load_cfg_with_fallback(path):
             break
     return {}
 
+
+try:
+    import ms_graph
+except Exception:
+    ms_graph = None
+
+class OutlookLoginWorker(QObject):
+    """Worker, der den blockierenden Login-Prozess in einem Thread ausführt."""
+    finished = pyqtSignal(dict)
+    error = pyqtSignal(str)
+
+    def __init__(self, flow):
+        super().__init__()
+        self.flow = flow
+
+    def run(self):
+        try:
+            # Diese blockierende Funktion wird jetzt im Hintergrund ausgeführt
+            result = ms_graph.acquire_token_by_device_flow(self.flow)
+            self.finished.emit(result)
+        except Exception as e:
+            self.error.emit(str(e))
 
 class EinstellungenTab(QWidget):
     def __init__(self, parent=None, login_db_path=None):
@@ -102,6 +147,7 @@ class EinstellungenTab(QWidget):
         ]
         allgemein_buttons = [
             ("Benutzer verwalten", self._open_benutzer_dialog),
+            ("Mit Outlook verbinden", self._connect_outlook),
         ]
         lager_buttons = [
             ("Module verwalten", self._open_module_dialog),
@@ -501,4 +547,58 @@ class EinstellungenTab(QWidget):
         from gui.db_sync_dialog import DBSyncDialog
         dlg = DBSyncDialog(self)
         dlg.exec_()
+
+    def _connect_outlook(self):
+        if ms_graph is None:
+            QMessageBox.warning(self, "Outlook", "ms_graph Modul nicht gefunden.")
+            return
+        try:
+            if ms_graph.is_connected():
+                QMessageBox.information(self, "Outlook", "Bereits mit Outlook verbunden.")
+                return
+            
+            flow = ms_graph.initiate_device_flow()
+            
+            # --- ALT ---
+            # QMessageBox.information(self, "Outlook anmelden", flow.get("message", "Bitte Anweisungen im Browser folgen."))
+            
+            # --- NEU: Unseren benutzerdefinierten Dialog verwenden ---
+            dialog = DeviceLoginDialog(flow, self)
+            dialog.exec_() # Zeigt den Dialog an und wartet, bis der Benutzer OK klickt
+
+            # Erstelle den Worker und den Thread, um das Warten auszulagern
+            self.thread = QThread()
+            self.worker = OutlookLoginWorker(flow)
+            self.worker.moveToThread(self.thread)
+
+            # Verbinde die Signale
+            self.thread.started.connect(self.worker.run)
+            self.worker.finished.connect(self._handle_login_result)
+            self.worker.error.connect(self._handle_login_error)
+            
+            # Starte den Thread
+            self.thread.start()
+
+        except Exception as e:
+            QMessageBox.critical(self, "Outlook", str(e))
+
+    def _handle_login_result(self, result):
+        """Wird aufgerufen, wenn der Worker fertig ist."""
+        if "access_token" in result:
+            QMessageBox.information(self, "Outlook", "Erfolgreich verbunden.")
+        else:
+            error_msg = result.get('error_description', 'Unbekannter Fehler bei der Anmeldung.')
+            QMessageBox.warning(self, "Outlook", f"Anmeldung fehlgeschlagen:\n{error_msg}")
+        
+        # Thread aufräumen
+        self.thread.quit()
+        self.thread.wait()
+
+    def _handle_login_error(self, error_message):
+        """Wird aufgerufen, wenn im Worker ein Fehler auftritt."""
+        QMessageBox.critical(self, "Outlook Fehler", error_message)
+        
+        # Thread aufräumen
+        self.thread.quit()
+        self.thread.wait()
 

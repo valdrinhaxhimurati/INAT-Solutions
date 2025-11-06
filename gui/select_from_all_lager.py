@@ -21,6 +21,7 @@ class SelectFromAllLagerDialog(QDialog):
         self.setWindowTitle("Aus Lager auswählen")
         self.resize(800, 600)
         self.selected_item = None
+        self.tab_map = {}  # NEU: Speichert die Zuordnung von Index zu Lagertyp
 
         layout = QVBoxLayout()
         self.tabs = QTabWidget()
@@ -46,6 +47,7 @@ class SelectFromAllLagerDialog(QDialog):
         try:
             conn = get_db()
             cur = conn.cursor()
+            # WICHTIG: ORDER BY für eine konsistente Reihenfolge
             cur.execute("SELECT lager_typ, aktiv FROM lager_einstellungen ORDER BY lager_typ")
             rows = cur.fetchall()
             conn.close()
@@ -65,42 +67,55 @@ class SelectFromAllLagerDialog(QDialog):
         except Exception:
             aktive = []
 
+        tab_index = 0  # Zähler für die Tabs
         if "material" in aktive:
             self.material_table = QTableWidget()
             # make row-selection reliable and ensure full-row select on click
             self.material_table.setSelectionBehavior(QTableWidget.SelectRows)
             self.material_table.setSelectionMode(QTableWidget.SingleSelection)
             self.material_table.setEditTriggers(QTableWidget.NoEditTriggers)
+            self.material_table.verticalHeader().setVisible(False)
             self.material_table.cellClicked.connect(lambda r, c, t=self.material_table: t.selectRow(r))
             self._load_materiallager()
             self.tabs.addTab(self.material_table, "Materiallager")
+            self.tab_map[tab_index] = "material"  # Zuordnung speichern
+            tab_index += 1
 
         if "reifen" in aktive:
             self.reifen_table = QTableWidget()
             self.reifen_table.setSelectionBehavior(QTableWidget.SelectRows)
             self.reifen_table.setSelectionMode(QTableWidget.SingleSelection)
             self.reifen_table.setEditTriggers(QTableWidget.NoEditTriggers)
+            self.reifen_table.verticalHeader().setVisible(False)
             self.reifen_table.cellClicked.connect(lambda r, c, t=self.reifen_table: t.selectRow(r))
             self._load_reifenlager()
             self.tabs.addTab(self.reifen_table, "Reifenlager")
+            self.tab_map[tab_index] = "reifen"  # Zuordnung speichern
+            tab_index += 1
 
         if "artikel" in aktive:
             self.artikel_table = QTableWidget()
             self.artikel_table.setSelectionBehavior(QTableWidget.SelectRows)
             self.artikel_table.setSelectionMode(QTableWidget.SingleSelection)
             self.artikel_table.setEditTriggers(QTableWidget.NoEditTriggers)
+            self.artikel_table.verticalHeader().setVisible(False)
             self.artikel_table.cellClicked.connect(lambda r, c, t=self.artikel_table: t.selectRow(r))
             self._load_artikellager()
             self.tabs.addTab(self.artikel_table, "Artikellager")
+            self.tab_map[tab_index] = "artikel"  # Zuordnung speichern
+            tab_index += 1
 
         if "dienstleistungen" in aktive:
             self.dienst_table = QTableWidget()
             self.dienst_table.setSelectionBehavior(QTableWidget.SelectRows)
             self.dienst_table.setSelectionMode(QTableWidget.SingleSelection)
             self.dienst_table.setEditTriggers(QTableWidget.NoEditTriggers)
+            self.dienst_table.verticalHeader().setVisible(False)
             self.dienst_table.cellClicked.connect(lambda r, c, t=self.dienst_table: t.selectRow(r))
             self._load_dienstleistungen()
             self.tabs.addTab(self.dienst_table, "Dienstleistungen")
+            self.tab_map[tab_index] = "dienstleistungen"  # Zuordnung speichern
+            tab_index += 1
 
     def _load_materiallager(self):
         try:
@@ -183,43 +198,27 @@ class SelectFromAllLagerDialog(QDialog):
                 self.artikel_table.setItem(r_idx, c_idx, item)
 
     def _select_item(self):
-        current_tab = self.tabs.currentIndex()
-        aktive = []
-        try:
-            conn = get_db()
-            cur = conn.cursor()
-            cur.execute("SELECT lager_typ, aktiv FROM lager_einstellungen ORDER BY lager_typ")
-            rows = cur.fetchall()
-            conn.close()
-            for row in rows:
-                if isinstance(row, dict):
-                    lt = row.get("lager_typ"); av = row.get("aktiv")
-                else:
-                    if len(row) >= 2:
-                        lt, av = row[0], row[1]
-                    else:
-                        continue
-                if lt and _to_bool(av):
-                    aktive.append(lt)
-        except Exception:
-            aktive = []
+        current_tab_index = self.tabs.currentIndex()
+        
+        # Vereinfachte Logik: Direkter Zugriff über die gespeicherte Map
+        typ = self.tab_map.get(current_tab_index)
 
-        if current_tab < len(aktive):
-            typ = aktive[current_tab]
-            if typ == "material":
-                table = self.material_table
-                cols = ["material_id", "materialnummer", "bezeichnung", "preis"]
-            elif typ == "reifen":
-                table = self.reifen_table
-                cols = ["reifen_id", "dimension", "typ", "preis"]
-            elif typ == "artikel":
-                table = self.artikel_table
-                cols = ["artikel_id", "artikelnummer", "bezeichnung", "preis"]
-            elif typ == "dienstleistungen":
-                table = self.dienst_table
-                cols = ["dienstleistung_id", "name", "beschreibung", "preis"]
-            else:
-                return
+        if not typ:
+            QMessageBox.warning(self, "Fehler", "Der ausgewählte Tab konnte nicht zugeordnet werden.")
+            return
+
+        if typ == "material":
+            table = self.material_table
+            cols = ["material_id", "materialnummer", "bezeichnung", "preis"]
+        elif typ == "reifen":
+            table = self.reifen_table
+            cols = ["reifen_id", "dimension", "typ", "preis"]
+        elif typ == "artikel":
+            table = self.artikel_table
+            cols = ["artikel_id", "artikelnummer", "bezeichnung", "preis"]
+        elif typ == "dienstleistungen":
+            table = self.dienst_table
+            cols = ["dienstleistung_id", "name", "beschreibung", "preis"]
         else:
             return
 

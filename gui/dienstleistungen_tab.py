@@ -12,6 +12,7 @@ class DienstleistungenTab(QWidget):
         self.table = QTableWidget()
         self.table.setSelectionBehavior(QTableWidget.SelectRows)
         self.table.setSelectionMode(QTableWidget.SingleSelection)
+        self.table.verticalHeader().setVisible(False)
 
         self.table.setColumnCount(7)
         self.table.setHorizontalHeaderLabels(["ID", "Name", "Beschreibung", "Preis", "Einheit", "Währung", "Bemerkung"])
