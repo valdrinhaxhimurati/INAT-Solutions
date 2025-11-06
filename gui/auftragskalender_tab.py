@@ -1,6 +1,7 @@
 from PyQt5.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QCalendarWidget, QListWidget, 
-    QMessageBox, QLabel, QListWidgetItem, QToolButton, QFrame, QDialog, QScrollArea, QSpinBox
+    QMessageBox, QLabel, QListWidgetItem, QToolButton, QFrame, QDialog, QScrollArea, QSpinBox,
+    QInputDialog
 )
 from PyQt5.QtCore import QDate, Qt
 from PyQt5.QtGui import QFont, QTextCharFormat, QColor, QPainter, QBrush
@@ -21,10 +22,8 @@ class CustomCalendarWidget(QCalendarWidget):
         super().__init__(parent)
         self.appointment_dates = set()
 
-        # Finde die Jahres-SpinBox und setze sie auf ReadOnly
-        year_spin_box = self.findChild(QSpinBox, "qt_calendar_yearbutton")
-        if year_spin_box:
-            year_spin_box.setReadOnly(True)
+        # Verstecke die Standard-Navigationsleiste komplett
+        self.findChild(QWidget, "qt_calendar_navigationbar").setVisible(False)
 
     def set_appointment_dates(self, dates):
         self.appointment_dates = set(dates)
@@ -134,12 +133,41 @@ class AuftragskalenderTab(QWidget):
         calendar_title = QLabel("📅 Kalender")
         calendar_title.setProperty("labelType", "calendarTitle")
         calendar_layout.addWidget(calendar_title)
+
+        # Eigene Navigationsleiste
+        nav_layout = QHBoxLayout()
+        self.prev_month_btn = QToolButton()
+        self.prev_month_btn.setText("<")
+        self.prev_month_btn.setObjectName("calendarNavButton")
+        
+        self.month_year_label = QLabel()
+        self.month_year_label.setObjectName("calendarTitleLabel")
+        self.month_year_label.setAlignment(Qt.AlignCenter)
+        
+        self.next_month_btn = QToolButton()
+        self.next_month_btn.setText(">")
+        self.next_month_btn.setObjectName("calendarNavButton")
+        
+        nav_layout.addWidget(self.prev_month_btn)
+        nav_layout.addStretch()
+        nav_layout.addWidget(self.month_year_label)
+        nav_layout.addStretch()
+        nav_layout.addWidget(self.next_month_btn)
+        calendar_layout.addLayout(nav_layout)
         
         self.calendar = CustomCalendarWidget()
         self.calendar.setVerticalHeaderFormat(QCalendarWidget.NoVerticalHeader)
         self.calendar.setGridVisible(True)
+        
+        # Signale verbinden
+        self.prev_month_btn.clicked.connect(self.calendar.showPreviousMonth)
+        self.next_month_btn.clicked.connect(self.calendar.showNextMonth)
+        self.calendar.currentPageChanged.connect(self.update_month_year_label)
+        self.month_year_label.mousePressEvent = self.select_year
         self.calendar.selectionChanged.connect(self.load_day_termine)
-        self.calendar.currentPageChanged.connect(self.highlight_dates_with_appointments)
+        
+        self.update_month_year_label(self.calendar.yearShown(), self.calendar.monthShown())
+
         calendar_layout.addWidget(self.calendar)
         left_column.addWidget(calendar_container, 3)
         
@@ -217,6 +245,20 @@ class AuftragskalenderTab(QWidget):
         main_layout.addLayout(right_layout, 1)
         
         self.selected_card = None
+
+    def update_month_year_label(self, year, month):
+        """Aktualisiert das Label für Monat und Jahr."""
+        locale = self.calendar.locale()
+        month_name = locale.monthName(month)
+        self.month_year_label.setText(f"{month_name} {year}")
+
+    def select_year(self, event):
+        """Öffnet einen Dialog zur Auswahl des Jahres."""
+        current_year = self.calendar.yearShown()
+        new_year, ok = QInputDialog.getInt(self, "Jahr auswählen", "Jahr:", current_year, 1900, 2100, 1)
+        if ok:
+            current_month = self.calendar.monthShown()
+            self.calendar.setCurrentPage(new_year, current_month)
 
     def _clear_cards(self, layout):
         """Entfernt alle Karten aus einem Layout"""

@@ -106,80 +106,35 @@ QScrollBar::handle:vertical:hover {
     background: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #5a7fb5, stop:1 #4a6fa5);
 }
 
-/* ========== KALENDER WIDGET STYLES ========== */
+/* ========== NEUE KALENDER WIDGET STYLES ========== */
 
-/* Navigationsleiste (Monat/Jahr) */
-QCalendarWidget QWidget#qt_calendar_navigationbar {
-    background-color: #f0f4fb;
-    border-bottom: 1px solid #e0e4ec;
-    padding: 4px 0;
-}
-
-/* Monat-Button */
-QCalendarWidget QToolButton#qt_calendar_monthbutton {
+/* Klickbares Label für Monat/Jahr */
+QLabel#calendarTitleLabel {
     font-size: 14pt;
     font-weight: 600;
     color: #2e5aa3;
-    margin: 0 4px;
-    padding: 2px 5px;
-    border: none;
-    background: transparent;
+    padding: 4px 10px;
+    border-radius: 4px;
 }
-
-/* Jahr-SpinBox so stylen, dass sie wie ein Label aussieht */
-QCalendarWidget QSpinBox#qt_calendar_yearbutton {
-    border: none;
-    background: transparent;
-    margin: 0 4px;
-    padding: 2px 5px;
-    /* WICHTIG: Verhindert, dass der Rahmen beim Fokussieren erscheint */
-    border-style: none;
-}
-/* Textfeld innerhalb der Jahr-SpinBox */
-QCalendarWidget QSpinBox#qt_calendar_yearbutton QLineEdit {
-    font-size: 14pt;
-    font-weight: 600;
-    color: #2e5aa3;
-    background: transparent;
-    border: none;
-    padding: 0;
-    margin: 0;
-    /* Verhindert den blauen Fokus-Rahmen */
-    border-color: transparent; 
-}
-
-/* Pfeile der Jahres-SpinBox komplett ausblenden */
-QCalendarWidget QSpinBox::up-button,
-QCalendarWidget QSpinBox::down-button {
-    width: 0px;
-    border: none;
-    background: none;
-}
-QCalendarWidget QSpinBox::up-arrow,
-QCalendarWidget QSpinBox::down-arrow {
-    image: none;
+QLabel#calendarTitleLabel:hover {
+    background-color: #d9e3f5;
 }
 
 /* Navigationspfeile (links/rechts) */
-QCalendarWidget QToolButton#qt_calendar_prevmonth,
-QCalendarWidget QToolButton#qt_calendar_nextmonth {
-    font-size: 14pt;
+QToolButton#calendarNavButton {
+    font-size: 16pt;
+    font-weight: bold;
     color: #4a6fa5;
     background-color: transparent;
     border: none;
     border-radius: 4px;
-    padding: 4px 10px;
+    padding: 0px 12px;
     min-height: 32px;
-    min-width: 32px;
 }
-
-QCalendarWidget QToolButton#qt_calendar_prevmonth:hover,
-QCalendarWidget QToolButton#qt_calendar_nextmonth:hover {
+QToolButton#calendarNavButton:hover {
     background-color: #d9e3f5;
 }
-
-QCalendarWidget QToolButton#qt_calendar_prevmonth:pressed,
-QCalendarWidget QToolButton#qt_calendar_nextmonth:pressed {
+QToolButton#calendarNavButton:pressed {
     background-color: #c2c9d8;
 }
 
