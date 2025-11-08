@@ -15,5 +15,11 @@
     <file>icons/preview.svg</file>
     <file>icons/Up_arrow.png</file>
     <file>icons/Down_arrow.png</file>
+    <file>icons/minimize.svg</file>
+    <file>icons/maximize.svg</file>
+    <file>icons/restore.svg</file>
+    <file>icons/close.svg</file>
+    <file>icons/close_white.svg</file>
+    <file>icons/logo.svg</file>
   </qresource>
 </RCC>

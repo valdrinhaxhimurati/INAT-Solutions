@@ -7,6 +7,50 @@ QWidget {
     color: #333333;
 }
 
+/* ========== BENUTZERDEFINIERTE TITELLEISTE ========== */
+QWidget#customTitleBar {
+    background: transparent; /* Standard-Hintergrund verwenden */
+    height: 60px; /* Höhe der Titelleiste erhöht */
+}
+
+QLabel#titleBarLabel {
+    color: #333333; /* Dunkler Text für hellen Hintergrund */
+    font-weight: 600;
+    font-size: 20px; 
+    background: transparent;
+}
+
+QToolButton#windowButton {
+    background: transparent;
+    border: none;
+    width: 40px; /* Breite der Buttons erhöht */
+    height: 40px; /* Höhe der Buttons erhöht */
+    padding: 10px; /* Padding angepasst */
+    qproperty-iconSize: 30px 30px; 
+}
+QToolButton#windowButton:hover {
+    background: rgba(0, 0, 0, 0.05); /* Leichter grauer Hover */
+}
+QToolButton#windowButton:pressed {
+    background: rgba(0, 0, 0, 0.1);
+}
+
+/* Icons für die Fenster-Buttons */
+QToolButton[buttonRole="minimize"] { qproperty-icon: url(:/icons/icons/minimize.svg); }
+QToolButton[buttonRole="maximize"] { qproperty-icon: url(:/icons/icons/maximize.svg); }
+QToolButton[buttonRole="restore"] { qproperty-icon: url(:/icons/icons/restore.svg); }
+QToolButton[buttonRole="close"] { qproperty-icon: url(:/icons/icons/close.svg); }
+
+/* Spezieller Hover für den Schließen-Button */
+QToolButton#windowButton[buttonRole="close"]:hover { 
+    background: #e81123; 
+}
+/* Ändert das Schließen-Icon auf Weiß, wenn man darüber fährt */
+QToolButton#windowButton[buttonRole="close"]:hover { 
+    qproperty-icon: url(icons/close_white.svg); 
+}
+
+
 QTabWidget::pane {
     border: none;
     background: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #ffffff, stop:1 #f0f2f5);

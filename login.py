@@ -50,7 +50,7 @@ class LoginDialog(QDialog):
     def __init__(self, db_path, parent=None):
         super().__init__(parent)
         self.db_path = db_path
-        self.setWindowIcon(QIcon(resource_path("favicon.ico")))
+        self.setWindowIcon(QIcon(resource_path("icons/logo.svg")))
         self.setWindowTitle("Login")
         self.setFixedSize(400, 250)
         self.setWindowFlag(Qt.WindowContextHelpButtonHint, False)

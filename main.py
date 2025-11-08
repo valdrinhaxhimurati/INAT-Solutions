@@ -17,9 +17,7 @@ from gui.main_window import resource_path
 app = QApplication(sys.argv)
 
 # setze globales App-Icon, damit alle Fenster/Dialogs das Favicon erben
-app.setWindowIcon(QIcon(resource_path("favicon.ico")))
-
-import resources_rc
+app.setWindowIcon(QIcon(resource_path("icons/logo.svg")))
 from gui.benutzer_dialog import BenutzerVerwaltenDialog
 from login import init_login_db, LoginDialog
 from migration import ensure_database
@@ -58,7 +56,7 @@ def sync_from_local():
     progress.resize(400, 120)
     progress.setWindowModality(Qt.ApplicationModal)
     progress.setWindowTitle("Update prüfen")
-    ico = resource_path("favicon.ico")
+    ico = resource_path("icons/logo.svg")
     if os.path.exists(ico):
         progress.setWindowIcon(QIcon(ico))
     progress.setCancelButton(None)
@@ -372,34 +370,26 @@ def run():
     splash = None
     try:
         from logo_splash import LogoSplash
-        img = resource_path("INAT SOLUTIONS.png")
-        if os.path.exists(img):
-            splash = LogoSplash(img)
-            splash.show()
+        # Korrigiere den Pfad, um das PNG-Logo für den Splash-Screen zu verwenden
+        splash = LogoSplash(logo_path="INAT SOLUTIONS.png")
     except Exception:
         splash = None
 
     def open_main():
-        # ensure DB schema (inkl. invoices) existiert bevor UI geladen wird
-      
-  
-
         # Fenster öffnen
         mw = MainWindow(benutzername=user, login_db_path=LOGIN_DB_PATH)
         app._main_window = mw
         mw.showMaximized()  # Öffne das Fenster maximiert
-        if splash:
-            try:
-                splash.finish(mw)
-            except Exception:
-                try: splash.close()
-                except Exception: pass
+        # Die alte splash.finish() Methode wird nicht mehr benötigt,
+        # da der neue Splash-Screen sich selbst schließt.
 
     if splash is not None and hasattr(splash, "finished"):
         splash.finished.connect(open_main)
+        splash.show() # WICHTIG: Starte den Splash-Screen und die Animation
     else:
+        # Fallback, falls der Splash-Screen nicht geladen werden kann
         from PyQt5.QtCore import QTimer
-        QTimer.singleShot(1200, open_main)
+        QTimer.singleShot(100, open_main)
 
     app._splash = splash
     return app.exec_()

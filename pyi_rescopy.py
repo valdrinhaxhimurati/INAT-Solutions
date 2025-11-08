@@ -37,7 +37,7 @@ def main():
         str(data_dir() / "config.json"),
         str(data_dir() / "schema.sql"),
         "config/rechnung_layout.json",
-        "favicon.ico",
+        "icons/logo.svg",
     ]
     for rel in needed:
         _copy_first_found(rel, dest_root)

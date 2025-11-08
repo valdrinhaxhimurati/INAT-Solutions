@@ -1,6 +1,7 @@
 ﻿# -*- coding: utf-8 -*-
+import ctypes
 from PyQt5.QtWidgets import (
-    QMainWindow, QTabWidget, QLabel, QWidget 
+    QMainWindow, QTabWidget, QLabel, QWidget, QVBoxLayout, QHBoxLayout, QToolButton, QSizePolicy, QTabBar
 )
 from db_connection import get_db, dict_cursor_factory
 from PyQt5.QtGui import QFont
@@ -15,7 +16,9 @@ from gui.auftragskalender_tab import AuftragskalenderTab
 
 from version import __version__
 from PyQt5.QtGui import QIcon, QPainter, QPixmap
-from PyQt5.QtCore import Qt, QPropertyAnimation, QEasingCurve, QThread, QTimer
+from PyQt5.QtCore import Qt, QPropertyAnimation, QEasingCurve, QThread, QTimer, QPoint, QEvent
+# NEUER IMPORT für die native Fenster-API
+from PyQt5.QtWinExtras import QtWin
 
 import sys
 import os
@@ -28,26 +31,127 @@ def resource_path(relative_path):
     return os.path.join(base_path, relative_path)
 
 
+class WindowButtons(QWidget):
+    """Ein Widget, das nur die Fenster-Buttons (Min, Max, Close) enthält."""
+    def __init__(self, parent):
+        super().__init__(parent)
+        self.parent_window = parent
+
+        layout = QHBoxLayout(self)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(0)
+
+        self.minimize_btn = QToolButton()
+        self.minimize_btn.setObjectName("windowButton")
+        self.minimize_btn.setProperty("buttonRole", "minimize")
+        
+        self.maximize_btn = QToolButton()
+        self.maximize_btn.setObjectName("windowButton")
+        self.maximize_btn.setProperty("buttonRole", "maximize")
+        
+        self.close_btn = QToolButton()
+        self.close_btn.setObjectName("windowButton")
+        self.close_btn.setProperty("buttonRole", "close")
+
+        layout.addWidget(self.minimize_btn)
+        layout.addWidget(self.maximize_btn)
+        layout.addWidget(self.close_btn)
+
+        self.minimize_btn.clicked.connect(self.parent_window.showMinimized)
+        self.maximize_btn.clicked.connect(self.toggle_maximize)
+        self.close_btn.clicked.connect(self.parent_window.close)
+        
+        self.update_maximize_icon()
+
+    def toggle_maximize(self):
+        if self.parent_window.isMaximized():
+            self.parent_window.showNormal()
+        else:
+            self.parent_window.showMaximized()
+        self.update_maximize_icon()
+
+    def update_maximize_icon(self):
+        if self.parent_window.isMaximized():
+            self.maximize_btn.setProperty("buttonRole", "restore")
+        else:
+            self.maximize_btn.setProperty("buttonRole", "maximize")
+        self.maximize_btn.style().unpolish(self.maximize_btn)
+        self.maximize_btn.style().polish(self.maximize_btn)
+
+
+class DraggableTabBar(QTabBar):
+    """
+    Eine QTabBar, die nur als Platzhalter dient. Die Drag-Logik wird
+    zentral in MainWindow.nativeEvent gehandhabt.
+    """
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.parent_window = parent
+
+
+class CustomTitleBar(QWidget):
+    """
+    Ein Widget, das nur als Platzhalter für den Titelbereich dient. Die Drag-Logik
+    wird zentral in MainWindow.nativeEvent gehandhabt.
+    """
+    def __init__(self, parent):
+        super().__init__(parent)
+        self.parent_window = parent
+
+
 class MainWindow(QMainWindow):
     def __init__(self, benutzername: str = "", login_db_path: str = None):
         super().__init__()
         self.benutzername = benutzername
         self._login_db_path = login_db_path
-        self.setWindowTitle("Deine Anwendung")
+        
+        self.setWindowFlags(Qt.FramelessWindowHint)
         self.resize(1920, 1080)
-        self.benutzername = benutzername or "Unbekannt"
-        self.logo_path = "C:/Users/V.Haxhimurati/Documents/TEST/INAT SOLUTIONS.png"
         self.setWindowTitle(f"INAT Solutions v{__version__}")
-        self.setWindowIcon(QIcon(resource_path("favicon.ico")))
+        self.setWindowIcon(QIcon(resource_path("icons/logo.svg")))
 
+        main_widget = QWidget()
+        main_layout = QVBoxLayout(main_widget)
+        main_layout.setContentsMargins(0, 0, 0, 0)
+        main_layout.setSpacing(0)
 
+        # 1. Erstelle das Tab-Widget
         self.tabs = QTabWidget()
+        self.tabs.setObjectName("mainTabs")
+        
+        # Ersetze die Standard-TabBar durch unsere (jetzt passive) DraggableTabBar
+        self.tabs.setTabBar(DraggableTabBar(self))
+
+        # Setzt die Höhe der gesamten oberen Leiste
+        self.title_bar_height = 60
+        self.tabs.tabBar().setFixedHeight(self.title_bar_height)
+
+        # 2. Erstelle die Widgets für die Ecken
+        # Linke Ecke: Logo in einem Container
+        left_corner_container = CustomTitleBar(self)
+        left_corner_container.setFixedHeight(self.title_bar_height)
+        left_layout = QHBoxLayout(left_corner_container)
+        left_layout.setContentsMargins(10, 0, 10, 0)
+        icon_label = QLabel()
+        icon_pixmap = QPixmap(resource_path("icons/logo.svg")).scaled(36, 36, Qt.KeepAspectRatio, Qt.SmoothTransformation)
+        icon_label.setPixmap(icon_pixmap)
+        left_layout.addWidget(icon_label, 0, Qt.AlignVCenter)
+        
+        # Rechte Ecke: Fenster-Buttons
+        self.window_buttons = WindowButtons(self)
+        self.window_buttons.setFixedHeight(self.title_bar_height)
+
+        # 3. Setze die Corner-Widgets
+        self.tabs.setCornerWidget(left_corner_container, Qt.TopLeftCorner)
+        self.tabs.setCornerWidget(self.window_buttons, Qt.TopRightCorner)
+
+        # 4. Füge die Tabs hinzu
         self.kunden_tab = KundenTab()
         self.rechnungen_tab = RechnungenTab()
         self.buchhaltung_tab = BuchhaltungTab()
         self.lieferanten_tab = LieferantenTab()
         self.lager_tab = LagerTab() 
-        self.auftragskalender_tab = AuftragskalenderTab()  # <-- NEU
+        self.auftragskalender_tab = AuftragskalenderTab()
         self.einstellungen_tab = EinstellungenTab(self)
         self.kunden_tab.kunde_aktualisiert.connect(self.rechnungen_tab.aktualisiere_kunden_liste)
 
@@ -56,9 +160,12 @@ class MainWindow(QMainWindow):
         self.tabs.addTab(self.buchhaltung_tab, "Buchhaltung")
         self.tabs.addTab(self.lieferanten_tab, "Lieferanten")
         self.tabs.addTab(self.lager_tab, "Lager")
-        self.tabs.addTab(self.auftragskalender_tab, "Auftragskalender")  # <-- NEU
+        self.tabs.addTab(self.auftragskalender_tab, "Auftragskalender")
         self.tabs.addTab(self.einstellungen_tab, "Einstellungen")
 
+        main_layout.addWidget(self.tabs)
+
+        # Statusleiste
         self.status_bar = self.statusBar()
         user_label = QLabel(f"👤  Angemeldet als: {self.benutzername}")
         font = QFont("Segoe UI", 15)
@@ -77,10 +184,100 @@ class MainWindow(QMainWindow):
         """)
         self.status_bar.addWidget(user_label)
 
-        self.setCentralWidget(self.tabs)
+        spacer = QWidget()
+        spacer.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
+        self.status_bar.addWidget(spacer, 1)
 
-        # schedule background init after event-loop / after show to avoid blocking UI
+        version_label = QLabel(f"v{__version__}")
+        version_label.setStyleSheet("""
+            QLabel {
+                background: transparent;
+                border: none;
+                color: #888;
+                font-size: 14px;
+                padding-right: 10px;
+            }
+        """)
+        self.status_bar.addWidget(version_label)
+
+        self.setCentralWidget(main_widget)
         QTimer.singleShot(0, self.finish_init)
+
+    def nativeEvent(self, eventType, message):
+        """
+        Fängt native Windows-Nachrichten ab, um das Verhalten eines Standard-Fensters
+        (Verschieben, Größenänderung, Aero Snap) korrekt zu implementieren.
+        """
+        retval, result = super().nativeEvent(eventType, message)
+        
+        if eventType == b"windows_generic_MSG":
+            msg = ctypes.wintypes.MSG.from_address(message.__int__())
+
+            if msg.message == 0x0084:  # WM_NCHITTEST
+                # Korrekte Extraktion der Mausposition (behandelt auch negative Werte)
+                x_global = ctypes.c_short(msg.lParam & 0xFFFF).value
+                y_global = ctypes.c_short((msg.lParam >> 16) & 0xFFFF).value
+                
+                # Globale Position in Widget-lokale Koordinaten umrechnen
+                global_pos = QPoint(x_global, y_global)
+                local_pos = self.mapFromGlobal(global_pos)
+                x = local_pos.x()
+                y = local_pos.y()
+                
+                # Größenänderung an den Fensterrändern (höchste Priorität)
+                border_width = 8
+                rect = self.rect()
+                
+                # Ecken haben Vorrang
+                if x < border_width and y < border_width: 
+                    return True, 13  # HTTOPLEFT
+                if x > rect.width() - border_width and y < border_width: 
+                    return True, 14  # HTTOPRIGHT
+                if x < border_width and y > rect.height() - border_width: 
+                    return True, 16  # HTBOTTOMLEFT
+                if x > rect.width() - border_width and y > rect.height() - border_width: 
+                    return True, 17  # HTBOTTOMRIGHT
+                
+                # Kanten
+                if y < border_width: 
+                    return True, 12  # HTTOP
+                if y > rect.height() - border_width: 
+                    return True, 15  # HTBOTTOM
+                if x < border_width: 
+                    return True, 10  # HTLEFT
+                if x > rect.width() - border_width: 
+                    return True, 11  # HTRIGHT
+                
+                # Titelleiste (nur wenn nicht an den Rändern)
+                if y < self.title_bar_height:
+                    # Prüfen, ob die Maus über einem Tab ist
+                    tab_bar = self.tabs.tabBar()
+                    tab_local_pos = tab_bar.mapFromGlobal(global_pos)
+                    tab_at_pos = tab_bar.tabAt(tab_local_pos)
+                    
+                    # Wenn über einem Tab -> normale Qt-Verarbeitung
+                    if tab_at_pos != -1:
+                        return retval, result  # Qt übernimmt
+                    
+                    # Prüfen, ob die Maus über den Fenster-Buttons ist
+                    buttons_widget = self.window_buttons
+                    buttons_local_pos = buttons_widget.mapFromGlobal(global_pos)
+                    
+                    # Wenn über den Buttons -> normale Qt-Verarbeitung
+                    if buttons_widget.rect().contains(buttons_local_pos):
+                        return retval, result  # Qt übernimmt
+                    
+                    # Maus ist im leeren Bereich der Titelleiste (Logo, Lücke)
+                    # -> Windows mitteilen, dass dies die Titelleiste ist
+                    return True, 2  # HTCAPTION
+
+        return retval, result
+
+    def changeEvent(self, event):
+        if event.type() == QEvent.WindowStateChange:
+            if hasattr(self, 'window_buttons'):
+                self.window_buttons.update_maximize_icon()
+        super().changeEvent(event)
 
     # Für einen Button
     def animate_button(self, button):
