@@ -118,25 +118,31 @@ class MainWindow(QMainWindow):
         # 1. Erstelle das Tab-Widget
         self.tabs = QTabWidget()
         self.tabs.setObjectName("mainTabs")
-        
-        # Ersetze die Standard-TabBar durch unsere (jetzt passive) DraggableTabBar
         self.tabs.setTabBar(DraggableTabBar(self))
 
-        # Setzt die Höhe der gesamten oberen Leiste
+        # Tabs sollen nicht automatisch breiter werden und bei Platzmangel scrollen
+        self.tabs.tabBar().setExpanding(False)
+        self.tabs.tabBar().setElideMode(Qt.ElideRight)
+        self.tabs.setUsesScrollButtons(True)
+
+        # Höhe der Titelleiste auf einen vernünftigen Wert setzen
         self.title_bar_height = 60
         self.tabs.tabBar().setFixedHeight(self.title_bar_height)
 
-        # 2. Erstelle die Widgets für die Ecken
-        # Linke Ecke: Logo in einem Container
+        # Linke Ecke: Logo-Container
         left_corner_container = CustomTitleBar(self)
         left_corner_container.setFixedHeight(self.title_bar_height)
         left_layout = QHBoxLayout(left_corner_container)
-        left_layout.setContentsMargins(10, 0, 10, 0)
+        left_layout.setContentsMargins(12, 0, 10, 0)
         icon_label = QLabel()
+        # NEU: Hintergrund des Labels transparent machen
+        icon_label.setStyleSheet("background: transparent;")
+        # Logo-Größe an die neue Leistenhöhe anpassen
         icon_pixmap = QPixmap(resource_path("icons/logo.svg")).scaled(36, 36, Qt.KeepAspectRatio, Qt.SmoothTransformation)
         icon_label.setPixmap(icon_pixmap)
+        icon_label.setFixedHeight(self.title_bar_height) # Wichtig für vertikale Zentrierung
         left_layout.addWidget(icon_label, 0, Qt.AlignVCenter)
-        
+
         # Rechte Ecke: Fenster-Buttons
         self.window_buttons = WindowButtons(self)
         self.window_buttons.setFixedHeight(self.title_bar_height)

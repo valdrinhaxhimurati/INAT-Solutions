@@ -9,8 +9,8 @@ QWidget {
 
 /* ========== BENUTZERDEFINIERTE TITELLEISTE ========== */
 QWidget#customTitleBar {
-    background: transparent; /* Standard-Hintergrund verwenden */
-    height: 60px; /* Höhe der Titelleiste erhöht */
+    height: 60px;
+    background: transparent;
 }
 
 QLabel#titleBarLabel {
@@ -21,12 +21,10 @@ QLabel#titleBarLabel {
 }
 
 QToolButton#windowButton {
-    background: transparent;
-    border: none;
-    width: 40px; /* Breite der Buttons erhöht */
-    height: 40px; /* Höhe der Buttons erhöht */
-    padding: 10px; /* Padding angepasst */
-    qproperty-iconSize: 30px 30px; 
+    height: 60px; /* Höhe an Titelleiste anpassen */
+    width: 60px;  /* Breite für bessere Proportionen erhöhen */
+    padding: 10px;
+    qproperty-iconSize: 20px 20px; /* Icons vergrößern */
 }
 QToolButton#windowButton:hover {
     background: rgba(0, 0, 0, 0.05); /* Leichter grauer Hover */
@@ -57,21 +55,41 @@ QTabWidget::pane {
     border-radius: 8px;
 }
 
+/* Die Tab-Leiste - NUR Hintergrund entfernen */
+QTabBar {
+    background: transparent;
+    qproperty-drawBase: 0;
+}
+
 QTabBar::tab {
+    /* Die Tabs selbst sind kleiner, aber mittig in der 60px Leiste */
+    height: 40px;
+    margin-top: 10px; /* Zentriert den 40px Tab in der 60px Leiste */
+    margin-bottom: 10px;
+    margin-right: 10px; /* Abstand zwischen den Tabs */
+    padding: 0 16px;
+    /* Bestehendes Design beibehalten */
     background: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #f0f4fb, stop:1 #e8ecf0);
     border: none;
-    padding: 12px 24px;
-    margin-right: 4px;
     border-radius: 8px 8px 0 0;
     color: #666666;
     font-weight: 500;
     min-width: 130px;
 }
 
-QTabBar::tab:selected, QTabBar::tab:hover {
+/* NEU: Hover-Effekt für nicht ausgewählte Tabs */
+QTabBar::tab:!selected:hover {
+    background: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #f9fbfd, stop:1 #f0f4fb);
+}
+
+QTabBar::tab:selected {
     background: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #4a6fa5, stop:1 #3b5b85);
-    color: #e8eaf6;
-    font-weight: 600;
+    color: white;
+}
+
+QTabWidget#mainTabs::pane {
+    border: 1px solid #d0d0d0;
+    margin-top: 4px;
 }
 
 QPushButton {
