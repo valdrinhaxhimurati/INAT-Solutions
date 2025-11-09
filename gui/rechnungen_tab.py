@@ -160,6 +160,18 @@ class RechnungenTab(QWidget):
                             abschluss_text TEXT
                         )
                     """)
+                    # NEU: Synchronisiere die ID-Sequenzen mit den maximal vorhandenen Werten.
+                    # Dies behebt den UniqueViolation-Fehler.
+                    try:
+                        # KORREKTUR: Der dritte Parameter muss 'true' sein, damit der nächste Wert MAX(id) + 1 ist.
+                        # Korrigiert die Zählung für die 'rechnungen'-Tabelle
+                        cursor.execute("SELECT setval('rechnungen_id_seq', COALESCE((SELECT MAX(id) FROM rechnungen), 1), true)")
+                        # Korrigiert vorsorglich auch die 'kunden'-Tabelle
+                        cursor.execute("SELECT setval('kunden_kundennr_seq', COALESCE((SELECT MAX(kundennr) FROM kunden), 1), true)")
+                    except Exception as e:
+                        # Fehler ignorieren, falls die Tabelle/Sequenz noch nicht existiert, was beim allerersten Start normal ist.
+                        print(f"Info: Konnte Sequenz nicht synchronisieren (normal beim ersten Start): {e}")
+
             conn.commit()
 
     def oeffne_rechnungslayout_dialog(self):
@@ -1123,4 +1135,4 @@ def _get_qr_daten():
             qr = import_json_if_missing("qr_daten", "config/qr_daten.json") or {}
         return qr
 
-   
+

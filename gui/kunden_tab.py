@@ -4,6 +4,7 @@ from PyQt5.QtWidgets import (
     QToolButton, QDialog, QMessageBox, QLabel, QHeaderView
 )
 from PyQt5.QtCore import Qt, pyqtSignal
+# KORREKTUR: DBConnection entfernt, da es nicht existiert. Wir verwenden get_db().
 from db_connection import get_db, dict_cursor_factory
 from settings_store import load_config
 from gui.kunden_dialog import KundenDialog
@@ -367,32 +368,29 @@ class KundenTab(QWidget):
         dlg = KundenDialog(self, kunde=None)
         if dlg.exec_() == QDialog.Accepted:
             d = dlg.get_daten()
-            with get_db() as con:
-                config = load_config()
-                db_type = config.get("db_type", "sqlite")
-                is_sqlite = db_type == "sqlite"
-                cols = self._detect_kunden_columns(con)
+            # KORREKTUR: get_db() verwenden, wie es in db_connection.py vorgesehen ist
+            conn = get_db()
+            try:
+                cols = self._detect_kunden_columns(conn.raw) # .raw für die echte Verbindung
                 field_map = {
-                    "anrede": cols.get("anrede"),
-                    "name": cols.get("name"),
-                    "firma": cols.get("firma"),
-                    "plz": cols.get("plz"),
-                    "strasse": cols.get("strasse"),
-                    "stadt": cols.get("stadt"),
-                    "email": cols.get("email"),
-                    "bemerkung": cols.get("bemerkung"),
+                    "anrede": cols.get("anrede"), "name": cols.get("name"), "firma": cols.get("firma"),
+                    "plz": cols.get("plz"), "strasse": cols.get("strasse"), "stadt": cols.get("stadt"),
+                    "email": cols.get("email"), "bemerkung": cols.get("bemerkung"),
                 }
-                insert_cols = [dbcol for key, dbcol in field_map.items() if dbcol]
-                insert_vals = [d.get(key, "") for key, dbcol in field_map.items() if dbcol]
+                insert_cols = [dbcol for key, dbcol in field_map.items() if dbcol and d.get(key)]
+                insert_vals = [d.get(key) for key, dbcol in field_map.items() if dbcol and d.get(key)]
+
                 if insert_cols:
-                    if is_sqlite:
-                        placeholders = ", ".join(["?"] * len(insert_cols))
-                    else:
-                        placeholders = ", ".join(["%s"] * len(insert_cols))
+                    # KORREKTUR: Immer %s verwenden. Der CursorWrapper übersetzt es für SQLite.
+                    placeholders = ", ".join(["%s"] * len(insert_cols))
                     sql = f"INSERT INTO kunden ({', '.join(insert_cols)}) VALUES ({placeholders})"
-                    with con.cursor() as cur:
-                        cur.execute(sql, insert_vals)
-                con.commit()
+                    
+                    cur = conn.cursor()
+                    cur.execute(sql, insert_vals)
+                    conn.commit()
+            finally:
+                conn.close()
+
             self.lade_kunden()
             self.kunde_aktualisiert.emit()
 
@@ -423,27 +421,32 @@ class KundenTab(QWidget):
         dlg = KundenDialog(self, kunde=kunde)
         if dlg.exec_() == QDialog.Accepted:
             d = dlg.get_daten()
-            with get_db() as con:
-                cols = self._detect_kunden_columns(con)
+            conn = get_db()
+            try:
+                cols = self._detect_kunden_columns(conn.raw)
                 field_map = {
-                    "anrede": cols.get("anrede"),
-                    "name": cols.get("name"),
-                    "plz": cols.get("plz"),
-                    "strasse": cols.get("strasse"),
-                    "stadt": cols.get("stadt"),
-                    "email": cols.get("email"),
-                    "firma": cols.get("firma"),
-                    "bemerkung": cols.get("bemerkung"),
+                    "anrede": cols.get("anrede"), "name": cols.get("name"), "plz": cols.get("plz"),
+                    "strasse": cols.get("strasse"), "stadt": cols.get("stadt"), "email": cols.get("email"),
+                    "firma": cols.get("firma"), "bemerkung": cols.get("bemerkung"),
                 }
                 sets, params = [], []
                 for key, dbcol in field_map.items():
                     if dbcol is not None:
+                        # KORREKTUR: Immer %s verwenden
                         sets.append(f"{dbcol}=%s")
                         params.append(d.get(key, ""))
+                
                 if sets:
-                    with con.cursor() as cur:
-                        cur.execute(f"UPDATE kunden SET {', '.join(sets)} WHERE {cols['kundennr']}=%s", tuple(params + [rid]))
-                con.commit()
+                    # KORREKTUR: Immer %s verwenden
+                    sql = f"UPDATE kunden SET {', '.join(sets)} WHERE {cols['kundennr']}=%s"
+                    params.append(rid)
+                    
+                    cur = conn.cursor()
+                    cur.execute(sql, tuple(params))
+                    conn.commit()
+            finally:
+                conn.close()
+
             self.lade_kunden()
             self.kunde_aktualisiert.emit()
 
@@ -454,11 +457,19 @@ class KundenTab(QWidget):
             return
         if QMessageBox.question(self, "Löschen", "Kunde wirklich löschen?") != QMessageBox.Yes:
             return
-        with get_db() as con:
-            cols = self._detect_kunden_columns(con)
-            with con.cursor() as cur:
-                cur.execute(f"DELETE FROM kunden WHERE {cols['kundennr']}=%s", (rid,))
-            con.commit()
+        
+        conn = get_db()
+        try:
+            cols = self._detect_kunden_columns(conn.raw)
+            # KORREKTUR: Immer %s verwenden
+            sql = f"DELETE FROM kunden WHERE {cols['kundennr']}=%s"
+            
+            cur = conn.cursor()
+            cur.execute(sql, (rid,))
+            conn.commit()
+        finally:
+            conn.close()
+
         self.lade_kunden()
         self.kunde_aktualisiert.emit()
 
