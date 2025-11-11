@@ -1,22 +1,35 @@
 from PyQt5.QtWidgets import (
     QDialog, QVBoxLayout, QHBoxLayout, QLabel, QLineEdit, QPushButton, QMessageBox
 )
+# NEU: BaseDialog importieren
+from .base_dialog import BaseDialog
 from db_connection import get_db, dict_cursor_factory
-class LagerDialog(QDialog):
+
+# ÄNDERUNG: Von BaseDialog erben
+class LagerDialog(BaseDialog):
     def __init__(self, parent=None, artikel=None):
         super().__init__(parent)
         self.setWindowTitle("Artikel erfassen" if artikel is None else "Artikel bearbeiten")
-        self.resize(400, 200)
-        layout = QVBoxLayout()
+        self.resize(400, 350) # Höhe leicht angepasst für Titelleiste
+
+        # WICHTIG: Das Layout vom BaseDialog verwenden
+        layout = self.content_layout
 
         layout.addWidget(QLabel("Artikelnummer:"))
         self.artikelnummer_input = QLineEdit()
+        layout.addWidget(self.artikelnummer_input) # Hinzugefügt, damit es angezeigt wird
+
         layout.addWidget(QLabel("Bezeichnung:"))
         self.bezeichnung_input = QLineEdit()
+        layout.addWidget(self.bezeichnung_input) # Hinzugefügt, damit es angezeigt wird
+
         layout.addWidget(QLabel("Bestand:"))
         self.bestand_input = QLineEdit()
+        layout.addWidget(self.bestand_input) # Hinzugefügt, damit es angezeigt wird
+
         layout.addWidget(QLabel("Lagerort:"))
         self.lagerort_input = QLineEdit()
+        layout.addWidget(self.lagerort_input) # Hinzugefügt, damit es angezeigt wird
 
         if artikel:
             self.artikelnummer_input.setText(artikel.get("artikelnummer", ""))
@@ -24,10 +37,11 @@ class LagerDialog(QDialog):
             self.bestand_input.setText(str(artikel.get("bestand", "")))
             self.lagerort_input.setText(artikel.get("lagerort", ""))
 
-        layout.addWidget(self.artikelnummer_input)
-        layout.addWidget(self.bezeichnung_input)
-        layout.addWidget(self.bestand_input)
-        layout.addWidget(self.lagerort_input)
+        # Die folgenden Zeilen sind nicht mehr nötig, da sie oben schon hinzugefügt wurden
+        # layout.addWidget(self.artikelnummer_input)
+        # layout.addWidget(self.bezeichnung_input)
+        # layout.addWidget(self.bestand_input)
+        # layout.addWidget(self.lagerort_input)
 
         btn_layout = QHBoxLayout()
         btn_ok = QPushButton("OK")
@@ -38,9 +52,11 @@ class LagerDialog(QDialog):
         btn_layout.addWidget(btn_cancel)
 
         layout.addLayout(btn_layout)
-        self.setLayout(layout)
+        # ÄNDERUNG: self.setLayout() entfernen
+        # self.setLayout(layout)
 
     def accept_dialog(self):
+        # DIESE METHODE BLEIBT UNVERÄNDERT
         # Pflichtfelder pr�fen
         if not self.artikelnummer_input.text().strip():
             QMessageBox.warning(self, "Pflichtfeld", "Bitte Artikelnummer eingeben!")
@@ -51,6 +67,7 @@ class LagerDialog(QDialog):
         self.accept()
 
     def get_daten(self):
+        # DIESE METHODE BLEIBT UNVERÄNDERT
         return {
             "artikelnummer": self.artikelnummer_input.text().strip(),
             "bezeichnung": self.bezeichnung_input.text().strip(),

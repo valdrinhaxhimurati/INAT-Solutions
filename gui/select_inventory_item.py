@@ -1,6 +1,7 @@
 # gui/select_inventory_item.py
 
 from PyQt5 import QtWidgets, QtCore
+from .base_dialog import BaseDialog
 from db_connection import get_db, dict_cursor_factory
 import sqlite3
 
@@ -11,8 +12,8 @@ def _is_sqlite(con) -> bool:
     base = getattr(con, "_con", con)  # unwrap evtl. Wrapper
     return isinstance(base, sqlite3.Connection)
 
-
-class SelectInventoryItemDialog(QtWidgets.QDialog):
+# ÄNDERUNG: Von BaseDialog erben
+class SelectInventoryItemDialog(BaseDialog):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setWindowTitle("Artikel aus Lager auswählen")
@@ -49,7 +50,8 @@ class SelectInventoryItemDialog(QtWidgets.QDialog):
         buttons.addWidget(btn_ok)
         buttons.addWidget(btn_cancel)
 
-        lay = QtWidgets.QVBoxLayout(self)
+        # ÄNDERUNG: Das Layout von BaseDialog verwenden
+        lay = self.content_layout
         lay.addLayout(top)
         lay.addWidget(self.table)
         lay.addLayout(buttons)

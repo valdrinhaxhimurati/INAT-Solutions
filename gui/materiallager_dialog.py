@@ -1,4 +1,6 @@
 ﻿# -*- coding: utf-8 -*-
+# NEU: BaseDialog importieren
+from .base_dialog import BaseDialog
 from PyQt5.QtWidgets import (
     QDialog, QVBoxLayout, QHBoxLayout, QLabel, QLineEdit,
     QComboBox, QPushButton
@@ -7,12 +9,16 @@ from db_connection import get_db, dict_cursor_factory
 from PyQt5.QtCore import Qt
 from gui.widgets import NumericLineEdit
 
-class MateriallagerDialog(QDialog):
+# ÄNDERUNG: Von BaseDialog erben
+class MateriallagerDialog(BaseDialog):
     def __init__(self, parent=None, material=None):
+        # ÄNDERUNG: super() für BaseDialog aufrufen
         super().__init__(parent)
         self.setWindowTitle("Material erfassen" if material is None else "Material bearbeiten")
-        self.resize(480, 320)
-        layout = QVBoxLayout()
+        self.resize(480, 600) # Höhe angepasst für bessere Sichtbarkeit
+        
+        # WICHTIG: Das Layout vom BaseDialog verwenden
+        layout = self.content_layout
 
         self.materialnummer_input = QLineEdit()
         self.bezeichnung_input = QLineEdit()
@@ -82,7 +88,8 @@ class MateriallagerDialog(QDialog):
         btn_layout.addWidget(btn_cancel)
         layout.addLayout(btn_layout)
 
-        self.setLayout(layout)
+        # ÄNDERUNG: self.setLayout(layout) wird nicht mehr benötigt
+        # self.setLayout(layout)
 
     def _lade_lieferanten(self):
         try:

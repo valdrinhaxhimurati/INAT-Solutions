@@ -9,6 +9,8 @@ from PyQt5.QtWidgets import (
 from PyQt5.QtCore import Qt
 from PyQt5.QtGui import QIcon
 
+# NEU: BaseDialog importieren
+from gui.base_dialog import BaseDialog
 from paths import data_dir, users_db_path  # NEU: Fallback auf ProgramData
 
 def resource_path(relative_path):
@@ -46,25 +48,25 @@ def init_login_db(path: str | None = None) -> None:
 def get_conn(db_path: str):
     return sqlite3.connect(db_path)
 
-class LoginDialog(QDialog):
+
+class LoginDialog(BaseDialog):
     def __init__(self, db_path, parent=None):
         super().__init__(parent)
         self.db_path = db_path
-        self.setWindowIcon(QIcon(resource_path("icons/logo.svg")))
         self.setWindowTitle("Login")
-        self.setFixedSize(400, 250)
-        self.setWindowFlag(Qt.WindowContextHelpButtonHint, False)
+        self.setFixedSize(400, 300) # Höhe leicht angepasst für Titelleiste
 
         self.login_ok = False
         self.logged_in_user = None
 
-        layout = QVBoxLayout(self)
-        layout.setContentsMargins(30, 30, 30, 30)
+
+        layout = self.content_layout
+        layout.setContentsMargins(20, 20, 20, 20) # Innenabstand anpassen
         layout.setSpacing(15)
 
         title = QLabel("Anmeldung")
         title.setAlignment(Qt.AlignCenter)
-        title.setStyleSheet("font-size: 18px; font-weight: 600;")
+        title.setStyleSheet("font-size: 18px; font-weight: 400;")
         layout.addWidget(title)
 
         self.input_user = QLineEdit()
@@ -97,6 +99,7 @@ class LoginDialog(QDialog):
         layout.addLayout(button_layout)
 
         self.btn_login.clicked.connect(self.check_login)
+        # ÄNDERUNG: self.setLayout() entfernen
 
     def check_login(self):
         username = self.input_user.text().strip()

@@ -6,13 +6,18 @@
 from paths import data_dir
 import json, os
 from db_connection import get_einstellungen, set_einstellungen
-class KategorienDialog(QDialog):
+# NEU: BaseDialog importieren
+from .base_dialog import BaseDialog
+
+# ÄNDERUNG: Von BaseDialog erben
+class KategorienDialog(BaseDialog):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setWindowTitle("Kategorien verwalten")
-        self.resize(450, 350)
+        self.resize(450, 400) # Höhe angepasst
 
-        main_layout = QVBoxLayout(self)
+        # WICHTIG: Das Layout vom BaseDialog verwenden
+        main_layout = self.content_layout
 
         # Label für die Liste
         lbl_vorhanden = QLabel("Vorhandene Kategorien:")

@@ -5,6 +5,7 @@ from PyQt5.QtWidgets import (
 )
 from PyQt5.QtCore import Qt
 from PyQt5.QtGui import QPixmap
+from .base_dialog import BaseDialog
 from db_connection import get_db
 import os, mimetypes, sqlite3
 
@@ -271,13 +272,15 @@ def _row_to_dict(cur, row):
     except Exception:
         return dict(zip(cols, row)) if cols else {}
 
-class RechnungLayoutDialog(QDialog):
+
+class RechnungLayoutDialog(BaseDialog):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.setWindowTitle("Rechnungslayout bearbeiten")
         self.setMinimumSize(600, 520)
 
-        layout = QVBoxLayout(self)
+   
+        layout = self.content_layout
 
         # Felder
         layout.addWidget(QLabel("Kopfzeile (z. B. Firmeninfo):"))

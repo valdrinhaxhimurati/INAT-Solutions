@@ -6,6 +6,8 @@ from PyQt5.QtWidgets import (
 )
 from PyQt5.QtCore import Qt, QDate
 from PyQt5.QtGui import QIcon
+# NEU: BaseDialog importieren
+from .base_dialog import BaseDialog
 from db_connection import get_db, get_config_value
 from reportlab.lib.utils import ImageReader
 from io import BytesIO
@@ -84,8 +86,8 @@ def _draw_header_with_logo(self, canvas, layout_cfg: dict):
         h = w * (ih / iw if iw else 1.0)
     canvas.drawImage(img, x, y, width=w, height=h, mask="auto")
 
-
-class RechnungDialog(QDialog):
+# ÄNDERUNG: Von BaseDialog erben
+class RechnungDialog(BaseDialog):
     """
     Kombinierte Version des Rechnung-Dialogs:
     - Beinhaltet die Positions-Tabelle (Beschreibung, Menge, Einzelpreis, Total) inkl. Summenberechnung
@@ -100,6 +102,7 @@ class RechnungDialog(QDialog):
 
     def __init__(self, kunden_liste, kunden_firmen, kunden_adressen, *args, **kwargs):
         parent = kwargs.pop('parent', None)
+        # ÄNDERUNG: super() für BaseDialog aufrufen
         super().__init__(parent)
         self.setWindowTitle("Rechnung")
         self.resize(1200, 900)
@@ -122,7 +125,8 @@ class RechnungDialog(QDialog):
         self.kunden_adressen = dict(kunden_adressen or {})
 
         # --- UI ---
-        root = QVBoxLayout(self)
+        # WICHTIG: Das Layout vom BaseDialog verwenden
+        root = self.content_layout
         grid = QGridLayout()
         row = 0
 

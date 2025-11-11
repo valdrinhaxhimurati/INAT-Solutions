@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 from PyQt5.QtWidgets import QDialog, QVBoxLayout, QLabel, QCheckBox, QPushButton, QHBoxLayout, QMessageBox
+from .base_dialog import BaseDialog
 from db_connection import get_db
 import sqlite3
 
@@ -15,11 +16,12 @@ def _to_bool(val):
         s = str(val).strip().lower()
         return s in ("1", "true", "t", "yes", "y")
 
-class LagerEinstellungenDialog(QDialog):
+
+class LagerEinstellungenDialog(BaseDialog):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.setWindowTitle("Lager-Module aktivieren")
-        layout = QVBoxLayout()
+        layout = self.content_layout
 
         # Ein einziges Mapping für alle Checkboxen
         self.checkboxes = {}
@@ -41,7 +43,6 @@ class LagerEinstellungenDialog(QDialog):
         btn_layout.addWidget(btn_cancel)
         layout.addLayout(btn_layout)
 
-        self.setLayout(layout)
 
     def _load_einstellungen(self):
         try:

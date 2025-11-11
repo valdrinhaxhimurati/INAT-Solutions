@@ -1,33 +1,32 @@
 ﻿from PyQt5.QtWidgets import (
-    QDialog, QVBoxLayout, QHBoxLayout, QLabel, QCheckBox, QPushButton,
-    QWidget, QScrollArea, QMessageBox
+    QDialog, QVBoxLayout, QLabel, QCheckBox, QPushButton, QMessageBox,
+    QHBoxLayout, QSpacerItem, QSizePolicy, QScrollArea, QWidget
 )
 from PyQt5.QtCore import Qt
-from db_connection import list_business_tables, clear_selected_tables, get_remote_status
+# NEU: BaseDialog importieren
+from .base_dialog import BaseDialog
+from db_connection import clear_selected_tables, get_db
 
-class ClearDatabaseDialog(QDialog):
+# ÄNDERUNG: Von BaseDialog erben
+class ClearDatabaseDialog(BaseDialog):
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.setWindowTitle("Datenbank lÃ¶schen")
-        self.setMinimumWidth(420)
+        self.setWindowTitle("Datenbank leeren")
+        self.setMinimumWidth(400)
 
-        try:
-            status = get_remote_status()
-            is_remote = bool(status.get("use_remote", False))
-        except Exception:
-            is_remote = False
-        mode_txt = "Remote (PostgreSQL)" if is_remote else "Lokal (SQLite)"
+        # WICHTIG: Das Layout vom BaseDialog verwenden
+        layout = self.content_layout
+        layout.setSpacing(15)
 
-        root = QVBoxLayout(self)
-        root.setContentsMargins(16, 16, 16, 16)
-        root.setSpacing(10)
-
-        info = QLabel(f"WÃ¤hlen Sie die Tabellen, die gelÃ¶scht werden sollen.\nModus: {mode_txt}\nHinweis: Die Benutzer-Tabelle 'users' wird nie gelÃ¶scht.")
-        info.setWordWrap(True)
-        root.addWidget(info)
+        info_label = QLabel(
+            "<b>Achtung:</b> Diese Aktion löscht ausgewählte Daten unwiderruflich.\n"
+            "Bitte wählen Sie die zu löschenden Tabellen aus."
+        )
+        info_label.setWordWrap(True)
+        layout.addWidget(info_label)
 
         self.select_all_cb = QCheckBox("Alle auswÃ¤hlen")
-        root.addWidget(self.select_all_cb)
+        layout.addWidget(self.select_all_cb)
 
         # Scrollbare Liste der Tabellen
         self.container = QWidget()
@@ -36,12 +35,10 @@ class ClearDatabaseDialog(QDialog):
         self.container_lay.setSpacing(4)
 
         self.checks = []
-        try:
-            tables = list_business_tables(exclude=("users",))
-        except Exception as e:
-            QMessageBox.critical(self, "Fehler", f"Tabellen konnten nicht geladen werden:\n{e}")
-            tables = []
+        tables = get_db().get_tables()  # ÄNDERUNG: Tabellen direkt von der DB abrufen
         for t in tables:
+            if t == "users":
+                continue  # Benutzer-Tabelle überspringen
             cb = QCheckBox(t)
             self.container_lay.addWidget(cb, alignment=Qt.AlignLeft)
             self.checks.append(cb)
@@ -50,28 +47,28 @@ class ClearDatabaseDialog(QDialog):
         scroll = QScrollArea()
         scroll.setWidgetResizable(True)
         scroll.setWidget(self.container)
-        root.addWidget(scroll, 1)
+        layout.addWidget(scroll, 1)
 
         # Buttons
-        btn_row = QHBoxLayout()
-        btn_row.addStretch(1)
-        self.btn_clear = QPushButton("LÃ¶schen")
+        btn_layout = QHBoxLayout()
+        btn_layout.addStretch(1)
+        self.btn_clear = QPushButton("Löschen")
         self.btn_cancel = QPushButton("Abbrechen")
-        btn_row.addWidget(self.btn_cancel)
-        btn_row.addWidget(self.btn_clear)
-        root.addLayout(btn_row)
+        btn_layout.addWidget(self.btn_cancel)
+        btn_layout.addWidget(self.btn_clear)
+        layout.addLayout(btn_layout)
 
-        # Events
-        self.select_all_cb.toggled.connect(self._toggle_all)
-        self.btn_cancel.clicked.connect(self.reject)
-        self.btn_clear.clicked.connect(self._on_clear)
+        # ÄNDERUNG: self.setLayout() entfernen
+        
+    def get_tables_to_clear(self):
+        return [cb.text() for cb in self.checks if cb.isChecked()]
 
     def _toggle_all(self, checked: bool):
         for cb in self.checks:
             cb.setChecked(checked)
 
     def _on_clear(self):
-        selected = [cb.text() for cb in self.checks if cb.isChecked()]
+        selected = self.get_tables_to_clear()
         if not selected:
             QMessageBox.information(self, "Hinweis", "Bitte wÃ¤hlen Sie mindestens eine Tabelle aus.")
             return

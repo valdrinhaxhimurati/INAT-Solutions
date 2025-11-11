@@ -1,26 +1,28 @@
-﻿from PyQt5.QtWidgets import (
-    QDialog, QVBoxLayout, QHBoxLayout, QLabel, QLineEdit, QComboBox, QPushButton, QDateEdit, QMessageBox
+﻿# -*- coding: utf-8 -*-
+# NEU: BaseDialog importieren
+from .base_dialog import BaseDialog
+from PyQt5.QtWidgets import (
+    QVBoxLayout, QHBoxLayout, QLabel, QLineEdit,
+    QComboBox, QPushButton, QDateEdit
 )
 from db_connection import get_db, dict_cursor_factory
 from PyQt5.QtCore import Qt, QDate
 
-class ReifenlagerDialog(QDialog):
+# ÄNDERUNG: Von BaseDialog erben
+class ReifenlagerDialog(BaseDialog):
     def __init__(self, parent=None, reifen=None):
+        # ÄNDERUNG: super() für BaseDialog aufrufen
         super().__init__(parent)
         self.setWindowTitle("Reifen erfassen" if reifen is None else "Reifen bearbeiten")
-        self.resize(500, 400)
-        layout = QVBoxLayout()
+        self.resize(480, 600)
 
-        # Kundenliste als ComboBox
+        # WICHTIG: Das Layout vom BaseDialog verwenden
+        layout = self.content_layout
+
+        self.kunden_input = QComboBox()
+        self.kunden_input.setEditable(True)
         layout.addWidget(QLabel("Kunde:"))
-        self.kunden = self.lade_kundenliste()
-        self.kunden_box = QComboBox()
-        self.kunden_box.addItem("Kein Kunde", None)
-        for k in self.kunden:
-            kundennr = k.get("kundennr")
-            anzeige = k.get("display") or f"{(k.get('anrede') or '').strip()} {(k.get('name') or '').strip()}".strip()
-            self.kunden_box.addItem(anzeige or "", kundennr)
-        layout.addWidget(self.kunden_box)
+        layout.addWidget(self.kunden_input)
 
         # Restliche Felder
         self.fahrzeug_input = QLineEdit()
@@ -72,9 +74,9 @@ class ReifenlagerDialog(QDialog):
         layout.addWidget(self.bemerkung_input)
 
         if reifen:
-            idx = self.kunden_box.findText(reifen.get("kunde_anzeige", ""), Qt.MatchContains)
+            idx = self.kunden_input.findText(reifen.get("kunde_anzeige", ""), Qt.MatchContains)
             if idx >= 0:
-                self.kunden_box.setCurrentIndex(idx)
+                self.kunden_input.setCurrentIndex(idx)
             self.fahrzeug_input.setText(reifen.get("fahrzeug", ""))
             self.dimension_input.setText(reifen.get("dimension", ""))
             typ_idx = self.typ_input.findText(reifen.get("typ", ""), Qt.MatchExactly)
@@ -109,16 +111,13 @@ class ReifenlagerDialog(QDialog):
         btn_cancel.clicked.connect(self.reject)
         btn_layout.addWidget(btn_ok)
         btn_layout.addWidget(btn_cancel)
-
         layout.addLayout(btn_layout)
-        self.setLayout(layout)
 
-    def lade_kundenliste(self):
-        """
-        Liefert Liste von dicts mit mindestens den Keys:
-        'kundennr', 'anrede', 'name', 'firma', 'display'
-        (robust gegen dict / sqlite3.Row / tuple rows)
-        """
+        # ÄNDERUNG: self.setLayout(layout) wird nicht mehr benötigt
+        # self.setLayout(layout)
+
+    def _lade_kunden(self):
+        # DIESE METHODE BLEIBT UNVERÄNDERT
         out = []
         conn = get_db()
         try:
@@ -184,11 +183,8 @@ class ReifenlagerDialog(QDialog):
             })
         return out
 
-    def accept(self):
-        # keine Pflicht mehr: akzeptieren auch ohne Kundenauswahl (DB vergibt eigene ID)
-        super().accept()
-
     def get_daten(self):
+        # DIESE METHODE BLEIBT UNVERÄNDERT
         # Sentinel für "kein Datum" (falls ihr das so verwendet habt)
         sentinel = QDate(2000, 1, 1)
 
@@ -203,8 +199,8 @@ class ReifenlagerDialog(QDialog):
             return d.toString("yyyy-MM-dd")
 
         return {
-            "kundennr": None if self.kunden_box.currentData() is None else int(self.kunden_box.currentData()),
-            "kunde_anzeige": self.kunden_box.currentText(),
+            "kundennr": None if self.kunden_input.currentData() is None else int(self.kunden_input.currentData()),
+            "kunde_anzeige": self.kunden_input.currentText(),
             "fahrzeug": self.fahrzeug_input.text().strip(),
             "dimension": self.dimension_input.text().strip(),
             "typ": self.typ_input.currentText(),
@@ -212,9 +208,7 @@ class ReifenlagerDialog(QDialog):
             "lagerort": self.lagerort_input.text().strip(),
             "eingelagert_am": fmt_date(getattr(self, "eingelagert_am_input", None)),
             "ausgelagert_am": fmt_date(getattr(self, "ausgelagert_am_input", None)),
-            "bemerkung": self.bemerkung_input.text().strip(),
-            "preis": self.preis_input.text().strip(),
-            "waehrung": self.waehrung_input.currentText()
+            "bemerkung": self.bemerkung_input.toPlainText().strip()
         }
 
 

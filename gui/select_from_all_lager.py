@@ -3,6 +3,8 @@ from PyQt5.QtWidgets import QDialog, QVBoxLayout, QHBoxLayout, QTabWidget, QPush
 from PyQt5.QtCore import Qt
 from db_connection import get_db
 import sqlite3
+# NEU: BaseDialog importieren
+from .base_dialog import BaseDialog
 
 def _to_bool(val):
     if isinstance(val, bool):
@@ -15,7 +17,8 @@ def _to_bool(val):
         s = str(val).strip().lower()
         return s in ("1", "true", "t", "yes", "y", "on")
 
-class SelectFromAllLagerDialog(QDialog):
+# ÄNDERUNG: Von BaseDialog erben
+class SelectFromAllLagerDialog(BaseDialog):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setWindowTitle("Aus Lager auswählen")
@@ -23,7 +26,8 @@ class SelectFromAllLagerDialog(QDialog):
         self.selected_item = None
         self.tab_map = {}  # NEU: Speichert die Zuordnung von Index zu Lagertyp
 
-        layout = QVBoxLayout()
+        # WICHTIG: Das Layout vom BaseDialog verwenden
+        layout = self.content_layout
         self.tabs = QTabWidget()
 
         # Lade aktive Lager
@@ -41,7 +45,7 @@ class SelectFromAllLagerDialog(QDialog):
         btn_layout.addWidget(btn_cancel)
         layout.addLayout(btn_layout)
 
-        self.setLayout(layout)
+        # ÄNDERUNG: self.setLayout() entfernen
 
     def _load_aktive_lager_tabs(self):
         try:

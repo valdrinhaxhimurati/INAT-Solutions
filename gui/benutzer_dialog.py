@@ -3,6 +3,8 @@ from PyQt5.QtWidgets import (
     QDialog, QVBoxLayout, QHBoxLayout, QListWidget, QLineEdit,
     QPushButton, QLabel, QMessageBox
 )
+# NEU: BaseDialog importieren
+from .base_dialog import BaseDialog
 from db_connection import connect_sqlite_at
 from PyQt5.QtWidgets import QLineEdit
 import bcrypt
@@ -131,18 +133,20 @@ def _configure_password_field(self):
         self.passwort_edit.setReadOnly(False)
 
 
-class BenutzerVerwaltenDialog(QDialog):
+# ÄNDERUNG: Von BaseDialog erben
+class BenutzerVerwaltenDialog(BaseDialog):
     def __init__(self, db_path, parent=None):
         super().__init__(parent)
         self.db_path = db_path
         self.setWindowTitle("Benutzer verwalten")
-        self.setMinimumWidth(360)
+        self.setMinimumWidth(400)
 
         # Tabelle users sicherstellen und Liste laden
         init_db(self.db_path)
 
         # UI
-        lay = QVBoxLayout(self)
+        # WICHTIG: Das Layout vom BaseDialog verwenden
+        lay = self.content_layout
         self.list = QListWidget()
         lay.addWidget(self.list)
 

@@ -3,10 +3,12 @@ from PyQt5.QtWidgets import (
     QPushButton, QWidget, QHBoxLayout, QFormLayout, QMessageBox, QRadioButton, QApplication
 )
 from PyQt5.QtCore import Qt, QProcess
+from .base_dialog import BaseDialog
 from gui.utils import create_button_bar
 from db_connection import get_remote_status, test_remote_connection, enable_remote, disable_remote
 
-class DBSettingsDialog(QDialog):
+# ÄNDERUNG: Von BaseDialog erben
+class DBSettingsDialog(BaseDialog):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setWindowTitle("Datenbank-Einstellungen")
@@ -15,8 +17,8 @@ class DBSettingsDialog(QDialog):
         self._initial_use_remote = bool(status.get("use_remote", False))
         self._initial_url = (status.get("db_url") or "").strip()
 
-        # Root-Layout
-        root = QVBoxLayout(self)
+        # WICHTIG: Das Layout vom BaseDialog verwenden
+        root = self.content_layout
         root.setContentsMargins(16, 16, 16, 16)
         root.setSpacing(12)
 

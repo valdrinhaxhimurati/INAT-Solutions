@@ -3,6 +3,8 @@ from PyQt5.QtWidgets import (
     QTextEdit, QDateTimeEdit, QPushButton, QComboBox, QMessageBox, QFrame
 )
 from PyQt5.QtCore import QDateTime, Qt
+# NEU: BaseDialog importieren
+from .base_dialog import BaseDialog
 from db_connection import get_db
 from datetime import datetime, timezone, date
 
@@ -11,7 +13,8 @@ try:
 except Exception:
     ms_graph = None
 
-class AuftragDialog(QDialog):
+# ÄNDERUNG: Von BaseDialog erben
+class AuftragDialog(BaseDialog):
     def __init__(self, parent=None, auftrag_id=None):
         super().__init__(parent)
         self.auftrag_id = auftrag_id
@@ -24,8 +27,8 @@ class AuftragDialog(QDialog):
             self.load_auftrag()
 
     def init_ui(self):
-        # Korrekte, einfache Layout-Struktur (wie in artikellager_dialog.py)
-        layout = QVBoxLayout()
+        # WICHTIG: Das Layout vom BaseDialog verwenden
+        layout = self.content_layout
         layout.setSpacing(10)
         layout.setContentsMargins(15, 15, 15, 15)
 
@@ -109,8 +112,7 @@ class AuftragDialog(QDialog):
         
         layout.addLayout(button_layout)
         
-        # Setze das Layout für den Dialog
-        self.setLayout(layout)
+        # ÄNDERUNG: self.setLayout() entfernen
         
     def load_kunden(self):
         """Lädt alle Kunden aus der Datenbank."""

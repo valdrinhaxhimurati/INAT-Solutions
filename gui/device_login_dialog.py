@@ -1,27 +1,30 @@
 from PyQt5.QtWidgets import (
-    QDialog, QVBoxLayout, QHBoxLayout, QLabel, QLineEdit, 
+    QVBoxLayout, QHBoxLayout, QLabel, QLineEdit, 
     QPushButton, QApplication, QDialogButtonBox
 )
 from PyQt5.QtCore import Qt
+# NEU: BaseDialog importieren
+from .base_dialog import BaseDialog
 
-class DeviceLoginDialog(QDialog):
+# ÄNDERUNG: Von BaseDialog erben
+class DeviceLoginDialog(BaseDialog):
     """
     Ein Dialog, der den Device-Code-Flow benutzerfreundlich darstellt.
     - Zeigt die URL als klickbaren Link an.
     - Zeigt den Code in einem Feld an und bietet einen Kopieren-Button.
     """
     def __init__(self, flow_data, parent=None):
+        # ÄNDERUNG: super() für BaseDialog aufrufen
         super().__init__(parent)
         self.setWindowTitle("Outlook anmelden")
-        self.setMinimumWidth(400)
+        self.setMinimumWidth(450)
 
         # Extrahieren der Daten aus dem Flow-Dictionary
-        message = flow_data.get("message", "")
         user_code = flow_data.get("user_code", "CODE NICHT GEFUNDEN")
         verification_uri = flow_data.get("verification_uri", "https://microsoft.com/devicelogin")
 
-        # Layout
-        main_layout = QVBoxLayout(self)
+        # WICHTIG: Das Layout vom BaseDialog verwenden
+        main_layout = self.content_layout
 
         # Anweisungstext
         info_label = QLabel("Um sich anzumelden, öffnen Sie die folgende Seite im Browser und geben Sie den Code ein:")
@@ -55,6 +58,7 @@ class DeviceLoginDialog(QDialog):
 
     def copy_code_to_clipboard(self):
         """Kopiert den Code in die Zwischenablage."""
+        # DIESE METHODE BLEIBT UNVERÄNDERT
         clipboard = QApplication.clipboard()
         clipboard.setText(self.code_edit.text())
         # Optional: Visuelles Feedback geben

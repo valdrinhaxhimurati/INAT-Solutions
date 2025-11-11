@@ -1,6 +1,9 @@
 ﻿from PyQt5.QtWidgets import (
-    QDialog, QVBoxLayout, QLabel, QLineEdit, QPushButton, QMessageBox
+    QDialog, QVBoxLayout, QLabel, QLineEdit, QPushButton, QMessageBox,
+    QHBoxLayout
 )
+
+from .base_dialog import BaseDialog
 from db_connection import get_qr_daten, set_qr_daten
 from paths import data_dir
 import json, os
@@ -8,26 +11,27 @@ import json, os
 CONFIG_PFAD = str(data_dir() / "qr_daten.json")
 
 
-class QRDatenDialog(QDialog):
+class QRDatenDialog(BaseDialog):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setWindowTitle("QR-Rechnungsdaten")
-        layout = QVBoxLayout()
+        self.resize(500, 700) # Größe anpassen für besseres Layout
 
+
+        layout = self.content_layout
         self.inputs = {}
 
         felder = [
-            ("name", "Empfängername (z. B. DeineFirma AG)"),
+            ("name", "Empfängername (z.B. DeineFirma AG)"),
             ("street", "Empfängerstraße"),
             ("pcode", "PLZ"),
             ("city", "Ort"),
-            ("country", "Land (z. B. CH)"),
+            ("country", "Land (z.B. CH)"),
             ("iban", "IBAN (QR-IBAN)"),
-            ("currency", "Währung (z. B. CHF)"),
+            ("currency", "Währung (z.B. CHF)"),
             ("reference", "Referenznummer (optional)"),
             ("unstructured_message", "Mitteilung / Zahlungszweck"),
         ]
-
 
         for key, label in felder:
             layout.addWidget(QLabel(label))
@@ -35,11 +39,21 @@ class QRDatenDialog(QDialog):
             self.inputs[key] = line_edit
             layout.addWidget(line_edit)
 
+        layout.addStretch() # Platzhalter, um Buttons nach unten zu schieben
+
+        # ÄNDERUNG: Standard-Button-Leiste am Ende
+        btn_layout = QHBoxLayout()
+        btn_layout.addStretch()
         self.save_button = QPushButton("Speichern")
         self.save_button.clicked.connect(self.save_data)
-        layout.addWidget(self.save_button)
+        self.cancel_button = QPushButton("Abbrechen")
+        self.cancel_button.clicked.connect(self.reject)
+        btn_layout.addWidget(self.save_button)
+        btn_layout.addWidget(self.cancel_button)
+        layout.addLayout(btn_layout)
 
-        self.setLayout(layout)
+        # ÄNDERUNG: self.setLayout() entfernen
+        # self.setLayout(layout)
         self.load_data()
 
     def load_data(self):
