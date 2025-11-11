@@ -156,16 +156,18 @@ class EinstellungenTab(QWidget):
             ("Module verwalten", self._open_module_dialog),
         ]
 
-        # Berechne Höhe so, dass die Boxen Buchhaltung/Rechnungen gleich groß sind
-        max_rows = max(len(buch_buttons), len(rech_buttons), 1)
-        approx_button_h = 34
-        title_h = 36
-        min_box_h = title_h + max_rows * (approx_button_h + 6) + 20
+        # --- KORREKTUR: Manuelle Höhenberechnung entfernen ---
+        # Die folgenden Zeilen werden entfernt, da Qt das Layout besser automatisch verwaltet.
+        # max_rows = max(len(buch_buttons), len(rech_buttons), 1)
+        # approx_button_h = 34
+        # title_h = 36
+        # min_box_h = title_h + max_rows * (approx_button_h + 6) + 20
 
         # Buchhaltung-Box (links)
         box_buchhaltung = QFrame(); box_buchhaltung.setFrameShape(QFrame.StyledPanel); box_buchhaltung.setObjectName("settingsBox")
-        box_buchhaltung.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
-        box_buchhaltung.setMinimumHeight(min_box_h)
+        # --- KORREKTUR: SizePolicy anpassen für flexibles Wachstum ---
+        box_buchhaltung.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
+        # box_buchhaltung.setMinimumHeight(min_box_h) # Entfernt
         lay_buchhaltung = QVBoxLayout(box_buchhaltung)
         title_buch = QLabel("Buchhaltung"); title_buch.setObjectName("settingsTitle")
         lay_buchhaltung.addWidget(title_buch); lay_buchhaltung.addSpacing(8)
@@ -178,8 +180,9 @@ class EinstellungenTab(QWidget):
 
         # Rechnungen-Box (rechts) - gleiche Höhe wie Buchhaltung
         box_rechnungen = QFrame(); box_rechnungen.setFrameShape(QFrame.StyledPanel); box_rechnungen.setObjectName("settingsBox")
-        box_rechnungen.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
-        box_rechnungen.setMinimumHeight(min_box_h)
+        # --- KORREKTUR: SizePolicy anpassen für flexibles Wachstum ---
+        box_rechnungen.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
+        # box_rechnungen.setMinimumHeight(min_box_h) # Entfernt
         lay_rechnungen = QVBoxLayout(box_rechnungen)
         title_rech = QLabel("Rechnungen"); title_rech.setObjectName("settingsTitle")
         lay_rechnungen.addWidget(title_rech); lay_rechnungen.addSpacing(8)
@@ -191,22 +194,30 @@ class EinstellungenTab(QWidget):
 
         # Lager (unterhalb, links)
         box_lager = QFrame(); box_lager.setFrameShape(QFrame.StyledPanel); box_lager.setObjectName("settingsBox")
+        # --- KORREKTUR: SizePolicy anpassen ---
+        box_lager.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
         lay_lager = QVBoxLayout(box_lager)
         title_lager = QLabel("Lager"); title_lager.setObjectName("settingsTitle")
         lay_lager.addWidget(title_lager); lay_lager.addSpacing(8)
         for text, handler in lager_buttons:
             btn = QPushButton(text); btn.clicked.connect(handler)
             lay_lager.addWidget(btn)
+        # --- NEU: Stretch hinzufügen für konsistentes Layout ---
+        lay_lager.addStretch(1)
         grid.addWidget(box_lager, 2, 0)
 
         # Allgemein (unterhalb, rechts) - Benutzerverwaltungen separat
         box_allgemein = QFrame(); box_allgemein.setFrameShape(QFrame.StyledPanel); box_allgemein.setObjectName("settingsBox")
+        # --- KORREKTUR: SizePolicy anpassen ---
+        box_allgemein.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
         lay_allgemein = QVBoxLayout(box_allgemein)
         title_allg = QLabel("Allgemein"); title_allg.setObjectName("settingsTitle")
         lay_allgemein.addWidget(title_allg); lay_allgemein.addSpacing(8)
         for text, handler in allgemein_buttons:
             btn = QPushButton(text); btn.clicked.connect(handler)
             lay_allgemein.addWidget(btn)
+        # --- NEU: Stretch hinzufügen für konsistentes Layout ---
+        lay_allgemein.addStretch(1)
         grid.addWidget(box_allgemein, 2, 1)
 
         # Spalten gleichmäßig dehnen
@@ -214,8 +225,9 @@ class EinstellungenTab(QWidget):
         grid.setColumnStretch(1, 1)
         # Zeilenverteilung: damit die oberen Boxen gleiche Höhe bekommen
         grid.setRowStretch(0, 0)
-        grid.setRowStretch(1, 0)
-        grid.setRowStretch(2, 0)
+        # --- KORREKTUR: Zeilen erlauben, sich den Platz zu teilen ---
+        grid.setRowStretch(1, 1)
+        grid.setRowStretch(2, 1)
         main.addLayout(grid)
         main.addStretch(1)
 
@@ -562,19 +574,23 @@ class EinstellungenTab(QWidget):
             return
         try:
             if ms_graph.is_connected():
-                QMessageBox.information(self, "Outlook", "Bereits mit Outlook verbunden.")
-                return
-            
+                # --- KORREKTUR: Trennen-Option anbieten ---
+                antwort = QMessageBox.question(self, "Outlook-Verbindung",
+                                               "Sie sind bereits mit einem Outlook-Konto verbunden.\n\nMöchten Sie die Verbindung trennen, um das Konto zu wechseln?",
+                                               QMessageBox.Yes | QMessageBox.No, QMessageBox.No)
+                if antwort == QMessageBox.Yes:
+                    if ms_graph.disconnect():
+                        QMessageBox.information(self, "Outlook", "Verbindung wurde erfolgreich getrennt.")
+                    else:
+                        QMessageBox.warning(self, "Outlook", "Trennen der Verbindung fehlgeschlagen.")
+                return  # In jedem Fall hier beenden
+
+            # Wenn nicht verbunden, den normalen Anmeldevorgang starten
             flow = ms_graph.initiate_device_flow()
             
-            # --- ALT ---
-            # QMessageBox.information(self, "Outlook anmelden", flow.get("message", "Bitte Anweisungen im Browser folgen."))
-            
-            # --- NEU: Unseren benutzerdefinierten Dialog verwenden ---
             dialog = DeviceLoginDialog(flow, self)
-            dialog.exec_() # Zeigt den Dialog an und wartet, bis der Benutzer OK klickt
+            dialog.exec_()
 
-            # Erstelle den Worker und den Thread, um das Warten auszulagern
             self.thread = QThread()
             self.worker = OutlookLoginWorker(flow)
             self.worker.moveToThread(self.thread)

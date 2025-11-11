@@ -57,6 +57,22 @@ def is_connected() -> bool:
     except Exception:
         return False
 
+def disconnect():
+    """Meldet den aktuellen Benutzer ab, indem der Token-Cache geleert wird."""
+    try:
+        app, cache = _build_app()
+        accounts = app.get_accounts()
+        if accounts:
+            for acc in accounts:
+                app.remove_account(acc)
+            _persist_cache(cache)
+        # Zur Sicherheit auch die Datei löschen, falls das Leeren nicht reicht
+        if os.path.exists(CACHE_PATH):
+            os.remove(CACHE_PATH)
+        return True
+    except Exception:
+        return False
+
 def initiate_device_flow():
     app, cache = _build_app()
     flow = app.initiate_device_flow(scopes=SCOPES)

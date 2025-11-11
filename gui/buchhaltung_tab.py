@@ -276,19 +276,7 @@ class BuchhaltungTab(QWidget):
 
 
         main_layout.addLayout(button_layout, 1)
-        # loading indicator label (shown until first chunk or finished)
-        self._loading_label = QLabel("Lädt... Bitte warten", self)
-        self._loading_label.setObjectName("buchhaltung_loading_label")
-        self._loading_label.setAlignment(Qt.AlignCenter)
-        # insert the label above the table in the layout if possible
-        try:
-            main_layout.insertWidget(0, self._loading_label)
-        except Exception:
-            try:
-                main_layout.addWidget(self._loading_label)
-            except Exception:
-                pass
-        self._loading_label.show()
+
         self.setLayout(main_layout)
 
     # NEU: Öffentliche Methode (Slot) zum Aktualisieren der Kategorien
@@ -1030,12 +1018,7 @@ class BuchhaltungTab(QWidget):
             if not rows:
                 return
 
-            # hide loading label once data arrives
-            try:
-                if hasattr(self, "_loading_label") and self._loading_label.isVisible():
-                    self._loading_label.hide()
-            except Exception:
-                pass
+
 
             expected_cols = ["id", "datum", "typ", "kategorie", "betrag", "beschreibung"]
             headers = ["Nr", "Datum", "Typ", "Kategorie", "Betrag (CHF)", "Beschreibung", "Rechnung"]
@@ -1204,22 +1187,7 @@ class BuchhaltungTab(QWidget):
             self._initial_load_rows = None # WICHTIG: Sammelmodus beenden
             self.append_rows(collected_rows)
 
-        try:
-            if self.table.rowCount() == 0:
-                try:
-                    if hasattr(self, "_loading_label"):
-                        self._loading_label.setText("Keine Einträge")
-                        self._loading_label.show()
-                except Exception:
-                    pass
-            else:
-                try:
-                    if hasattr(self, "_loading_label"):
-                        self._loading_label.hide()
-                except Exception:
-                    pass
-        except Exception as e:
-            print(f"[DBG] BuchhaltungTab.load_finished error: {e}", flush=True)
+
 
         # ensure Gesamtbilanz is up-to-date when loading finished
         try:
@@ -1266,10 +1234,7 @@ class BuchhaltungTab(QWidget):
     def filter_anwenden_async(self):
         """Apply filter asynchronously (non-blocking)."""
         try:
-            # Show loading indicator
-            if hasattr(self, "_loading_label"):
-                self._loading_label.setText("Lädt gefilterte Daten...")
-                self._loading_label.show()
+
 
             # Clear table
             self.table.setRowCount(0)
