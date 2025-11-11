@@ -115,6 +115,16 @@ class AuftragskalenderTab(QWidget):
         self.load_week_termine()
         self.load_day_termine()
 
+    # --- NEUE METHODE ---
+    def update_customer_data(self):
+        """
+        Wird aufgerufen, wenn sich Kundendaten geändert haben.
+        Lädt die Terminansichten neu, um die Änderungen zu übernehmen.
+        """
+        print("[Auftragskalender] Aktualisiere Termine aufgrund von Kundenänderung...")
+        self.load_day_termine()
+        self.load_week_termine()
+
     def init_ui(self):
         main_layout = QHBoxLayout(self)
         main_layout.setSpacing(15)

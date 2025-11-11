@@ -376,10 +376,16 @@ def run():
         splash = None
 
     def open_main():
-        # Fenster öffnen
+        nonlocal splash
         mw = MainWindow(benutzername=user, login_db_path=LOGIN_DB_PATH)
+        
+        # --- ÄNDERUNG: Explizit "normal" anzeigen, nicht maximiert ---
+        mw.showNormal()
+        
         app._main_window = mw
-        mw.showMaximized()  # Öffne das Fenster maximiert
+        if splash is not None:
+            splash.close()
+            splash = None
  
  
     if splash is not None and hasattr(splash, "finished"):

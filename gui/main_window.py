@@ -1,7 +1,7 @@
 ﻿# -*- coding: utf-8 -*-
 import ctypes
 from PyQt5.QtWidgets import (
-    QMainWindow, QTabWidget, QLabel, QWidget, QVBoxLayout, QHBoxLayout, QToolButton, QSizePolicy, QTabBar
+    QMainWindow, QTabWidget, QLabel, QWidget, QVBoxLayout, QHBoxLayout, QToolButton, QSizePolicy, QTabBar, QDesktopWidget
 )
 from db_connection import get_db, dict_cursor_factory
 from PyQt5.QtGui import QFont
@@ -58,7 +58,7 @@ class MainWindow(QMainWindow):
         self._login_db_path = login_db_path
         
         self.setWindowFlags(Qt.FramelessWindowHint)
-        self.resize(1920, 1080)
+
         self.setWindowTitle(f"INAT Solutions v{__version__}")
         self.setWindowIcon(QIcon(resource_path("icons/logo.svg")))
 
@@ -112,6 +112,11 @@ class MainWindow(QMainWindow):
         self.auftragskalender_tab = AuftragskalenderTab()
         self.einstellungen_tab = EinstellungenTab(self)
         self.kunden_tab.kunde_aktualisiert.connect(self.rechnungen_tab.aktualisiere_kunden_liste)
+        self.kunden_tab.kunde_aktualisiert.connect(self.auftragskalender_tab.update_customer_data)
+
+        
+        self.resize(1920, 1080)
+        self.center_window()
 
         # Aufruf der zentralen Methode zum Verbinden von Signalen
         self._connect_signals()
@@ -411,4 +416,11 @@ class MainWindow(QMainWindow):
             print("[DBG] started lieferanten TabLoader", flush=True)
         except Exception as e:
             print(f"[DBG] start lieferanten loader failed: {e}", flush=True)
+
+    def center_window(self):
+        """Zentriert das Fenster auf dem Bildschirm."""
+        qr = self.frameGeometry()
+        cp = QDesktopWidget().availableGeometry().center()
+        qr.moveCenter(cp)
+        self.move(qr.topLeft())
 
