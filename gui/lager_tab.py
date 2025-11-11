@@ -26,6 +26,21 @@ class LagerTab(QWidget):
         self.setLayout(self.layout)
         self._load_aktive_lager()
 
+    # NEU: Öffentliche Methode (Slot) zum Empfangen und Weiterleiten von Aktualisierungen
+    def aktualisiere_lieferanten_liste(self):
+        """
+        Wird aufgerufen, wenn sich die Lieferantenliste ändert.
+        Leitet die Anforderung an relevante Unter-Tabs weiter.
+        """
+        print("LagerTab: Signal 'lieferant_aktualisiert' empfangen.")
+        
+        # Prüfen, ob der Materiallager-Tab existiert und eine Aktualisierungsmethode hat
+        if hasattr(self, 'materiallager_tab') and hasattr(self.materiallager_tab, 'aktualisiere_daten'):
+            print("--> Leite Aktualisierung an MateriallagerTab weiter.")
+            self.materiallager_tab.aktualisiere_daten()
+        
+        # Hier könnten zukünftig weitere Unter-Tabs (z.B. Artikellager) aktualisiert werden.
+
     def _load_aktive_lager(self):
         # Layout leeren
         while self.layout.count():

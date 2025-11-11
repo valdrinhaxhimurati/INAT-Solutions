@@ -290,9 +290,20 @@ class BuchhaltungTab(QWidget):
                 pass
         self._loading_label.show()
         self.setLayout(main_layout)
-        # DO NOT load data here (blocking). Data will be loaded asynchronously.
-        # self.lade_eintrage()  # <- removed to avoid UI blocking on construction
 
+    # NEU: Öffentliche Methode (Slot) zum Aktualisieren der Kategorien
+    def aktualisiere_kategorien(self):
+        """Lädt die Kategorien neu und aktualisiert das Filter-Dropdown."""
+        print("BuchhaltungTab: Signal 'kategorien_geaendert' empfangen. Aktualisiere Kategorien...")
+        
+        # Die Logik ist dieselbe wie im Konstruktor
+        self.kategorien = self.lade_kategorien_aus_einstellungen()
+        
+        # ComboBox aktualisieren
+        self.filter_kategorie.clear()
+        self.filter_kategorie.addItem("Alle")
+        self.filter_kategorie.addItems(self.kategorien)
+        
     def lade_firmenname(self):
         """
         Lies 'firmenname' aus der Config-Tabelle (funktioniert für SQLite und Postgres).
@@ -344,6 +355,8 @@ class BuchhaltungTab(QWidget):
                 pass
 
     def lade_kategorien_aus_einstellungen(self):
+        """Liest die Kategorien aus der Datenbank."""
+        kategorien = []
         try:
             daten = get_einstellungen()
             return daten.get("buchhaltungs_kategorien", [])

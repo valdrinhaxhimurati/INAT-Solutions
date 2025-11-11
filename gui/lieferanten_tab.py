@@ -6,9 +6,11 @@ from db_connection import get_db, dict_cursor_factory
 import sqlite3
 import webbrowser
 from PyQt5.QtWidgets import QToolButton
-from PyQt5.QtCore import Qt
+from PyQt5.QtCore import Qt, pyqtSignal
 
 class LieferantenTab(QWidget):
+    lieferant_aktualisiert = pyqtSignal()
+
     def __init__(self):
         super().__init__()
         self.table = QTableWidget()
@@ -166,6 +168,7 @@ class LieferantenTab(QWidget):
             conn.commit()
             conn.close()
             self.lade_lieferanten()
+            self.lieferant_aktualisiert.emit()
 
     def lieferant_bearbeiten(self):
         from gui.lieferanten_dialog import LieferantenDialog
@@ -193,6 +196,7 @@ class LieferantenTab(QWidget):
             conn.commit()
             conn.close()
             self.lade_lieferanten()
+            self.lieferant_aktualisiert.emit()
 
     def lieferant_loeschen(self):
         z = self.table.currentRow()
@@ -244,6 +248,7 @@ class LieferantenTab(QWidget):
                 pass
 
         self.lade_lieferanten()
+        self.lieferant_aktualisiert.emit()
 
     def portal_link_oeffnen(self):
         zeile = self.table.currentRow()

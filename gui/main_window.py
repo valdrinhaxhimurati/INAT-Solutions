@@ -161,6 +161,9 @@ class MainWindow(QMainWindow):
         self.einstellungen_tab = EinstellungenTab(self)
         self.kunden_tab.kunde_aktualisiert.connect(self.rechnungen_tab.aktualisiere_kunden_liste)
 
+        # Aufruf der zentralen Methode zum Verbinden von Signalen
+        self._connect_signals()
+
         self.tabs.addTab(self.kunden_tab, "Kunden")
         self.tabs.addTab(self.rechnungen_tab, "Rechnungen")
         self.tabs.addTab(self.buchhaltung_tab, "Buchhaltung")
@@ -208,6 +211,26 @@ class MainWindow(QMainWindow):
 
         self.setCentralWidget(main_widget)
         QTimer.singleShot(0, self.finish_init)
+
+    # --- NEUE METHODE ---
+    def _connect_signals(self):
+        """Zentrale Methode, um alle Signal-Slot-Verbindungen zu erstellen."""
+        
+        print("Richte zusätzliche Signal-Verbindungen ein...")
+
+        # Verbindungen:
+        # ------------------------------------
+
+        # 2. Lieferanten-Änderungen
+        # QUELLE: LieferantenTab | ZIEL: LagerTab
+        self.lieferanten_tab.lieferant_aktualisiert.connect(self.lager_tab.aktualisiere_lieferanten_liste)
+
+        # 3. Buchhaltungs-Kategorien-Änderungen
+        # QUELLE: EinstellungenTab | ZIEL: BuchhaltungTab
+        self.einstellungen_tab.kategorien_geaendert.connect(self.buchhaltung_tab.aktualisiere_kategorien)
+
+
+
 
     def nativeEvent(self, eventType, message):
         """

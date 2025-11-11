@@ -8,8 +8,19 @@ from gui.materiallager_dialog import MateriallagerDialog
 
 
 class MateriallagerTab(QWidget):
-    def __init__(self):
-        super().__init__()
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setup_ui()
+        self.lade_material()
+
+    # NEU: Öffentliche Methode (Slot) zum Aktualisieren der Daten
+    def aktualisiere_daten(self):
+        """Lädt die Materialliste neu, um Änderungen widerzuspiegeln."""
+        print("MateriallagerTab: Lade Daten neu...")
+        self.lade_material()
+
+    def setup_ui(self):
+        main_layout = QHBoxLayout(self)
         self.table = QTableWidget()
         self.table.setSelectionBehavior(QTableWidget.SelectRows)
         self.table.setSelectionMode(QTableWidget.SingleSelection)
@@ -26,7 +37,6 @@ class MateriallagerTab(QWidget):
         btn_layout.addWidget(btn_loeschen)
         btn_layout.addStretch()
 
-        main_layout = QHBoxLayout()
         main_layout.addWidget(self.table)
         main_layout.addLayout(btn_layout)
         self.setLayout(main_layout)

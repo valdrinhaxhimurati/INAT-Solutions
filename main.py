@@ -380,9 +380,8 @@ def run():
         mw = MainWindow(benutzername=user, login_db_path=LOGIN_DB_PATH)
         app._main_window = mw
         mw.showMaximized()  # Öffne das Fenster maximiert
-        # Die alte splash.finish() Methode wird nicht mehr benötigt,
-        # da der neue Splash-Screen sich selbst schließt.
-
+ 
+ 
     if splash is not None and hasattr(splash, "finished"):
         splash.finished.connect(open_main)
         splash.show() # WICHTIG: Starte den Splash-Screen und die Animation

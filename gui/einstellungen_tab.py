@@ -76,6 +76,9 @@ class OutlookLoginWorker(QObject):
             self.error.emit(str(e))
 
 class EinstellungenTab(QWidget):
+    # NEU: Signal definieren
+    kategorien_geaendert = pyqtSignal()
+
     def __init__(self, parent=None, login_db_path=None):
         super().__init__(parent)
         self.login_db_path = login_db_path
@@ -392,7 +395,12 @@ class EinstellungenTab(QWidget):
         except Exception as e:
             QMessageBox.warning(self, "Kategorien", f"Dialog nicht gefunden:\n{e}")
             return
-        KategorienDialog(self).exec_()
+        
+        dialog = KategorienDialog(self)
+        dialog.exec_() # Dialog wird ausgeführt und blockiert bis zur Schließung
+
+        # NEU: Signal senden, nachdem der Dialog geschlossen wurde
+        self.kategorien_geaendert.emit()
 
     def _open_benutzer_dialog(self):
         from gui.benutzer_dialog import BenutzerVerwaltenDialog
