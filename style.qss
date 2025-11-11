@@ -74,17 +74,27 @@ QTabBar::tab {
     border-radius: 8px 8px 0 0;
     color: #666666;
     font-weight: 500;
-    min-width: 130px;
+    /* NEU: Schriftgröße um ca. 20% erhöhen */
+    font-size: 10pt;
+    /* NEU: Minimale Breite an die größere Schrift anpassen */
+    min-width: 150px;
+
+    /* Animation definieren */
+    transition: background-color 150ms ease-in-out, margin-top 150ms ease-in-out;
 }
 
-/* NEU: Hover-Effekt für nicht ausgewählte Tabs */
+/* Hover-Effekt für nicht ausgewählte Tabs */
 QTabBar::tab:!selected:hover {
     background: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #f9fbfd, stop:1 #f0f4fb);
+    /* NEU: Tab um 2px nach oben bewegen für den "Anhebe"-Effekt */
+    margin-top: 8px;
 }
 
 QTabBar::tab:selected {
     background: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #4a6fa5, stop:1 #3b5b85);
     color: white;
+    /* Der ausgewählte Tab bleibt oben, auch wenn man nicht darüber hovert */
+    margin-top: 8px;
 }
 
 QTabWidget#mainTabs::pane {
