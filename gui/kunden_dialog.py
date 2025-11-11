@@ -1,15 +1,16 @@
-﻿from PyQt5.QtWidgets import QDialog, QVBoxLayout, QHBoxLayout, QLabel, QLineEdit, QPushButton
-from db_connection import get_db, dict_cursor_factory
+﻿from .base_dialog import BaseDialog
+from PyQt5.QtWidgets import QVBoxLayout, QHBoxLayout, QLabel, QLineEdit, QPushButton
 
-class KundenDialog(QDialog):
+class KundenDialog(BaseDialog):
     def __init__(self, parent=None, kunde=None):
         super().__init__(parent)
         self.setWindowTitle("Kunde bearbeiten" if kunde else "Neuen Kunden hinzufügen")
-        self.resize(800, 600)
+        self.resize(500, 450)
 
-        kunde = kunde or {}  # Falls None, leeres Dict
+        kunde = kunde or {}
 
-        layout = QVBoxLayout()
+        # WICHTIG: Das Layout vom BaseDialog verwenden (self.content_layout)
+        layout = self.content_layout
 
         # Anrede
         self.input_anrede = QLineEdit(kunde.get("anrede", ""))
@@ -46,15 +47,18 @@ class KundenDialog(QDialog):
         layout.addWidget(QLabel("E-Mail"))
         layout.addWidget(self.input_email)
 
+        layout.addStretch() # Platzhalter, damit die Buttons unten bleiben
+
         # Buttons
         btn_layout = QHBoxLayout()
         btn_ok = QPushButton("OK")
         btn_abbrechen = QPushButton("Abbrechen")
+        btn_layout.addStretch()
         btn_layout.addWidget(btn_ok)
         btn_layout.addWidget(btn_abbrechen)
 
         layout.addLayout(btn_layout)
-        self.setLayout(layout)
+        # WICHTIG: self.setLayout(layout) wird nicht mehr benötigt, da wir das Layout des BaseDialog verwenden.
 
         btn_ok.clicked.connect(self.accept)
         btn_abbrechen.clicked.connect(self.reject)

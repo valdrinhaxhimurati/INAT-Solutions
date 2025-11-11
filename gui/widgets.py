@@ -1,5 +1,5 @@
-from PyQt5.QtWidgets import QLineEdit
-from PyQt5.QtCore import pyqtSignal
+from PyQt5.QtWidgets import QLineEdit, QWidget, QHBoxLayout, QToolButton
+from PyQt5.QtCore import pyqtSignal, Qt
 from PyQt5.QtGui import QIntValidator, QDoubleValidator
 
 class NumericLineEdit(QLineEdit):
@@ -76,3 +76,53 @@ class NumericLineEdit(QLineEdit):
             self._update_validator()
         except Exception:
             pass
+
+# --- NEU: WindowButtons aus main_window.py hierher verschoben ---
+class WindowButtons(QWidget):
+    """Ein Widget, das nur die Fenster-Buttons (Min, Max, Close) enthält."""
+    def __init__(self, parent):
+        super().__init__(parent)
+        self.parent_window = parent
+
+        layout = QHBoxLayout(self)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(0)
+
+        self.minimize_btn = QToolButton()
+        self.minimize_btn.setObjectName("windowButton")
+        self.minimize_btn.setProperty("buttonRole", "minimize")
+        
+        self.maximize_btn = QToolButton()
+        self.maximize_btn.setObjectName("windowButton")
+        self.maximize_btn.setProperty("buttonRole", "maximize")
+        
+        self.close_btn = QToolButton()
+        self.close_btn.setObjectName("windowButton")
+        self.close_btn.setProperty("buttonRole", "close")
+
+        layout.addWidget(self.minimize_btn)
+        layout.addWidget(self.maximize_btn)
+        layout.addWidget(self.close_btn)
+
+        self.minimize_btn.clicked.connect(self.parent_window.showMinimized)
+        self.maximize_btn.clicked.connect(self.toggle_maximize)
+        self.close_btn.clicked.connect(self.parent_window.close)
+        
+        self.update_maximize_icon()
+
+    def toggle_maximize(self):
+        if self.parent_window.isMaximized():
+            self.parent_window.showNormal()
+        else:
+            self.parent_window.showMaximized()
+        self.update_maximize_icon()
+
+    def update_maximize_icon(self):
+        if self.parent_window.isMaximized():
+            self.maximize_btn.setProperty("buttonRole", "restore")
+        else:
+            self.maximize_btn.setProperty("buttonRole", "maximize")
+        # Stil neu anwenden, um das Icon zu ändern
+        if self.maximize_btn.style():
+            self.maximize_btn.style().unpolish(self.maximize_btn)
+            self.maximize_btn.style().polish(self.maximize_btn)
