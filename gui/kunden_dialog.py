@@ -47,6 +47,11 @@ class KundenDialog(BaseDialog):
         layout.addWidget(QLabel("E-Mail"))
         layout.addWidget(self.input_email)
 
+        # --- NEU: Bemerkungsfeld hinzufügen ---
+        self.input_bemerkung = QLineEdit(kunde.get("bemerkung", ""))
+        layout.addWidget(QLabel("Bemerkung"))
+        layout.addWidget(self.input_bemerkung)
+
         layout.addStretch() # Platzhalter, damit die Buttons unten bleiben
 
         # Buttons
@@ -72,6 +77,8 @@ class KundenDialog(BaseDialog):
             "strasse": self.input_strasse.text(),
             "stadt": self.input_stadt.text(),
             "email": self.input_email.text(),
+            # --- NEU: Bemerkung zurückgeben ---
+            "bemerkung": self.input_bemerkung.text(),
         }
 
 

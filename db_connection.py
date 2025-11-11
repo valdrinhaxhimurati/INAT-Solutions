@@ -73,8 +73,7 @@ class CursorWrapper:
         try:
             if _is_sqlite_cursor(self._cur):
                 sql = _normalize_sql_for_sqlite(sql)
-                if params is not None:
-                    sql = sql.replace("%s", "?")  # Platzhalter an SQLite anpassen
+                sql = sql.replace("%s", "?")
             res = self._cur.execute(sql, params or ())
             return res
         finally:

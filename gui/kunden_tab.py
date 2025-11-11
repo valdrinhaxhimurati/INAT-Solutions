@@ -49,37 +49,38 @@ class KundenTab(QWidget):
         btn_del.clicked.connect(self.kunde_loeschen)
 
         self._ensure_table()
-        # DON'T load synchronously here — data will be loaded asynchronously via TabLoader.
-        # No loading placeholder shown in KundenTab (consistent with other tabs).
-        # Keine Zeilennummern anzeigen
+
         try:
             self.table.verticalHeader().setVisible(False)
         except Exception:
             pass
 
     # --- Helpers: Spalten erkennen und Adressausdruck bauen ---
-    def _detect_kunden_columns(self, conn):
+    def _detect_kunden_columns(self, conn_wrapper):
         names = set()
-        with conn.cursor() as cur:
-            try:
-                if getattr(conn, "is_sqlite", False):
-                    cur.execute("PRAGMA table_info(kunden)")
-                    rows = cur.fetchall()
-                    for r in rows:
-                        name = r["name"] if isinstance(r, dict) else (r[1] if len(r) > 1 else r[0])
-                        names.add(str(name).lower())
-                else:
-                    cur.execute(
-                        "SELECT column_name FROM information_schema.columns "
-                        "WHERE table_schema = current_schema() AND table_name = %s",
-                        ("kunden",)
-                    )
-                    rows = cur.fetchall()
-                    for r in rows:
-                        name = r["column_name"] if isinstance(r, dict) else r[0]
-                        names.add(str(name).lower())
-            except Exception:
-                pass
+        # --- KORREKTUR: Die Prüfung auf SQLite muss auf dem Wrapper stattfinden ---
+        is_sqlite = getattr(conn_wrapper, "is_sqlite", False)
+        conn = getattr(conn_wrapper, "raw", conn_wrapper) # Die rohe Verbindung für die Abfrage holen
+
+        cur = conn.cursor()
+        try:
+            if is_sqlite:
+                # PRAGMA für SQLite
+                cur.execute(f"PRAGMA table_info(kunden)")
+                # Spaltennamen aus dem Ergebnis extrahieren (Index 1)
+                names = {r[1].lower() for r in cur.fetchall()}
+            else:
+                # information_schema für PostgreSQL
+                cur.execute("""
+                    SELECT column_name FROM information_schema.columns
+                    WHERE table_schema = 'public' AND table_name = 'kunden'
+                """)
+                names = {r[0].lower() for r in cur.fetchall()}
+        except Exception:
+            pass
+        finally:
+            cur.close()
+
         def pick(cands):
             for c in cands:
                 if c in names:
@@ -88,12 +89,13 @@ class KundenTab(QWidget):
         return {
             "kundennr": pick(["kundennr", "id", "kunde_id"]) or "kundennr",
             "name":     pick(["name", "kundenname"]) or "name",
-            "anrede":   pick(["anrede", "salutation"]),
-            "email":    pick(["email", "e_mail", "mail"]),
-            "firma":    pick(["firma", "company", "unternehmen"]),
-            "plz":      pick(["plz", "postleitzahl", "zip"]),
-            "strasse":  pick(["strasse", "straÃŸe", "street", "adresse", "address"]),
-            "stadt":    pick(["stadt", "ort", "city", "ortschaft"]),
+            "anrede":   pick(["anrede", "salutation"]) or "anrede",
+            "email":    pick(["email", "e_mail", "mail"]) or "email",
+            "firma":    pick(["firma", "company", "unternehmen"]) or "firma",
+            "plz":      pick(["plz", "postleitzahl", "zip"]) or "plz",
+            "strasse":  pick(["strasse", "straÃŸe", "street", "adresse", "address"]) or "strasse",
+            "stadt":    pick(["stadt", "ort", "city", "ortschaft"]) or "stadt",
+            "bemerkung": pick(["bemerkung", "notes"]) or "bemerkung",
         }
 
     def _adresse_expr(self, cols):
@@ -368,20 +370,20 @@ class KundenTab(QWidget):
         dlg = KundenDialog(self, kunde=None)
         if dlg.exec_() == QDialog.Accepted:
             d = dlg.get_daten()
-            # KORREKTUR: get_db() verwenden, wie es in db_connection.py vorgesehen ist
             conn = get_db()
             try:
-                cols = self._detect_kunden_columns(conn.raw) # .raw für die echte Verbindung
+                # --- KORREKTUR: Den Wrapper übergeben, nicht conn.raw ---
+                cols = self._detect_kunden_columns(conn)
                 field_map = {
                     "anrede": cols.get("anrede"), "name": cols.get("name"), "firma": cols.get("firma"),
                     "plz": cols.get("plz"), "strasse": cols.get("strasse"), "stadt": cols.get("stadt"),
                     "email": cols.get("email"), "bemerkung": cols.get("bemerkung"),
                 }
-                insert_cols = [dbcol for key, dbcol in field_map.items() if dbcol and d.get(key)]
-                insert_vals = [d.get(key) for key, dbcol in field_map.items() if dbcol and d.get(key)]
+                # --- KORREKTUR: Die Bedingung wurde geändert ---
+                insert_cols = [dbcol for key, dbcol in field_map.items() if dbcol and key in d]
+                insert_vals = [d.get(key) for key, dbcol in field_map.items() if dbcol and key in d]
 
                 if insert_cols:
-                    # KORREKTUR: Immer %s verwenden. Der CursorWrapper übersetzt es für SQLite.
                     placeholders = ", ".join(["%s"] * len(insert_cols))
                     sql = f"INSERT INTO kunden ({', '.join(insert_cols)}) VALUES ({placeholders})"
                     
@@ -423,7 +425,8 @@ class KundenTab(QWidget):
             d = dlg.get_daten()
             conn = get_db()
             try:
-                cols = self._detect_kunden_columns(conn.raw)
+                # --- KORREKTUR: Den Wrapper übergeben, nicht conn.raw ---
+                cols = self._detect_kunden_columns(conn)
                 field_map = {
                     "anrede": cols.get("anrede"), "name": cols.get("name"), "plz": cols.get("plz"),
                     "strasse": cols.get("strasse"), "stadt": cols.get("stadt"), "email": cols.get("email"),
@@ -431,13 +434,11 @@ class KundenTab(QWidget):
                 }
                 sets, params = [], []
                 for key, dbcol in field_map.items():
-                    if dbcol is not None:
-                        # KORREKTUR: Immer %s verwenden
+                    if dbcol is not None and key in d:
                         sets.append(f"{dbcol}=%s")
                         params.append(d.get(key, ""))
                 
                 if sets:
-                    # KORREKTUR: Immer %s verwenden
                     sql = f"UPDATE kunden SET {', '.join(sets)} WHERE {cols['kundennr']}=%s"
                     params.append(rid)
                     
