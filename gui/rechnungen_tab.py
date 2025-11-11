@@ -133,7 +133,7 @@ class RechnungenTab(QWidget):
                     """)
                 else:
                     cursor.execute("""
-                        CREATE TABLE IF NOT EXISTS public.kunden (
+                        CREATE TABLE IF NOT EXISTS kunden (
                             kundennr BIGSERIAL PRIMARY KEY,
                             name     TEXT,
                             firma    TEXT,
@@ -145,7 +145,7 @@ class RechnungenTab(QWidget):
                         )
                     """)
                     cursor.execute("""
-                        CREATE TABLE IF NOT EXISTS public.rechnungen (
+                        CREATE TABLE IF NOT EXISTS rechnungen (
                             id BIGSERIAL PRIMARY KEY,
                             rechnung_nr TEXT,
                             kunde TEXT,
@@ -307,21 +307,21 @@ class RechnungenTab(QWidget):
     def _lade_kunden_adressen(self):
         with get_db() as conn:
             with conn.cursor() as cursor:
-                cursor.execute("SELECT name, firma, plz, strasse, stadt FROM public.kunden ORDER BY name")
+                cursor.execute("SELECT name, firma, plz, strasse, stadt FROM kunden ORDER BY name")
                 daten = cursor.fetchall()
         return {name: f"{strasse}\n{plz} {stadt}" for name, firma, plz, strasse, stadt in daten}
 
     def _lade_kunden_firmen(self):
         with get_db() as conn:
             with conn.cursor() as cursor:
-                cursor.execute("SELECT name, firma FROM public.kunden ORDER BY name")
+                cursor.execute("SELECT name, firma FROM kunden ORDER BY name")
                 daten = cursor.fetchall()
         return {name: firma for name, firma in daten}
 
     def _lade_kundennamen(self):
         with get_db() as conn:
             with conn.cursor() as cursor:
-                cursor.execute("SELECT name FROM public.kunden ORDER BY name")
+                cursor.execute("SELECT name FROM kunden ORDER BY name")
                 namen = [row[0] for row in cursor.fetchall()]
         return namen
 
@@ -358,7 +358,7 @@ class RechnungenTab(QWidget):
             with conn.cursor() as cursor:
                 cursor.execute("""
                     SELECT id, rechnung_nr, kunde, firma, adresse, datum, mwst, zahlungskonditionen, positionen, uid, abschluss, COALESCE(abschluss_text,'')
-                    FROM public.rechnungen ORDER BY datum DESC NULLS LAST, id DESC
+                    FROM rechnungen ORDER BY datum DESC NULLS LAST, id DESC
                 """)
                 daten = cursor.fetchall()
 
@@ -457,7 +457,7 @@ class RechnungenTab(QWidget):
 
         with get_db() as conn:
             with conn.cursor() as cursor:
-                cursor.execute("UPDATE public.rechnungen SET abschluss=%s WHERE id=%s", (status, rechnung_id))
+                cursor.execute("UPDATE rechnungen SET abschluss=%s WHERE id=%s", (status, rechnung_id))
             conn.commit()
 
         # UI aktualisieren
@@ -533,7 +533,7 @@ class RechnungenTab(QWidget):
         if antwort == QMessageBox.Yes:
             with get_db() as conn:
                 with conn.cursor() as cursor:
-                    cursor.execute("DELETE FROM public.rechnungen WHERE id = %s", (rechnung_id,))
+                    cursor.execute("DELETE FROM rechnungen WHERE id = %s", (rechnung_id,))
                 conn.commit()
             self.lade_rechnungen()
 
@@ -544,7 +544,7 @@ class RechnungenTab(QWidget):
             with get_db() as conn:
                 with conn.cursor() as cursor:
                     cursor.execute("""
-                        UPDATE public.rechnungen SET
+                        UPDATE rechnungen SET
                             rechnung_nr = %s, kunde = %s, firma = %s, adresse = %s, datum = %s,
                             mwst = %s, zahlungskonditionen = %s, positionen = %s, uid = %s, abschluss = %s, abschluss_text=%s
                         WHERE id = %s
@@ -567,7 +567,7 @@ class RechnungenTab(QWidget):
             with get_db() as conn:
                 with conn.cursor() as cursor:
                     cursor.execute("""
-                        INSERT INTO public.rechnungen (
+                        INSERT INTO rechnungen (
                             rechnung_nr, kunde, firma, adresse, datum,
                             mwst, zahlungskonditionen, positionen, uid, abschluss, abschluss_text
                         ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
@@ -887,7 +887,7 @@ class RechnungenTab(QWidget):
             qr_data = _get_qr_daten()
             creditor = qr_data.get("creditor") or {
                 'name': "Deine Firma GmbH", 'street': "Musterstrasse 1",
-                'pcode': "8000", 'city': "ZÃ¼rich", 'country': "CH",
+                'pcode': "8000", 'city': "Zürich", 'country': "CH",
             }
             iban = qr_data.get("iban") or "CH5800791123000889012"
             currency = qr_data.get("currency", "CHF")
@@ -896,7 +896,7 @@ class RechnungenTab(QWidget):
                 'name': "Deine Firma GmbH",
                 'street': "Musterstrasse 1",
                 'pcode': "8000",
-                'city': "ZÃ¼rich",
+                'city': "Zürich",
                 'country': "CH",
             }
             iban = "CH5800791123000889012"

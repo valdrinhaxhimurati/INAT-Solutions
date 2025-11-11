@@ -649,6 +649,24 @@ def ensure_app_schema():
             ("betrag", "NUMERIC"),
             ("beschreibung", "TEXT")
         ],
+        "auftraege": [
+            ("id", "BIGSERIAL PRIMARY KEY"),
+            ("titel", "TEXT NOT NULL"),
+            ("beschreibung", "TEXT"),
+            ("start_zeit", "TIMESTAMP NOT NULL"),
+            ("end_zeit", "TIMESTAMP NOT NULL"),
+            ("ort", "TEXT"),
+            ("kunden_id", "INTEGER"),
+            ("rechnung_id", "INTEGER"),
+            ("outlook_event_id", "TEXT UNIQUE"),
+            ("created_at", "TIMESTAMP DEFAULT CURRENT_TIMESTAMP")
+        ],
+        # --- NEU: Tabelle für die Outlook-Synchronisation ---
+        "outlook_events": [
+            ("outlook_event_id", "TEXT PRIMARY KEY"),
+            ("auftrag_id", "INTEGER NOT NULL"),
+            ("last_sync", "TIMESTAMP")
+        ],
         "invoices": [
             ("id", "BIGSERIAL PRIMARY KEY" if not _is_sqlite(get_db()) else "INTEGER PRIMARY KEY AUTOINCREMENT"),
             ("buchung_id", "BIGINT"),
@@ -772,7 +790,8 @@ def ensure_app_schema():
                         t = "INTEGER PRIMARY KEY AUTOINCREMENT"
                     else:
                         t = t.replace("BIGSERIAL", "INTEGER").replace("SERIAL", "INTEGER") \
-                             .replace("BYTEA", "BLOB").replace("JSONB", "TEXT")
+                             .replace("BYTEA", "BLOB").replace("JSONB", "TEXT") \
+                             .replace("TIMESTAMP", "TEXT").replace("TIMESTAMPTZ", "TEXT")
                     col_defs.append(f"{name} {t}")
                 create_sql = f"CREATE TABLE IF NOT EXISTS {table} ({', '.join(col_defs)})"
             else:
@@ -801,7 +820,8 @@ def ensure_app_schema():
                     for name, typ in cols:
                         if name not in existing:
                             t = typ.replace("BIGSERIAL", "INTEGER").replace("SERIAL", "INTEGER") \
-                                   .replace("BYTEA", "BLOB").replace("JSONB", "TEXT")
+                                   .replace("BYTEA", "BLOB").replace("JSONB", "TEXT") \
+                                   .replace("TIMESTAMP", "TEXT").replace("TIMESTAMPTZ", "TEXT")
                             try:
                                 cur.execute(f"ALTER TABLE {table} ADD COLUMN {name} {t}")
                             except Exception:
