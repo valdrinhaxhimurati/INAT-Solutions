@@ -1,5 +1,5 @@
 #define MyAppName "INAT Solutions"
-#define MyAppVersion "0.8.6.5"
+#define MyAppVersion "0.9.0.0"
 #define MyAppPublisher "INAT Solutions"
 #define MyAppExeName "INAT-Solutions.exe"
 #define MySourceDir "..\dist\INAT-Solutions"
@@ -8,8 +8,10 @@
 [Setup]
 AppName={#MyAppName}
 AppVersion={#MyAppVersion}
-DefaultDirName={localappdata}\{#MyAppName}  
-PrivilegesRequired=lowest
+; --- KORREKTUR: Standard-Installationspfad für 64-Bit-Anwendungen ---
+DefaultDirName={autopf64}\{#MyAppName}
+; --- KORREKTUR: Admin-Rechte für die Installation in Program Files anfordern ---
+PrivilegesRequired=admin
 ArchitecturesAllowed=x64
 ArchitecturesInstallIn64BitMode=x64
 DisableDirPage=no
@@ -18,144 +20,38 @@ DisableProgramGroupPage=yes
 ShowLanguageDialog=yes
 SetupIconFile={#MyAssetsDir}\app.ico
 UninstallDisplayIcon={app}\{#MyAppExeName}
-OutputBaseFilename=INAT Solutions Setup  
+OutputBaseFilename=INAT Solutions Setup
 
 [Languages]
 Name: "de"; MessagesFile: "compiler:Languages\German.isl"
 Name: "en"; MessagesFile: "compiler:Default.isl"
 
 [Dirs]
-; Zentraler Datenordner (schreibbar, leer starten)
-Name: "{commonappdata}\INAT Solutions\data"; Permissions: users-modify; Flags: uninsalwaysuninstall
-Name: "{commonappdata}\INAT Solutions\logs"; Permissions: users-modify; Flags: uninsalwaysuninstall
+; Zentraler Datenordner für alle Benutzer. Wird bei Updates NICHT gelöscht.
+; Permissions: users-modify -> Stellt sicher, dass normale Benutzer hier schreiben können.
+Name: "{commonappdata}\INAT Solutions\data"; Permissions: users-modify; Flags: uninsneveruninstall
+Name: "{commonappdata}\INAT Solutions\logs"; Permissions: users-modify; Flags: uninsneveruninstall
 
 [Files]
-; App-Binaries, aber KEINE DBs/Einstellungen mitliefern
+; App-Binaries in das Installationsverzeichnis kopieren.
+; WICHTIG: Keine Entwickler-Datenbanken oder Konfigs mitliefern.
 Source: "{#MySourceDir}\*"; DestDir: "{app}"; Flags: recursesubdirs createallsubdirs ignoreversion; \
-  Excludes: "*.db;*.sqlite;*.mdb;*.ldf;*.ndf;*.log;*.json;*.yml;*.yaml;*.ini"
+  Excludes: "*.db;*.sqlite;*.log;config.json"
 
-; Optional: leere Default-Config (falls App sie erwartet)
-; Source: ".\installer\assets\empty.json"; DestDir: "{commonappdata}\{#MyAppName}\data"; DestName: "config.json"; Flags: ignoreversion overwritereadonly
-Source: "{#MyAssetsDir}\splash-de.bmp"; Flags: dontcopy
-Source: "{#MyAssetsDir}\splash-en.bmp"; Flags: dontcopy
-
-[InstallDelete]
-; Vor Installation alles Alte entfernen (DBs/Einstellungen)
-Type: files; Name: "{app}\*.db"
-Type: files; Name: "{app}\*.sqlite"
-Type: files; Name: "{app}\*.json"
-Type: files; Name: "{app}\*.ini"
-Type: files; Name: "{commonappdata}\{#MyAppName}\data\*.*"
-Type: files; Name: "{localappdata}\{#MyAppName}\data\*.*"
-Type: files; Name: "{userappdata}\{#MyAppName}\data\*.*"
-
-[UninstallDelete]
-; Beim Deinstallieren Datenordner komplett entfernen
-Type: filesandordirs; Name: "{commonappdata}\{#MyAppName}"
-Type: filesandordirs; Name: "{localappdata}\{#MyAppName}"
-Type: filesandordirs; Name: "{userappdata}\{#MyAppName}"
+[Icons]
+Name: "{group}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"
+Name: "{commondesktop}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; Tasks: desktopicon
 
 [Tasks]
 Name: "desktopicon"; Description: "Desktop-Verknüpfung erstellen"; GroupDescription: "Zusätzliche Symbole:"; Flags: unchecked
 
-[Icons]
-Name: "{commondesktop}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; Tasks: desktopicon
+; --- ENTFERNT: [InstallDelete] ---
+; Diese Sektion wurde entfernt, um Datenverlust bei Updates zu verhindern.
+; Inno Setup überschreibt standardmäßig nur die alten Programmdateien.
 
-[Code]
-#ifdef UNICODE
-  #define AW "W"
-#else
-  #define AW "A"
-#endif
+[UninstallDelete]
+; Beim Deinstallieren den Datenordner nur löschen, wenn der Benutzer zustimmt.
+Type: filesandordirs; Name: "{commonappdata}\{#MyAppName}"
 
-const
-  GWL_EXSTYLE   = -20;
-  WS_EX_LAYERED = $00080000;
-  LWA_ALPHA     = $00000002;
-
-function GetWindowLong(hWnd: HWND; nIndex: Integer): Longint;
-  external 'GetWindowLong{#AW}@user32.dll stdcall';
-function SetWindowLong(hWnd: HWND; nIndex: Integer; dwNewLong: Longint): Longint;
-  external 'SetWindowLong{#AW}@user32.dll stdcall';
-function SetLayeredWindowAttributes(hWnd: HWND; crKey: Longint; bAlpha: Byte; dwFlags: Longint): Boolean;
-  external 'SetLayeredWindowAttributes@user32.dll stdcall';
-function GetSystemMetrics(nIndex: Integer): Integer;
-  external 'GetSystemMetrics@user32.dll stdcall';
-
-var
-  SplashForm: TSetupForm;
-  SplashImg: TBitmapImage;
-
-procedure FadeOutSplash;
-var i: Integer;
-begin
-  if not Assigned(SplashForm) then Exit;
-  for i := 255 downto 0 do begin
-    if (i mod 13) = 0 then begin
-      SetWindowLong(SplashForm.Handle, GWL_EXSTYLE, GetWindowLong(SplashForm.Handle, GWL_EXSTYLE) or WS_EX_LAYERED);
-      SetLayeredWindowAttributes(SplashForm.Handle, 0, i, LWA_ALPHA);
-      Sleep(25);
-    end;
-  end;
-end;
-
-procedure CloseSplash;
-begin
-  if Assigned(SplashForm) then begin
-    FadeOutSplash;
-    SplashForm.Close;
-    SplashForm.Free;
-    SplashForm := nil;
-  end;
-end;
-
-procedure ShowSplash;
-var
-  SplashFile, SplashPath: string;
-  Bmp: TBitmap; W, H, SW, SH: Integer;
-begin
-  if ActiveLanguage = 'de' then SplashFile := 'splash-de.bmp' else SplashFile := 'splash-en.bmp';
-  ExtractTemporaryFile(SplashFile);
-  SplashPath := ExpandConstant('{tmp}\' + SplashFile);
-
-  Bmp := TBitmap.Create;
-  try
-    Bmp.LoadFromFile(SplashPath);
-    W := Bmp.Width; H := Bmp.Height;
-  finally
-    Bmp.Free;
-  end;
-
-  SW := GetSystemMetrics(0); SH := GetSystemMetrics(1);
-
-  SplashForm := CreateCustomForm;
-  SplashForm.BorderStyle := bsNone;
-  SplashForm.Color := clWhite;
-  SplashForm.SetBounds((SW - W) div 2, (SH - H) div 2, W, H);
-
-  SetWindowLong(SplashForm.Handle, GWL_EXSTYLE, GetWindowLong(SplashForm.Handle, GWL_EXSTYLE) or WS_EX_LAYERED);
-  SetLayeredWindowAttributes(SplashForm.Handle, 0, 255, LWA_ALPHA);
-
-  SplashImg := TBitmapImage.Create(SplashForm);
-  SplashImg.Parent := SplashForm;
-  SplashImg.SetBounds(0, 0, W, H);
-  SplashImg.Stretch := False;
-  SplashImg.Bitmap.LoadFromFile(SplashPath);
-
-  SplashForm.Show;
-  SplashForm.Refresh;
-  Sleep(5000);
-  CloseSplash;
-end;
-
-function InitializeSetup: Boolean;
-begin
-  ExtractTemporaryFile('splash-de.bmp');
-  ExtractTemporaryFile('splash-en.bmp');
-  Result := True;
-end;
-
-procedure InitializeWizard;
-begin
-  ShowSplash;  // Splash nach Sprachauswahl anzeigen (sprachspezifischer Text)
-end;
+; --- ENTFERNT: [Code] Sektion ---
+; Die Splash-Screen-Logik wurde entfernt. Dies sollte von der Anwendung selbst gehandhabt werden.

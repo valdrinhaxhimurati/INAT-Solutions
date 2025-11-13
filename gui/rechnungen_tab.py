@@ -36,6 +36,7 @@ class RechnungenTab(QWidget):
 
         self.initialisiere_datenbank()
 
+
         # Hauptlayout: horizontal, links Tabelle, rechts Buttons
         self.layout_main = QHBoxLayout(self)
 
@@ -81,6 +82,7 @@ class RechnungenTab(QWidget):
         self.btn_exportieren.clicked.connect(self.exportiere_ausgewaehlte_rechnung)
         self.btn_vorschau.clicked.connect(self.vorschau_ausgewaehlte_rechnung)
 
+        # --- ENTFERNT: Signal für die Bearbeitung der Bemerkungen ---
 
         # Data will be loaded asynchronously via TabLoader.
         # Keep attribute for compatibility but do not show any loading label.
@@ -328,14 +330,21 @@ class RechnungenTab(QWidget):
     # ---------------- Tabelle / UI ----------------
 
     def _setup_table(self):
-        self.table.setColumnCount(5)
-        self.table.setHorizontalHeaderLabels(["ID", "Rechnungs-Nr", "Kunde", "Datum", "Status"])
-        self.table.setColumnWidth(0, 50)
-        self.table.setColumnWidth(1, 150)
-        self.table.setColumnWidth(2, 200)
-        self.table.setColumnWidth(3, 100)
-        self.table.setColumnWidth(4, 100)
+        # --- KORREKTUR: Spaltenanzahl auf 6 reduziert ---
+        self.table.setColumnCount(6)
+        self.table.setHorizontalHeaderLabels(["ID", "Rechnungs-Nr", "Kunde", "Datum", "Gesamtsumme", "Status"])
+        self.table.setColumnHidden(0, True)
+
+        # --- KORREKTUR: Spaltenlayout angepasst ---
+        header = self.table.horizontalHeader()
+        # Alle Spalten passen sich ihrem Inhalt an
+        for i in range(1, self.table.columnCount()):
+            header.setSectionResizeMode(i, QHeaderView.ResizeToContents)
+        # Verhindert, dass die letzte Spalte den restlichen Platz füllt
+        header.setStretchLastSection(False)
+
         self.table.setSelectionBehavior(self.table.SelectRows)
+        # --- KORREKTUR: Tabelle wieder auf nicht editierbar setzen ---
         self.table.setEditTriggers(self.table.NoEditTriggers)
         # Keine Zeilennummern anzeigen
         try:
@@ -354,31 +363,56 @@ class RechnungenTab(QWidget):
             it.setBackground(brush)
 
     def lade_rechnungen(self):
+        # --- ENTFERNT: Layout-Code wird jetzt nur noch in _setup_table gesetzt ---
+
         with get_db() as conn:
+            is_sqlite = getattr(conn, "is_sqlite", False)
             with conn.cursor() as cursor:
-                cursor.execute("""
+                # --- KORREKTUR: Sortierung nach Rechnungsnummer (numerisch) ---
+                if is_sqlite:
+                    # SQLite: CAST zu INTEGER für numerische Sortierung
+                    order_clause = "ORDER BY CAST(rechnung_nr AS INTEGER) DESC, id DESC"
+                else:
+                    # PostgreSQL: CAST zu BIGINT für numerische Sortierung
+                    order_clause = "ORDER BY CAST(NULLIF(regexp_replace(rechnung_nr, '\\D', '', 'g'), '') AS BIGINT) DESC NULLS LAST, id DESC"
+
+                cursor.execute(f"""
                     SELECT id, rechnung_nr, kunde, firma, adresse, datum, mwst, zahlungskonditionen, positionen, uid, abschluss, COALESCE(abschluss_text,'')
-                    FROM rechnungen ORDER BY datum DESC NULLS LAST, id DESC
+                    FROM rechnungen
+                    {order_clause}
                 """)
                 daten = cursor.fetchall()
 
+        # Blockiere Signale während des Ladens, um ungewollte Speicherungen zu verhindern
+        self.table.blockSignals(True)
         self.rechnungen = []
         self.table.setRowCount(len(daten))
 
         for i, (id_, nr, kunde, firma, adresse, datum, mwst, zahlungskonditionen, positionen_json, uid, abschluss, abschluss_text) in enumerate(daten):
-            self.table.setItem(i, 0, QTableWidgetItem(str(id_)))
-            self.table.setItem(i, 1, QTableWidgetItem(nr or ""))
-            self.table.setItem(i, 2, QTableWidgetItem(kunde or ""))
-            self.table.setItem(i, 3, QTableWidgetItem(str(datum or "")))
-
-            status_text, farbe = self._berechne_status(str(datum or ""), zahlungskonditionen or "", abschluss or "")
-            self.table.setItem(i, 4, QTableWidgetItem(status_text))
-            self._setze_zeilenfarbe(i, farbe)
-
             try:
                 positionen = json.loads(positionen_json) if positionen_json else []
             except Exception:
                 positionen = []
+            
+            # --- NEU: Gesamtsumme berechnen ---
+            gesamtbetrag_netto = sum(float(pos.get("menge", 0)) * float(pos.get("einzelpreis", 0)) for pos in positionen)
+            mwst_prozent = float(mwst or 0)
+            mwst_betrag = gesamtbetrag_netto * mwst_prozent / 100.0
+            gesamtbetrag_brutto = gesamtbetrag_netto + mwst_betrag
+
+            # Spalten füllen
+            self.table.setItem(i, 0, QTableWidgetItem(str(id_)))
+            self.table.setItem(i, 1, QTableWidgetItem(nr or ""))
+            self.table.setItem(i, 2, QTableWidgetItem(kunde or ""))
+            self.table.setItem(i, 3, QTableWidgetItem(str(datum or "")))
+            self.table.setItem(i, 4, QTableWidgetItem(f"{gesamtbetrag_brutto:.2f} CHF"))
+            
+            status_text, farbe = self._berechne_status(str(datum or ""), zahlungskonditionen or "", abschluss or "")
+            self.table.setItem(i, 5, QTableWidgetItem(status_text))
+            
+            # --- ENTFERNT: Logik für Bemerkungs-Spalte ---
+
+            self._setze_zeilenfarbe(i, farbe)
 
             self.rechnungen.append({
                 "id": id_,
@@ -395,6 +429,9 @@ class RechnungenTab(QWidget):
                 "abschluss_text": abschluss_text or "",
                 "status": status_text,
             })
+        
+        # Signale wieder freigeben
+        self.table.blockSignals(False)
 
     # ---------------- Status-Logik ----------------
 
@@ -470,9 +507,11 @@ class RechnungenTab(QWidget):
                 break
 
         status_text, farbe = self._berechne_status(datum, zahlk or "", status)
-        self.table.setItem(zeile, 4, QTableWidgetItem(status_text))
+        self.table.setItem(zeile, 5, QTableWidgetItem(status_text))
         self._setze_zeilenfarbe(zeile, farbe)
         QMessageBox.information(self, "Rechnung", f"Status geändert zu: {status_text}")
+
+
 
     # ---------------- CRUD Rechnungen ----------------
 
@@ -819,7 +858,7 @@ class RechnungenTab(QWidget):
             textobj.setTextOrigin(rand_links, y_zahlung)
             textobj.setLeading(leading)
             zahl_lines = zahlungstext.splitlines()
-            for zeile in zahl_lines:
+            for zeile in zahlungstext.splitlines():
                 textobj.textLine(zeile)
             c.drawText(textobj)
             # genau 2 Zeilen Abstand; für 3 Zeilen ändere zu gap_lines = 3
@@ -1037,21 +1076,29 @@ class RechnungenTab(QWidget):
                     pass
                 self.table.setItem(insert_index, 0, item_id)
 
-                # fill a few visible columns (keep existing UI layout)
+                # --- KORREKTUR: Spalten korrekt befüllen ---
                 try:
+                    # Spalten 1-3: Rechnungs-Nr, Kunde, Datum
                     self.table.setItem(insert_index, 1, QTableWidgetItem(str(values[1] or "")))
                     self.table.setItem(insert_index, 2, QTableWidgetItem(str(values[2] or "")))
                     self.table.setItem(insert_index, 3, QTableWidgetItem(str(values[5] or "")))
-                except Exception:
-                    pass
 
-                # status column and color if helper exists
-                try:
+                    # Spalte 4: Gesamtsumme berechnen
+                    positionen = json.loads(values[8]) if isinstance(values[8], str) and values[8] else (values[8] if isinstance(values[8], list) else [])
+                    mwst_prozent = float(values[6] or 0)
+                    gesamtbetrag_netto = sum(float(pos.get("menge", 0)) * float(pos.get("einzelpreis", 0)) for pos in positionen)
+                    mwst_betrag = gesamtbetrag_netto * mwst_prozent / 100.0
+                    gesamtbetrag_brutto = gesamtbetrag_netto + mwst_betrag
+                    self.table.setItem(insert_index, 4, QTableWidgetItem(f"{gesamtbetrag_brutto:.2f} CHF"))
+
+                    # Spalte 5: Status und Farbe
                     status_text, farbe = self._berechne_status(str(values[5] or ""), values[7] or "", values[10] or "")
-                    self.table.setItem(insert_index, 4, QTableWidgetItem(status_text))
+                    self.table.setItem(insert_index, 5, QTableWidgetItem(status_text))
                     self._setze_zeilenfarbe(insert_index, farbe)
                 except Exception:
                     pass
+
+                # --- ENTFERNT: Alter, fehlerhafter Codeblock ---
 
                 # keep internal cache consistent (prepend)
                 try:

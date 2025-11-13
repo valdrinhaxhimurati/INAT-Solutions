@@ -364,7 +364,8 @@ class BuchhaltungTab(QWidget):
         dialog = BuchhaltungDialog(eintrag={"id": vorschlag_nr}, kategorien=self.kategorien)
         if dialog.exec_() == dialog.Accepted:
             self.speichere_eintrag_aus_dialog(dialog)
-            self.lade_eintraege()
+            # --- KORREKTUR: Langsamen Ladevorgang durch schnellen, asynchronen ersetzen ---
+            self.filter_anwenden_async()
 
     def get_row_id(self, row_index) -> int | None:
         """Return numeric ID for given row or None if not found."""
@@ -410,7 +411,8 @@ class BuchhaltungTab(QWidget):
         dialog = BuchhaltungDialog(eintrag=eintrag, kategorien=self.kategorien)
         if dialog.exec_() == dialog.Accepted:
             self.speichere_eintrag_aus_dialog(dialog, eintrag_id=eintrag_id)
-            self.lade_eintraege()
+            # --- KORREKTUR: Langsamen Ladevorgang durch schnellen, asynchronen ersetzen ---
+            self.filter_anwenden_async()
 
     def eintrag_loeschen(self):
         selected = self.table.currentRow()
@@ -433,7 +435,8 @@ class BuchhaltungTab(QWidget):
             cursor.execute("DELETE FROM buchhaltung WHERE id = %s", (eintrag_id,))
             conn.commit()
             conn.close()
-            self.lade_eintraege()
+            # --- KORREKTUR: Langsamen Ladevorgang durch schnellen, asynchronen ersetzen ---
+            self.filter_anwenden_async()
 
     def vorschau_pdf(self):
         if self.table.rowCount() == 0:
@@ -674,6 +677,8 @@ class BuchhaltungTab(QWidget):
 
 
     def lade_eintraege(self):
+        # --- HINWEIS: Diese Funktion wird jetzt nur noch selten direkt verwendet. ---
+        # Der Haupt-Ladevorgang läuft über filter_anwenden_async.
         conn = get_db()
         cursor = conn.cursor(cursor_factory=dict_cursor_factory(conn))
 
@@ -701,7 +706,13 @@ class BuchhaltungTab(QWidget):
                 )
             """)
 
-        query = "SELECT id, datum, typ, kategorie, betrag, beschreibung FROM buchhaltung WHERE 1=1"
+        # --- OPTIMIERUNG: N+1-Problem beheben durch JOIN ---
+        query = """
+            SELECT b.id, b.datum, b.typ, b.kategorie, b.betrag, b.beschreibung, 
+                   (SELECT COUNT(*) FROM invoices i WHERE i.buchung_id = b.id) as invoice_count
+            FROM buchhaltung b 
+            WHERE 1=1
+        """
         params = []
 
         typ = self.filter_typ.currentText()
@@ -748,7 +759,9 @@ class BuchhaltungTab(QWidget):
         gesamt = 0.0
         
         for row_idx, row in enumerate(daten):
-            for col_idx, value in enumerate(row):
+            # --- ANPASSUNG: Spaltenindizes haben sich durch die neue Abfrage geändert ---
+            # row ist jetzt (id, datum, typ, kategorie, betrag, beschreibung, invoice_count)
+            for col_idx, value in enumerate(row[:-1]): # Letzte Spalte (invoice_count) ignorieren
                 if col_idx == 1:  # Datum-Spalte
                     text = normalize_date_for_display(value)
                 else:
@@ -758,13 +771,10 @@ class BuchhaltungTab(QWidget):
                 self.table.setItem(row_idx, col_idx, item)
 
             # Spalte "Rechnung" ganz am Ende hinzufügen
-            eintrag_id = row[0]
-            inv_rows = get_invoices_for_buchung(eintrag_id)
-            if inv_rows:
-                names = [r[1] for r in inv_rows]
-                invoice_item = QTableWidgetItem(f"✔ {names[0]}")
-                invoice_item.setToolTip("\n".join(names))
-                invoice_item.setTextAlignment(Qt.AlignLeft | Qt.AlignVCenter)
+            invoice_count = row[6] # Letzte Spalte der neuen Abfrage
+            if invoice_count > 0:
+                invoice_item = QTableWidgetItem(f"✔ ({invoice_count})")
+                invoice_item.setTextAlignment(Qt.AlignCenter | Qt.AlignVCenter)
             else:
                 invoice_item = QTableWidgetItem("")
                 invoice_item.setTextAlignment(Qt.AlignCenter)
@@ -833,7 +843,8 @@ class BuchhaltungTab(QWidget):
             filename = os.path.basename(pfad_src)
             save_invoice_db(eintrag_id, filename, data)
             QMessageBox.information(self, "Erfolgreich", f"Rechnung in Datenbank gespeichert: {filename}")
-            self.lade_eintraege()
+            # --- KORREKTUR: Langsamen Ladevorgang durch schnellen, asynchronen ersetzen ---
+            self.filter_anwenden_async()
         except Exception as e:
             QMessageBox.critical(self, "Fehler", f"Rechnung konnte nicht gespeichert werden:\n{e}")
 
@@ -892,7 +903,8 @@ class BuchhaltungTab(QWidget):
         try:
             delete_invoices_for_buchung(eintrag_id)
             QMessageBox.information(self, "Erfolgreich", "Rechnung(en) in der Datenbank erfolgreich gelöscht.")
-            self.lade_eintraege()
+            # --- KORREKTUR: Langsamen Ladevorgang durch schnellen, asynchronen ersetzen ---
+            self.filter_anwenden_async()
         except Exception as e:
             QMessageBox.critical(self, "Fehler", f"Rechnung(en) konnten nicht gelöscht werden:\n{e}")
 
@@ -994,7 +1006,8 @@ class BuchhaltungTab(QWidget):
         conn.commit()
         conn.close()
         QMessageBox.information(self, "Fertig", f"{len(daten)} Buchungen importiert!")
-        self.lade_eintraege()
+        # --- KORREKTUR: Langsamen Ladevorgang durch schnellen, asynchronen ersetzen ---
+        self.filter_anwenden_async()
 
     def append_rows(self, rows):
         """Append a chunk of rows (dicts or sequences) into QTableWidget with fixed column order and coloring."""
@@ -1018,9 +1031,8 @@ class BuchhaltungTab(QWidget):
             if not rows:
                 return
 
-
-
-            expected_cols = ["id", "datum", "typ", "kategorie", "betrag", "beschreibung"]
+            # --- KORREKTUR: Spaltenliste an die SQL-Abfrage anpassen ---
+            expected_cols = ["id", "datum", "typ", "kategorie", "betrag", "beschreibung", "invoice_count"]
             headers = ["Nr", "Datum", "Typ", "Kategorie", "Betrag (CHF)", "Beschreibung", "Rechnung"]
 
             if self.table.columnCount() == 0:
@@ -1046,13 +1058,10 @@ class BuchhaltungTab(QWidget):
                     if isinstance(r, dict):
                         values = [r.get(c, "") for c in expected_cols]
                     else:
-                        seq = list(r)
-                        if len(seq) >= len(expected_cols):
-                            values = seq[:len(expected_cols)]
-                        else:
-                            while len(seq) < len(expected_cols):
-                                seq.append("")
-                            values = seq[:len(expected_cols)]
+                        # --- KORREKTUR: Die gesamte Zeile verwenden ---
+                        values = list(r)
+                        while len(values) < len(expected_cols):
+                            values.append("")
 
                     # ensure id_text and numeric id
                     id_val = values[0]
@@ -1066,7 +1075,8 @@ class BuchhaltungTab(QWidget):
                     row_position = self.table.rowCount()
                     self.table.insertRow(row_position)
                     
-                    for col_idx, val in enumerate(values):
+                    # --- KORREKTUR: Nur die ersten 6 Spalten durchlaufen ---
+                    for col_idx, val in enumerate(values[:-1]):
                         if col_idx == 1:
                             text = normalize_date_for_display(val)
                         elif col_idx == 4:
@@ -1088,11 +1098,18 @@ class BuchhaltungTab(QWidget):
                             item = QTableWidgetItem(text)
                         self.table.setItem(row_position, col_idx, item)
 
-                    # invoice column (last)
+                    # --- KORREKTUR: invoice_count auswerten und in die letzte Spalte schreiben ---
+                    invoice_count = values[6] if len(values) > 6 and values[6] else 0
                     invoice_col = self.table.columnCount() - 1
-                    inv_item = QTableWidgetItem("")
-                    inv_item.setTextAlignment(Qt.AlignCenter)
+                    
+                    if invoice_count > 0:
+                        inv_item = QTableWidgetItem(f"✔ ({invoice_count})")
+                        inv_item.setTextAlignment(Qt.AlignCenter | Qt.AlignVCenter)
+                    else:
+                        inv_item = QTableWidgetItem("")
+                        inv_item.setTextAlignment(Qt.AlignCenter)
                     self.table.setItem(row_position, invoice_col, inv_item)
+
 
                     # apply color by typ (column index 2)
                     try:
@@ -1242,8 +1259,13 @@ class BuchhaltungTab(QWidget):
             # --- NEU: Temporäre Liste zum Sammeln ---
             self._temp_filtered_rows = []
 
-            # Build filter query
-            query = "SELECT id, datum, typ, kategorie, betrag, beschreibung FROM buchhaltung WHERE 1=1"
+            # --- OPTIMIERUNG: N+1-Problem beheben durch JOIN ---
+            query = """
+                SELECT b.id, b.datum, b.typ, b.kategorie, b.betrag, b.beschreibung,
+                       (SELECT COUNT(*) FROM invoices i WHERE i.buchung_id = b.id) as invoice_count
+                FROM buchhaltung b
+                WHERE 1=1
+            """
             params = []
 
             typ = self.filter_typ.currentText()

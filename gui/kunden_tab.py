@@ -24,6 +24,16 @@ class KundenTab(QWidget):
         self.table.setColumnCount(9)
         self.table.setHorizontalHeaderLabels(["ID", "Anrede", "Name", "Firma", "PLZ", "Straße", "Stadt", "E-Mail", "Bemerkung"])
 
+
+        self.table.setColumnHidden(0, True)
+
+
+        header = self.table.horizontalHeader()
+        for i in range(1, 8):
+            header.setSectionResizeMode(i, QHeaderView.ResizeToContents)
+        header.setSectionResizeMode(8, QHeaderView.Stretch)
+
+
         btn_layout = QVBoxLayout()
         btn_add = QToolButton();
         btn_add.setText("Kunde hinzufügen");
@@ -161,40 +171,15 @@ class KundenTab(QWidget):
                 pass
 
     def lade_kunden(self):
-        conn = get_db()
         try:
-            cols = self._detect_kunden_columns(conn)
-            def alias_or_empty(dbcol, alias): return f"{dbcol} AS {alias}" if dbcol else f"NULL AS {alias}"
-            bemerkung_expr = alias_or_empty(cols.get('bemerkung'), 'bemerkung')
-            sql = f"""
-                SELECT
-                    {cols['kundennr']} AS kundennr,
-                    {alias_or_empty(cols.get('anrede'), 'anrede')},
-                    {cols['name']}     AS name,
-                    {alias_or_empty(cols.get('firma'), 'firma')},
-                    {alias_or_empty(cols.get('plz'), 'plz')},
-                    {alias_or_empty(cols.get('strasse'), 'strasse')},
-                    {alias_or_empty(cols.get('stadt'), 'stadt')},
-                    {alias_or_empty(cols.get('email'), 'email')},
-                    {bemerkung_expr}
-                FROM kunden
-                ORDER BY {cols['kundennr']}
-            """
-            with conn.cursor() as cur:
-                cur.execute(sql)
-                rows = cur.fetchall()
-                if rows and not isinstance(rows[0], dict):
-                    desc = getattr(cur, "description", None)
-                    if desc:
-                        cols_desc = [d[0] for d in desc]
-                        rows = [dict(zip(cols_desc, row)) for row in rows]
-                    else:
-                        rows = [dict(r) if hasattr(r, "keys") else r for r in rows]
-
-            col_order = ["kundennr", "anrede", "name", "firma", "plz", "strasse", "stadt", "email", "bemerkung"]
-
+            conn = get_db()
+            cursor = conn.cursor()
+            # --- KORREKTUR: Alphabetische Sortierung nach Namen hinzufügen ---
+            cursor.execute("SELECT kundennr, anrede, name, firma, plz, strasse, stadt, email, bemerkung FROM kunden ORDER BY name ASC")
+            self.kunden = cursor.fetchall()
+            col_order = [0, 1, 2, 3, 4, 5, 6, 7, 8]
             norm_rows = []
-            for r in rows:
+            for r in self.kunden:
                 if isinstance(r, dict):
                     vals = tuple(r.get(c) for c in col_order)
                     norm_rows.append(vals)
@@ -206,9 +191,9 @@ class KundenTab(QWidget):
 
             self.table.setRowCount(len(norm_rows))
             self.table.setColumnCount(len(col_order))
-            self.table.setHorizontalHeaderLabels(["ID","Anrede","Name","Firma","PLZ","Strasse","Stadt","E-Mail","Bemerkung"])
-            self.table.setColumnHidden(0, False)
-            self.table.setColumnWidth(0, 60)
+            self.table.setHorizontalHeaderLabels(["ID","Anrede","Name","Firma","PLZ","Strasse","Stadt","E-Mail","Bemerkung"])          
+            self.table.setColumnHidden(0, True)
+
 
             for ri, row in enumerate(norm_rows):
                 for ci, val in enumerate(row):
@@ -228,15 +213,16 @@ class KundenTab(QWidget):
             except Exception:
                 pass
 
-            # set header to size columns to content (do not stretch)
+
             try:
                 header = self.table.horizontalHeader()
-                header.setSectionResizeMode(QHeaderView.ResizeToContents)
-                header.setStretchLastSection(False)
+                for i in range(self.table.columnCount() - 1):
+                    if not self.table.isColumnHidden(i):
+                        header.setSectionResizeMode(i, QHeaderView.ResizeToContents)
+                header.setSectionResizeMode(self.table.columnCount() - 1, QHeaderView.Stretch)
             except Exception:
                 pass
-            # ensure a one-time adjust based on current contents
-            self.table.resizeColumnsToContents()
+
         finally:
              try:
                  conn.close()
@@ -269,14 +255,7 @@ class KundenTab(QWidget):
 
             expected_cols = ["kundennr", "anrede", "name", "firma", "plz", "strasse", "stadt", "email", "bemerkung"]
 
-            # ensure table headers
-            try:
-                self._ensure_table()
-                header = self.table.horizontalHeader()
-                header.setSectionResizeMode(QHeaderView.ResizeToContents)
-                header.setStretchLastSection(False)
-            except Exception:
-                pass
+            # --- ENTFERNT: Fehlerhafter Code, der das Layout überschreibt ---
 
             try:
                 self.table.setSortingEnabled(False)
@@ -336,7 +315,7 @@ class KundenTab(QWidget):
             try:
                 self.table.setUpdatesEnabled(True)
                 self.table.setSortingEnabled(True)
-                self.table.resizeColumnsToContents()
+
             except Exception:
                 pass
 

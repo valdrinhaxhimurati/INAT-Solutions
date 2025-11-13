@@ -321,10 +321,27 @@ class MainWindow(QMainWindow):
 
         # start rechnungen loader (asynchronous like Buchhaltung) — STARTS ALWAYS
         try:
+            # --- KORREKTUR: Dynamische Query für korrekte Sortierung ---
+            with get_db() as conn:
+                is_sqlite = getattr(conn, "is_sqlite", False)
+            
+            if is_sqlite:
+                # SQLite: CAST zu INTEGER für numerische Sortierung
+                order_clause = "ORDER BY CAST(rechnung_nr AS INTEGER) DESC, id DESC"
+            else:
+                # PostgreSQL: CAST zu BIGINT für numerische Sortierung
+                order_clause = "ORDER BY CAST(NULLIF(regexp_replace(rechnung_nr, '\\D', '', 'g'), '') AS BIGINT) DESC NULLS LAST, id DESC"
+
+            rechnungen_query = f"""
+                SELECT id, rechnung_nr, kunde, firma, adresse, datum, mwst, zahlungskonditionen, positionen, uid, abschluss, COALESCE(abschluss_text,'') 
+                FROM rechnungen 
+                {order_clause}
+            """
+
             loader_r = TabLoader(
                 key="rechnungen",
                 table="rechnungen",
-                query="SELECT id, rechnung_nr, kunde, firma, adresse, datum, mwst, zahlungskonditionen, positionen, uid, abschluss, COALESCE(abschluss_text,'') FROM public.rechnungen ORDER BY datum DESC",
+                query=rechnungen_query,
                 chunk_size=200
             )
             t_r = QThread()
@@ -353,12 +370,13 @@ class MainWindow(QMainWindow):
         except Exception as e:
             print(f"[DBG] start rechnungen loader failed: {e}", flush=True)
 
-        # start kunden loader (asynchronous like others) — STARTS ALWAYS
+        # start kunden loader (asynchronous)
         try:
             loader_k = TabLoader(
                 key="kunden",
                 table="kunden",
-                query="SELECT kundennr, anrede, name, firma, plz, strasse, stadt, email, bemerkung FROM kunden ORDER BY kundennr",
+                # --- KORREKTUR: Alphabetische Sortierung nach Namen hinzufügen ---
+                query="SELECT * FROM kunden ORDER BY name ASC",
                 chunk_size=200
             )
             t_k = QThread()
