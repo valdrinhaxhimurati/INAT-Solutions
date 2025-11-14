@@ -1,7 +1,7 @@
 ﻿# -*- coding: utf-8 -*-
 from PyQt5.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QTableWidget, QTableWidgetItem,
-    QToolButton, QDialog, QMessageBox, QLabel, QHeaderView
+    QToolButton, QDialog, QMessageBox, QLabel, QHeaderView, QLineEdit
 )
 from PyQt5.QtCore import Qt, pyqtSignal
 # KORREKTUR: DBConnection entfernt, da es nicht existiert. Wir verwenden get_db().
@@ -50,7 +50,16 @@ class KundenTab(QWidget):
         btn_layout.addStretch()
 
         main = QHBoxLayout();
-        main.addWidget(self.table);
+        
+        # --- NEU: Layout für Suche und Tabelle ---
+        table_layout = QVBoxLayout()
+        self.suchfeld = QLineEdit()
+        self.suchfeld.setPlaceholderText("Suchen...")
+        self.suchfeld.textChanged.connect(self.filter_tabelle)
+        table_layout.addWidget(self.suchfeld)
+        table_layout.addWidget(self.table)
+
+        main.addLayout(table_layout);
         main.addLayout(btn_layout)
         self.setLayout(main)
 
@@ -64,6 +73,15 @@ class KundenTab(QWidget):
             self.table.verticalHeader().setVisible(False)
         except Exception:
             pass
+
+    # --- NEU: Filterfunktion für die Tabelle ---
+    def filter_tabelle(self, text):
+        """Filtert die Tabelle basierend auf dem Suchtext."""
+        for row in range(self.table.rowCount()):
+            match = any(text.lower() in self.table.item(row, col).text().lower()
+                        for col in range(self.table.columnCount())
+                        if self.table.item(row, col))
+            self.table.setRowHidden(row, not match)
 
     # --- Helpers: Spalten erkennen und Adressausdruck bauen ---
     def _detect_kunden_columns(self, conn_wrapper):

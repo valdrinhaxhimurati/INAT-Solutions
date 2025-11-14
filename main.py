@@ -147,7 +147,8 @@ if %ERRORLEVEL%==0 (
 def sync_from_remote():
     import urllib.request, json, hashlib, tempfile, os, shutil, subprocess, sys
     from packaging import version
-    from PyQt5.QtWidgets import QMessageBox
+    from PyQt5.QtWidgets import QMessageBox, QProgressDialog
+    from PyQt5.QtCore import Qt
 
     log = os.path.join(tempfile.gettempdir(), "inat_update_debug.log")
     def dbg(s):
@@ -165,7 +166,6 @@ def sync_from_remote():
             meta = json.load(r)
         dbg(f"meta: {meta!r}")
 
-        # normalize version strings (strip leading 'v' or 'V')
         remote_ver_str = str(meta.get("version", "0")).lstrip("vV")
         current_ver_str = str(__version__).lstrip("vV")
         remote_ver = version.parse(remote_ver_str)
@@ -186,19 +186,46 @@ def sync_from_remote():
 
         url = meta.get("url")
         expected_sha = str(meta.get("sha256", "")).lower()
+        # --- NEU: Dynamischen Dateinamen aus der version.json holen ---
+        installer_filename = meta.get("filename", "INAT-Solutions-Setup.exe")
+
         if not url:
             dbg("no url in meta")
             QMessageBox.critical(None, "Update fehlgeschlagen", "Keine Download-URL in version.json")
             return
 
-        tmp = tempfile.gettempdir()
-        tmp_file = os.path.join(tmp, "INAT-Solutions-update.exe")
-        dbg(f"downloading to {tmp_file}")
-        urllib.request.urlretrieve(url, tmp_file)
+        tmp_dir = tempfile.gettempdir()
+        installer_path = os.path.join(tmp_dir, installer_filename)
+        dbg(f"downloading to {installer_path}")
 
-        # checksum
+        # --- NEU: Download mit Fortschrittsanzeige ---
+        progress_dialog = QProgressDialog("Update wird heruntergeladen...", "Abbrechen", 0, 100)
+        progress_dialog.setWindowModality(Qt.WindowModal)
+        progress_dialog.show()
+        
+        response = urllib.request.urlopen(url)
+        total_size = int(response.headers.get('content-length', 0))
+        downloaded_size = 0
+        
+        with open(installer_path, 'wb') as f:
+            while True:
+                if progress_dialog.wasCanceled():
+                    dbg("download canceled by user")
+                    return
+                chunk = response.read(8192)
+                if not chunk:
+                    break
+                f.write(chunk)
+                downloaded_size += len(chunk)
+                if total_size > 0:
+                    progress = (downloaded_size / total_size) * 100
+                    progress_dialog.setValue(int(progress))
+        
+        progress_dialog.setValue(100)
+
+        # Checksum
         h = hashlib.sha256()
-        with open(tmp_file, "rb") as f:
+        with open(installer_path, "rb") as f:
             for chunk in iter(lambda: f.read(8192), b""):
                 h.update(chunk)
         got = h.hexdigest().lower()
@@ -208,30 +235,15 @@ def sync_from_remote():
             QMessageBox.critical(None, "Integritätsfehler", "SHA256 stimmt nicht überein.")
             return
 
-        dst = sys.executable
-        backup = dst + ".old"
-        try:
-            shutil.copy2(dst, backup)
-        except Exception:
-            pass
-
-        bat_path = os.path.join(tmp, "inat_update_remote.bat")
-        with open(bat_path, "w", encoding="utf-8") as bat:
-            bat.write(f"""@echo off
-:WAIT
-tasklist /FI "IMAGENAME eq {os.path.basename(dst)}" | find /I "{os.path.basename(dst)}" >nul
-if %ERRORLEVEL%==0 (
-  timeout /t 1 >nul
-  goto WAIT
-)
-if exist "{backup}" del /F /Q "{backup}"
-copy /Y "{tmp_file}" "{dst}"
-start "" "{dst}"
-del "%~f0"
-""")
-        subprocess.Popen(["cmd", "/c", bat_path], creationflags=subprocess.CREATE_NEW_CONSOLE)
-        dbg("updater started")
-        sys.exit(0)
+        # --- KORREKTUR: Installer starten und Anwendung beenden ---
+        QMessageBox.information(None, "Download abgeschlossen", "Der Installer wird nun gestartet. Die Anwendung wird geschlossen.")
+        
+        # Starte den Installer als separaten Prozess
+        subprocess.Popen([installer_path])
+        
+        # Schließe die aktuelle Anwendung
+        dbg("starting installer and quitting application")
+        QApplication.instance().quit()
 
     except Exception as e:
         dbg("exception: " + repr(e))

@@ -1,10 +1,11 @@
 ﻿# -*- coding: utf-8 -*-
 from PyQt5.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QToolButton, QTableWidget, QTableWidgetItem,
-    QMessageBox, QDialog, QFileDialog, QInputDialog, QLabel, QHeaderView
+    QMessageBox, QDialog, QFileDialog, QInputDialog, QLabel, QHeaderView,
+    QLineEdit, QComboBox, QDateEdit, QPushButton
 )
-from PyQt5.QtGui import QBrush, QColor
-from PyQt5.QtCore import Qt
+from PyQt5.QtGui import QBrush, QColor, QFont
+from PyQt5.QtCore import Qt, QDate
 from reportlab.lib.utils import ImageReader
 import io
 from db_connection import get_db, dict_cursor_factory, get_rechnung_layout
@@ -35,10 +36,14 @@ class RechnungenTab(QWidget):
         self.mwst = 0.0
 
         self.initialisiere_datenbank()
+        self.init_ui()
+        self.lade_rechnungen()
 
 
+    def init_ui(self):
         # Hauptlayout: horizontal, links Tabelle, rechts Buttons
-        self.layout_main = QHBoxLayout(self)
+        main_layout = QHBoxLayout(self)
+        left_layout = QVBoxLayout()
 
         # Einstellungen und Layout laden
         self._lade_einstellungen()
@@ -49,14 +54,54 @@ class RechnungenTab(QWidget):
         self.kunden_adressen = self._lade_kunden_adressen()
         self.kunden_firmen = self._lade_kunden_firmen()
 
+        # Suchfeld (wie im Buchhaltung-Tab)
+        self.suchfeld = QLineEdit()
+        self.suchfeld.setPlaceholderText("Suchen...")
+        self.suchfeld.textChanged.connect(self.filter_tabelle)
+        left_layout.addWidget(self.suchfeld)
+
+        # Filter-Layout
+        filter_layout = QHBoxLayout()
+        
+        self.filter_status = QComboBox()
+        self.filter_status.addItems(["Alle Status", "offen", "überfällig", "bezahlt"])
+        filter_layout.addWidget(QLabel("Status:"))
+        filter_layout.addWidget(self.filter_status)
+
+        self.filter_kunde = QComboBox()
+        self.filter_kunde.addItem("Alle Kunden")
+        self.filter_kunde.addItems(self.kunden_liste)
+        filter_layout.addWidget(QLabel("Kunde:"))
+        filter_layout.addWidget(self.filter_kunde)
+
+
+        current_year = QDate.currentDate().year()
+        self.filter_von = QDateEdit(QDate(current_year, 1, 1))
+        self.filter_von.setCalendarPopup(True)
+        filter_layout.addWidget(QLabel("Von:"))
+        filter_layout.addWidget(self.filter_von)
+
+        self.filter_bis = QDateEdit(QDate(current_year, 12, 31))
+        self.filter_bis.setCalendarPopup(True)
+        filter_layout.addWidget(QLabel("Bis:"))
+        filter_layout.addWidget(self.filter_bis)
+
+        self.btn_filter_anwenden = QPushButton("Filter anwenden")
+        self.btn_filter_anwenden.clicked.connect(self.lade_rechnungen)
+        filter_layout.addWidget(self.btn_filter_anwenden)
+
+        left_layout.addLayout(filter_layout)
+
         # Tabelle mit Rechnungen
         self.table = QTableWidget()
         self.table.setSelectionMode(QTableWidget.SingleSelection)
         self._setup_table()
-        self.layout_main.addWidget(self.table, stretch=1)
+        left_layout.addWidget(self.table)
 
-        # Buttons rechts (wie im Kunden-Tab: QToolButton + role-Properties)
-        btn_layout = QVBoxLayout()
+        main_layout.addLayout(left_layout, 3) # Stretch-Faktor 3 für linke Seite
+
+
+        button_layout = QVBoxLayout()
         self.btn_neu = QToolButton();               self.btn_neu.setText("Neue Rechnung");             self.btn_neu.setProperty("role", "add")
         self.btn_bearbeiten = QToolButton();        self.btn_bearbeiten.setText("Rechnung bearbeiten"); self.btn_bearbeiten.setProperty("role", "edit")
         self.btn_loeschen = QToolButton();          self.btn_loeschen.setText("Rechnung löschen");      self.btn_loeschen.setProperty("role", "delete")
@@ -69,10 +114,12 @@ class RechnungenTab(QWidget):
             self.btn_neu, self.btn_bearbeiten, self.btn_loeschen,
             self.btn_set_status, self.btn_exportieren, self.btn_vorschau
         ]:
-            btn_layout.addWidget(btn)
-        btn_layout.addStretch()
+            button_layout.addWidget(btn)
+        button_layout.addStretch()
 
-        self.layout_main.addLayout(btn_layout)
+
+
+        main_layout.addLayout(button_layout, 1) # Stretch-Faktor 1 für rechte Seite
 
         # Button-Events verbinden
         self.btn_neu.clicked.connect(self.neue_rechnung)
@@ -93,6 +140,12 @@ class RechnungenTab(QWidget):
         self.kunden_liste = self._lade_kundennamen()
         self.kunden_adressen = self._lade_kunden_adressen()
         self.kunden_firmen = self._lade_kunden_firmen()
+        
+        # Kunden-Filter aktualisieren
+        self.filter_kunde.clear()
+        self.filter_kunde.addItem("Alle Kunden")
+        self.filter_kunde.addItems(self.kunden_liste)
+
         self.lade_rechnungen()
 
 # ---------------- DB / Settings ----------------
@@ -170,6 +223,7 @@ class RechnungenTab(QWidget):
                         cursor.execute("SELECT setval('rechnungen_id_seq', COALESCE((SELECT MAX(id) FROM rechnungen), 1), true)")
                         # Korrigiert vorsorglich auch die 'kunden'-Tabelle
                         cursor.execute("SELECT setval('kunden_kundennr_seq', COALESCE((SELECT MAX(kundennr) FROM kunden), 1), true)")
+
                     except Exception as e:
                         # Fehler ignorieren, falls die Tabelle/Sequenz noch nicht existiert, was beim allerersten Start normal ist.
                         print(f"Info: Konnte Sequenz nicht synchronisieren (normal beim ersten Start): {e}")
@@ -329,10 +383,19 @@ class RechnungenTab(QWidget):
 
     # ---------------- Tabelle / UI ----------------
 
+    def filter_tabelle(self, text):
+        """Filtert die Tabelle basierend auf dem Suchtext."""
+        for row in range(self.table.rowCount()):
+            match = any(text.lower() in self.table.item(row, col).text().lower()
+                        for col in range(self.table.columnCount())
+                        if self.table.item(row, col))
+            self.table.setRowHidden(row, not match)
+
     def _setup_table(self):
         # --- KORREKTUR: Spaltenanzahl auf 6 reduziert ---
         self.table.setColumnCount(6)
-        self.table.setHorizontalHeaderLabels(["ID", "Rechnungs-Nr", "Kunde", "Datum", "Gesamtsumme", "Status"])
+        # --- KORREKTUR: Spaltenname geändert ---
+        self.table.setHorizontalHeaderLabels(["ID", "Rechnungs-Nr", "Kunde", "Datum", "Rechnungsbetrag", "Status"])
         self.table.setColumnHidden(0, True)
 
         # --- KORREKTUR: Spaltenlayout angepasst ---
@@ -363,11 +426,39 @@ class RechnungenTab(QWidget):
             it.setBackground(brush)
 
     def lade_rechnungen(self):
-        # --- ENTFERNT: Layout-Code wird jetzt nur noch in _setup_table gesetzt ---
+        # --- Suchfeld zurücksetzen, da die Daten neu geladen werden ---
+        self.suchfeld.blockSignals(True)
+        self.suchfeld.clear()
+        self.suchfeld.blockSignals(False)
 
         with get_db() as conn:
             is_sqlite = getattr(conn, "is_sqlite", False)
             with conn.cursor() as cursor:
+                
+                query = """
+                    SELECT id, rechnung_nr, kunde, firma, adresse, datum, mwst, zahlungskonditionen, positionen, uid, abschluss, COALESCE(abschluss_text,'')
+                    FROM rechnungen
+                """
+                
+                # Filterlogik
+                where_clauses = []
+                params = []
+
+                # Datumsfilter
+                von_datum = self.filter_von.date().toString("yyyy-MM-dd")
+                bis_datum = self.filter_bis.date().toString("yyyy-MM-dd")
+                where_clauses.append("datum BETWEEN %s AND %s")
+                params.extend([von_datum, bis_datum])
+
+                # Kundenfilter
+                kunde_filter = self.filter_kunde.currentText()
+                if kunde_filter != "Alle Kunden":
+                    where_clauses.append("kunde = %s")
+                    params.append(kunde_filter)
+
+                if where_clauses:
+                    query += " WHERE " + " AND ".join(where_clauses)
+
                 # --- KORREKTUR: Sortierung nach Rechnungsnummer (numerisch) ---
                 if is_sqlite:
                     # SQLite: CAST zu INTEGER für numerische Sortierung
@@ -376,19 +467,23 @@ class RechnungenTab(QWidget):
                     # PostgreSQL: CAST zu BIGINT für numerische Sortierung
                     order_clause = "ORDER BY CAST(NULLIF(regexp_replace(rechnung_nr, '\\D', '', 'g'), '') AS BIGINT) DESC NULLS LAST, id DESC"
 
-                cursor.execute(f"""
-                    SELECT id, rechnung_nr, kunde, firma, adresse, datum, mwst, zahlungskonditionen, positionen, uid, abschluss, COALESCE(abschluss_text,'')
-                    FROM rechnungen
-                    {order_clause}
-                """)
+                cursor.execute(f"{query} {order_clause}", params)
                 daten = cursor.fetchall()
 
         # Blockiere Signale während des Ladens, um ungewollte Speicherungen zu verhindern
         self.table.blockSignals(True)
         self.rechnungen = []
-        self.table.setRowCount(len(daten))
+        self.table.setRowCount(0) # Tabelle leeren
 
-        for i, (id_, nr, kunde, firma, adresse, datum, mwst, zahlungskonditionen, positionen_json, uid, abschluss, abschluss_text) in enumerate(daten):
+        status_filter = self.filter_status.currentText()
+
+        for (id_, nr, kunde, firma, adresse, datum, mwst, zahlungskonditionen, positionen_json, uid, abschluss, abschluss_text) in daten:
+            status_text, farbe = self._berechne_status(str(datum or ""), zahlungskonditionen or "", abschluss or "")
+            
+            # Status-Filter (nach dem Laden, da Status berechnet wird)
+            if status_filter != "Alle Status" and status_text.lower() != status_filter.lower():
+                continue
+
             try:
                 positionen = json.loads(positionen_json) if positionen_json else []
             except Exception:
@@ -400,19 +495,25 @@ class RechnungenTab(QWidget):
             mwst_betrag = gesamtbetrag_netto * mwst_prozent / 100.0
             gesamtbetrag_brutto = gesamtbetrag_netto + mwst_betrag
 
+
+            # Zeile hinzufügen
+            row_position = self.table.rowCount()
+            self.table.insertRow(row_position)
+
             # Spalten füllen
-            self.table.setItem(i, 0, QTableWidgetItem(str(id_)))
-            self.table.setItem(i, 1, QTableWidgetItem(nr or ""))
-            self.table.setItem(i, 2, QTableWidgetItem(kunde or ""))
-            self.table.setItem(i, 3, QTableWidgetItem(str(datum or "")))
-            self.table.setItem(i, 4, QTableWidgetItem(f"{gesamtbetrag_brutto:.2f} CHF"))
-            
-            status_text, farbe = self._berechne_status(str(datum or ""), zahlungskonditionen or "", abschluss or "")
-            self.table.setItem(i, 5, QTableWidgetItem(status_text))
+            self.table.setItem(row_position, 0, QTableWidgetItem(str(id_)))
+            self.table.setItem(row_position, 1, QTableWidgetItem(nr or ""))
+            self.table.setItem(row_position, 2, QTableWidgetItem(kunde or ""))
+            self.table.setItem(row_position, 3, QTableWidgetItem(str(datum or "")))
+            # --- KORREKTUR: Item erstellen und zentrieren ---
+            item_summe = QTableWidgetItem(f"{gesamtbetrag_brutto:.2f} CHF")
+            item_summe.setTextAlignment(Qt.AlignCenter)
+            self.table.setItem(row_position, 4, item_summe)
+            self.table.setItem(row_position, 5, QTableWidgetItem(status_text))
             
             # --- ENTFERNT: Logik für Bemerkungs-Spalte ---
 
-            self._setze_zeilenfarbe(i, farbe)
+            self._setze_zeilenfarbe(row_position, farbe)
 
             self.rechnungen.append({
                 "id": id_,
@@ -432,6 +533,8 @@ class RechnungenTab(QWidget):
         
         # Signale wieder freigeben
         self.table.blockSignals(False)
+
+
 
     # ---------------- Status-Logik ----------------
 
@@ -893,6 +996,7 @@ class RechnungenTab(QWidget):
             except Exception:
                 fuss_text = ""
 
+
         if fuss_text:
             # Farbe optional übernehmen
             try:
@@ -1089,7 +1193,10 @@ class RechnungenTab(QWidget):
                     gesamtbetrag_netto = sum(float(pos.get("menge", 0)) * float(pos.get("einzelpreis", 0)) for pos in positionen)
                     mwst_betrag = gesamtbetrag_netto * mwst_prozent / 100.0
                     gesamtbetrag_brutto = gesamtbetrag_netto + mwst_betrag
-                    self.table.setItem(insert_index, 4, QTableWidgetItem(f"{gesamtbetrag_brutto:.2f} CHF"))
+                    # --- KORREKTUR: Item erstellen und zentrieren ---
+                    item_summe = QTableWidgetItem(f"{gesamtbetrag_brutto:.2f} CHF")
+                    item_summe.setTextAlignment(Qt.AlignCenter)
+                    self.table.setItem(insert_index, 4, item_summe)
 
                     # Spalte 5: Status und Farbe
                     status_text, farbe = self._berechne_status(str(values[5] or ""), values[7] or "", values[10] or "")
