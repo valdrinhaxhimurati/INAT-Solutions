@@ -145,7 +145,7 @@ if %ERRORLEVEL%==0 (
     sys.exit(0)
 
 def sync_from_remote():
-    import urllib.request, json, hashlib, tempfile, os, shutil, subprocess, sys
+    import urllib.request, json, hashlib, tempfile, os, shutil, subprocess, sys, random
     from packaging import version
     from PyQt5.QtWidgets import QMessageBox, QProgressDialog
     from PyQt5.QtCore import Qt
@@ -160,7 +160,10 @@ def sync_from_remote():
 
     dbg("sync_from_remote start")
     try:
-        version_url = "https://valdrinhaxhimurati.github.io/INAT-Solutions-Updates/version.json"
+        # --- KORREKTUR: Cache-Busting durch zufälligen Parameter ---
+        cache_buster = f"?v={random.randint(1000, 9999)}"
+        version_url = f"https://valdrinhaxhimurati.github.io/INAT-Solutions-Updates/version.json{cache_buster}"
+        
         dbg(f"fetching {version_url}")
         with urllib.request.urlopen(version_url, timeout=10) as r:
             meta = json.load(r)

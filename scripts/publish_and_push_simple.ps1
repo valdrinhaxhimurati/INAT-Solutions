@@ -1,116 +1,124 @@
-// ...existing code...
-    # Start batch in neuer Konsole, dann beenden die App damit das Batch ersetzen kann
-    subprocess.Popen(["cmd", "/k", bat_path], creationflags=subprocess.CREATE_NEW_CONSOLE)
-    sys.exit(0)
+<#
+.SYNOPSIS
+    Erstellt/Aktualisiert ein GitHub-Release und die version.json im öffentlichen Update-Repo.
+.DESCRIPTION
+    Dieses Skript automatisiert den gesamten Release-Prozess:
+    1. Stellt sicher, dass ein Release-Tag im öffentlichen 'INAT-Solutions-Updates'-Repository existiert.
+    2. Lädt die Setup-Datei als Asset hoch (überschreibt sie, falls vorhanden).
+    3. Berechnet den SHA256-Hash der Setup-Datei.
+    4. Erstellt/Aktualisiert die 'version.json' mit den neuen Informationen.
+    5. Pusht die aktualisierte 'version.json' zurück ins Update-Repository.
+.PARAMETER Version
+    Der Name des Git-Tags für das Release (z.B. "v0.9.0.3").
+.PARAMETER FilePath
+    Der Pfad zur Setup-Datei (z.B. ".\installer\output\INAT Solutions Setup.exe").
+#>
+param(
+    [Parameter(Mandatory=$true)]
+    [string]$Version,
 
-def sync_from_remote():
-    import urllib.request, json, hashlib, tempfile, os, shutil, subprocess, sys
-    from packaging import version
-    from PyQt5.QtWidgets import QMessageBox, QProgressDialog
-    from PyQt5.QtCore import Qt
+    [Parameter(Mandatory=$true)]
+    [string]$FilePath
+)
 
-    log = os.path.join(tempfile.gettempdir(), "inat_update_debug.log")
-    def dbg(s):
-        try:
-            with open(log, "a", encoding="utf-8") as f:
-                f.write(s + "\n")
-        except Exception:
-            pass
+# --- Konfiguration ---
+$publicRepo = "valdrinhaxhimurati/INAT-Solutions-Updates"
+$publicRepoUrl = "https://github.com/$publicRepo.git"
 
-    dbg("sync_from_remote start")
-    try:
-        version_url = "https://valdrinhaxhimurati.github.io/INAT-Solutions-Updates/version.json"
-        dbg(f"fetching {version_url}")
-        with urllib.request.urlopen(version_url, timeout=10) as r:
-            meta = json.load(r)
-        dbg(f"meta: {meta!r}")
+# --- Prüfungen ---
+if (-not (Get-Command gh -ErrorAction SilentlyContinue)) {
+    Write-Error "GitHub CLI (gh) ist nicht installiert. Bitte installieren Sie es von https://cli.github.com/"
+    exit 1
+}
+if (-not (Get-Command git -ErrorAction SilentlyContinue)) {
+    Write-Error "Git ist nicht installiert oder nicht im PATH."
+    exit 1
+}
 
-        remote_ver_str = str(meta.get("version", "0")).lstrip("vV")
-        current_ver_str = str(__version__).lstrip("vV")
-        remote_ver = version.parse(remote_ver_str)
-        current_ver = version.parse(current_ver_str)
-        dbg(f"remote={remote_ver} current={current_ver}")
+$fullFilePath = (Resolve-Path -Path $FilePath).Path
+if (-not (Test-Path -Path $fullFilePath -PathType Leaf)) {
+    Write-Error "Die Datei '$fullFilePath' wurde nicht gefunden."
+    exit 1
+}
 
-        if remote_ver <= current_ver:
-            dbg("no update available")
-            return
+# --- Schritt 1: Sicherstellen, dass das Release existiert ---
+Write-Host "1/5: Prüfe, ob Release '$Version' im Repository '$publicRepo' existiert..." -ForegroundColor Cyan
+$releaseExists = $false
+try {
+    gh release view $Version --repo $publicRepo --json tagName --jq .tagName > $null
+    $releaseExists = $true
+}
+catch {
+    # gh release view wirft einen Fehler, wenn das Release nicht existiert, das ist ok.
+    $releaseExists = $false
+}
 
-        ans = QMessageBox.question(None, "Update verfügbar",
-            f"Neue Version {remote_ver} verfügbar (aktuell {current_ver}). Jetzt aktualisieren?",
-            QMessageBox.Yes | QMessageBox.No)
-        dbg(f"user_answer={ans}")
-        if ans != QMessageBox.Yes:
-            dbg("user declined")
-            return
+if ($releaseExists) {
+    Write-Host "Release '$Version' existiert bereits. Fahre fort."
+}
+else {
+    Write-Host "Release '$Version' wird neu erstellt..."
+    try {
+        gh release create $Version --repo $publicRepo --title "Release $Version" --generate-notes
+        if ($LASTEXITCODE -ne 0) { throw "gh release create fehlgeschlagen" }
+        Write-Host "Release '$Version' wurde erfolgreich erstellt." -ForegroundColor Green
+    }
+    catch {
+        Write-Error "Fehler beim Erstellen des GitHub-Releases."
+        exit 1
+    }
+}
 
-        url = meta.get("url")
-        expected_sha = str(meta.get("sha256", "")).lower()
-        # --- NEU: Dynamischen Dateinamen aus der version.json holen ---
-        installer_filename = meta.get("filename", "INAT-Solutions-Setup.exe")
+# --- Schritt 2: Setup-Datei hochladen (wichtigster Schritt) ---
+Write-Host "2/5: Lade Setup-Datei hoch..." -ForegroundColor Cyan
+try {
+    # --clobber überschreibt die Datei, falls sie bereits existiert
+    gh release upload $Version $fullFilePath --repo $publicRepo --clobber
+    if ($LASTEXITCODE -ne 0) { throw "gh release upload fehlgeschlagen" }
+    Write-Host "Setup-Datei wurde erfolgreich hochgeladen." -ForegroundColor Green
+}
+catch {
+    Write-Error "Fehler beim Hochladen der Setup-Datei."
+    exit 1
+}
 
-        if not url:
-            dbg("no url in meta")
-            QMessageBox.critical(None, "Update fehlgeschlagen", "Keine Download-URL in version.json")
-            return
+# --- Schritt 3: SHA256-Hash berechnen ---
+Write-Host "3/5: Berechne SHA256-Hash für die Setup-Datei..." -ForegroundColor Cyan
+$sha256 = (Get-FileHash -Path $fullFilePath -Algorithm SHA256).Hash.ToLower()
+Write-Host "SHA256: $sha256"
 
-        tmp_dir = tempfile.gettempdir()
-        installer_path = os.path.join(tmp_dir, installer_filename)
-        dbg(f"downloading to {installer_path}")
+# --- Schritt 4: version.json aktualisieren ---
+Write-Host "4/5: Aktualisiere 'version.json' im Repository '$publicRepo'..." -ForegroundColor Cyan
+$tempDir = Join-Path $env:TEMP "inat-updates-repo"
+if (Test-Path $tempDir) {
+    Remove-Item -Recurse -Force $tempDir
+}
+git clone $publicRepoUrl $tempDir
 
-        # --- NEU: Download mit Fortschrittsanzeige ---
-        progress_dialog = QProgressDialog("Update wird heruntergeladen...", "Abbrechen", 0, 100)
-        progress_dialog.setWindowModality(Qt.WindowModal)
-        progress_dialog.show()
-        
-        response = urllib.request.urlopen(url)
-        total_size = int(response.headers.get('content-length', 0))
-        downloaded_size = 0
-        
-        with open(installer_path, 'wb') as f:
-            while True:
-                if progress_dialog.wasCanceled():
-                    dbg("download canceled by user")
-                    return
-                chunk = response.read(8192)
-                if not chunk:
-                    break
-                f.write(chunk)
-                downloaded_size += len(chunk)
-                if total_size > 0:
-                    progress = (downloaded_size / total_size) * 100
-                    progress_dialog.setValue(int(progress))
-        
-        progress_dialog.setValue(100)
+$versionJsonPath = Join-Path $tempDir "version.json"
+$installerFilename = Split-Path -Path $fullFilePath -Leaf
+$downloadUrl = "https://github.com/$publicRepo/releases/download/$Version/$installerFilename"
 
-        # Checksum
-        h = hashlib.sha256()
-        with open(installer_path, "rb") as f:
-            for chunk in iter(lambda: f.read(8192), b""):
-                h.update(chunk)
-        got = h.hexdigest().lower()
-        dbg(f"got_sha={got} expected_sha={expected_sha}")
-        if expected_sha and got != expected_sha:
-            dbg("sha mismatch")
-            QMessageBox.critical(None, "Integritätsfehler", "SHA256 stimmt nicht überein.")
-            return
+$versionData = @{
+    version = $Version.TrimStart('v');
+    url = $downloadUrl;
+    sha256 = $sha256;
+    filename = $installerFilename
+}
 
-        # --- KORREKTUR: Installer starten und Anwendung beenden ---
-        QMessageBox.information(None, "Download abgeschlossen", "Der Installer wird nun gestartet. Die Anwendung wird geschlossen.")
-        
-        # Starte den Installer als separaten Prozess
-        subprocess.Popen([installer_path])
-        
-        # Schließe die aktuelle Anwendung
-        dbg("starting installer and quitting application")
-        QApplication.instance().quit()
+$versionData | ConvertTo-Json | Set-Content -Path $versionJsonPath
 
-    except Exception as e:
-        dbg("exception: " + repr(e))
-        try:
-            QMessageBox.critical(None, "Update-Fehler", str(e))
-        except Exception:
-            pass
+# --- Schritt 5: Änderungen an version.json pushen ---
+Write-Host "5/5: Pushe die neue 'version.json'..." -ForegroundColor Cyan
+Push-Location $tempDir
+git config user.name "GitHub Actions"
+git config user.email "actions@github.com"
+git add version.json
+git commit -m "Update version.json to $Version"
+git push
+Pop-Location
 
-def apply_stylesheet(app, filename="style.qss"):
-    import sys, os, re
-// ...existing code...
+# --- Aufräumen ---
+Remove-Item -Recurse -Force $tempDir
+
+Write-Host "Update-Prozess erfolgreich abgeschlossen!" -ForegroundColor Green
