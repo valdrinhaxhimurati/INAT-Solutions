@@ -34,6 +34,7 @@ class RechnungenTab(QWidget):
         super().__init__(parent)
         # Default-MWST (Schutz falls importierte Daten keine mwst liefern)
         self.mwst = 0.0
+        self._known_invoice_ids = set()
 
         self.initialisiere_datenbank()
         self.init_ui()
@@ -473,6 +474,7 @@ class RechnungenTab(QWidget):
         # Blockiere Signale während des Ladens, um ungewollte Speicherungen zu verhindern
         self.table.blockSignals(True)
         self.rechnungen = []
+        self._known_invoice_ids = set()
         self.table.setRowCount(0) # Tabelle leeren
 
         status_filter = self.filter_status.currentText()
@@ -514,6 +516,11 @@ class RechnungenTab(QWidget):
             # --- ENTFERNT: Logik für Bemerkungs-Spalte ---
 
             self._setze_zeilenfarbe(row_position, farbe)
+            if id_ is not None:
+                try:
+                    self._known_invoice_ids.add(int(id_))
+                except Exception:
+                    pass
 
             self.rechnungen.append({
                 "id": id_,
@@ -618,13 +625,47 @@ class RechnungenTab(QWidget):
 
     # ---------------- CRUD Rechnungen ----------------
 
+    def _ermittle_naechste_rechnungsnummer(self) -> str:
+        """Bestimmt die nächste Rechnungsnummer anhand vorhandener Rechnungen (6-stellig)."""
+        with get_db() as conn:
+            with conn.cursor() as cursor:
+                cursor.execute(
+                    "SELECT rechnung_nr FROM rechnungen WHERE rechnung_nr IS NOT NULL AND TRIM(rechnung_nr) <> ''"
+                )
+                rows = cursor.fetchall()
+
+        max_wert = 0
+
+        for row in rows:
+            if isinstance(row, dict):
+                wert = row.get("rechnung_nr")
+            else:
+                try:
+                    wert = row[0]
+                except Exception:
+                    wert = row
+            if not wert:
+                continue
+            if isinstance(wert, bytes):
+                try:
+                    wert = wert.decode("utf-8")
+                except Exception:
+                    wert = wert.decode("latin-1", "ignore")
+            digits_only = "".join(ch for ch in str(wert).strip() if ch.isdigit())
+            if not digits_only:
+                continue
+            try:
+                numeric = int(digits_only)
+            except ValueError:
+                continue
+            if numeric > max_wert:
+                max_wert = numeric
+
+        next_value = max_wert + 1 if max_wert > 0 else 1
+        return f"{next_value:06d}"
+
     def neue_rechnung(self):
-        # Vorschlagsnummer aus Buchhaltung holen
-        with get_db() as con:
-            with con.cursor() as cur:
-                cur.execute("SELECT MAX(id) FROM buchhaltung")
-                max_id = cur.fetchone()[0]
-                vorschlag_nr = str((max_id or 0) + 1)
+        vorschlag_nr = self._ermittle_naechste_rechnungsnummer()
         dialog = RechnungDialog(
             self.kunden_liste,
             self.kunden_firmen,
@@ -1161,6 +1202,14 @@ class RechnungenTab(QWidget):
                             seq.append("")
                         values = seq[:len(expected_cols)]
 
+                id_val = values[0]
+                try:
+                    numeric_id = int(id_val)
+                except Exception:
+                    numeric_id = None
+                if numeric_id is not None and numeric_id in getattr(self, "_known_invoice_ids", set()):
+                    continue
+
                 # insert a new top row
                 try:
                     self.table.insertRow(0)
@@ -1170,7 +1219,6 @@ class RechnungenTab(QWidget):
                     self.table.setRowCount(start + 1)
                     insert_index = start
 
-                id_val = values[0]
                 id_text = "" if id_val is None else str(id_val)
                 item_id = QTableWidgetItem(id_text)
                 try:
@@ -1231,6 +1279,8 @@ class RechnungenTab(QWidget):
                     self.rechnungen = [rec] + getattr(self, "rechnungen", [])
 
             # restore updates and one resize
+                    if numeric_id is not None:
+                        self._known_invoice_ids.add(numeric_id)
             try:
                 self.table.setUpdatesEnabled(True)
                 self.table.setSortingEnabled(True)

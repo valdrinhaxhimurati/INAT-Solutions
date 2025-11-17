@@ -105,6 +105,10 @@ class TabLoader(QObject):
                                         year = None
                                 if year != current_year:
                                     continue
+                            elif self.key == "rechnungen":
+                                year = self._parse_year_from_value(row_dict.get("datum"))
+                                if year != current_year:
+                                    continue
                             out.append(row_dict)
                         except Exception:
                             out.append({i: v for i, v in enumerate(r)})
