@@ -1,5 +1,8 @@
 name: Build & Publish Installer (from main repo)
 
+permissions:
+  contents: write
+
 on:
   workflow_dispatch:
     inputs:
@@ -30,6 +33,7 @@ jobs:
           repository: valdrinhaxhimurati/INAT-Solutions
           path: app
           fetch-depth: 0
+          token: ${{ secrets.MAIN_REPO_TOKEN }}
 
       - name: Setup Python
         uses: actions/setup-python@v5
