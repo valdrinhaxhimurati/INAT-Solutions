@@ -30,7 +30,15 @@ a = Analysis(
         'reportlab.lib.utils','reportlab.pdfgen','reportlab.graphics.renderPM',
         'PIL.Image','packaging','swissqr',
         'PyQt5.QtWinExtras',
-        'svglib.svglib'
+        'svglib.svglib',
+        'fpdf',
+        'fpdf.fpdf',
+        'bs4',
+        'pydantic',
+        'qrcode',
+        'pandas',
+        'iso4217',
+        'pyban'
     ],
     hookspath=[],
     runtime_hooks=[here('pyi_rescopy.py')],

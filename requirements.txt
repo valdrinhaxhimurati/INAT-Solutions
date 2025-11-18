@@ -4,3 +4,12 @@ reportlab
 Pillow
 packaging
 svglib
+fpdf
+beautifulsoup4
+pydantic
+iso4217
+pyban
+qrcode
+lxml
+requests
+pandas
