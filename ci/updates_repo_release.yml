@@ -27,12 +27,27 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Preflight – check MAIN_REPO_TOKEN and access
+        shell: pwsh
+        env:
+          PAT: ${{ secrets.MAIN_REPO_TOKEN }}
+        run: |
+          if (-not $env:PAT) { throw "Secret MAIN_REPO_TOKEN fehlt. Lege im Updates-Repo ein PAT-Secret mit read access auf INAT-Solutions an." }
+          $Headers = @{ Authorization = "token $env:PAT"; 'User-Agent' = 'inat-updater' }
+          try {
+            $r = Invoke-RestMethod -Method Get -Headers $Headers -Uri "https://api.github.com/repos/valdrinhaxhimurati/INAT-Solutions"
+            Write-Host "Zugriff erfolgreich: $($r.full_name)"
+          } catch {
+            throw "Kein Zugriff auf valdrinhaxhimurati/INAT-Solutions mit MAIN_REPO_TOKEN: $($_.Exception.Message)"
+          }
+
       - name: Checkout Main App Repo
         uses: actions/checkout@v4
         with:
           repository: valdrinhaxhimurati/INAT-Solutions
           path: app
           fetch-depth: 0
+          ref: main
           token: ${{ secrets.MAIN_REPO_TOKEN }}
 
       - name: Setup Python
