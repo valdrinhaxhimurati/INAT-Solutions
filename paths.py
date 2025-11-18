@@ -16,6 +16,11 @@ def logs_dir() -> Path:
     p.mkdir(parents=True, exist_ok=True)
     return p
 
+def updates_dir() -> Path:
+    p = program_data() / "updates"
+    p.mkdir(parents=True, exist_ok=True)
+    return p
+
 def users_db_path() -> Path:
     return data_dir() / "users.db"
 

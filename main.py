@@ -1,10 +1,6 @@
 ﻿import os
 import sys
-import json
 import sqlite3
-import shutil
-import subprocess
-import tempfile
 import traceback
 import logging
 from db_connection import get_db, ensure_database_and_tables
@@ -13,7 +9,7 @@ from PyQt5.QtWidgets import QApplication, QMessageBox, QFileDialog, QDialog
 from PyQt5.QtCore import Qt
 from PyQt5.QtGui import QIcon
 from gui.main_window import resource_path
-from gui.progress_dialog import ThemedProgressDialog
+from updater import UpdateManager
 
 app = QApplication(sys.argv)
 
@@ -48,212 +44,6 @@ def benutzer_existieren(db_path: str) -> bool:
     except sqlite3.Error:
         return False
 
-LOCAL_FOLDER = r"C:\Users\V.Haxhimurati\Documents\TEST\dist\INAT Solutions"
-LOCAL_EXE = "INAT Solutions.exe"
-
-def sync_from_local():
-    # alte lokale Prüfung entfernen oder belassen als Fallback
-    progress = ThemedProgressDialog("Suche nach Updates…", cancel_text=None, minimum=0, maximum=0)
-    progress.resize(400, 120)
-    progress.setWindowModality(Qt.ApplicationModal)
-    progress.setWindowTitle("Update prüfen")
-    ico = resource_path("icons/logo.svg")
-    if os.path.exists(ico):
-        progress.setWindowIcon(QIcon(ico))
-    progress.setCancelButton(None)
-    progress.show()
-    QApplication.processEvents()
-
-    candidate = os.path.join(LOCAL_FOLDER, LOCAL_EXE)
-    if not os.path.isfile(candidate):
-        progress.close()
-        return
-
-    from packaging import version
-    current_ver = version.parse(__version__)
-    try:
-        out = subprocess.check_output([candidate, "--version"], stderr=subprocess.DEVNULL, universal_newlines=True, timeout=3).strip()
-        local_ver = version.parse(out)
-    except Exception:
-        progress.close()
-        return
-
-    if local_ver <= current_ver:
-        progress.close()
-        return
-
-    progress.close()
-    ans = QMessageBox.question(None, "Update verfügbar", f"Lokale Version {local_ver} > {current_ver}. Jetzt aktualisieren?", QMessageBox.Yes | QMessageBox.No)
-    if ans != QMessageBox.Yes:
-        return
-
-    dst = sys.executable
-    backup = dst + ".old"
-    try:
-        shutil.copy2(dst, backup)
-    except Exception:
-        pass
-
-    bat_path = os.path.join(tempfile.gettempdir(), "inat_update.bat")
-    logpath = os.path.join(tempfile.gettempdir(), "inat_update.bat.log")
-    dst_name = os.path.basename(dst).replace('"','')
-    # robustes Batch: wartet, versucht mehrfach zu kopieren, loggt Fehler und öffnet Pause bei Fehler
-    bat_contents = f'''@echo off
-echo update started at %DATE% %TIME% > "{logpath}"
-set "DST={dst}"
-set "SRC={candidate}"
-set "BACKUP=%DST%.old"
-echo dst=%DST% >> "{logpath}"
-echo src=%SRC% >> "{logpath}"
-:WAIT_PROC
-REM prüfe ob Prozess mit ImageName läuft
-tasklist /FI "IMAGENAME eq {dst_name}" 2>> "{logpath}" | find /I "{dst_name}" >nul
-if %ERRORLEVEL%==0 (
-  timeout /t 1 >nul
-  goto WAIT_PROC
-)
-echo process not running, attempting copy >> "{logpath}"
-
-REM entferne altes Backup, versuche Copy mehrfach
-if exist "%BACKUP%" del /F /Q "%BACKUP%" >> "{logpath}" 2>&1
-set tries=0
-:TRY_COPY
-set /A tries+=1
-echo try %tries% >> "{logpath}"
-copy /Y "%SRC%" "%DST%" >> "{logpath}" 2>&1
-if %ERRORLEVEL%==0 (
-  echo copy succeeded >> "{logpath}"
-  start "" "%DST%"
-  del "%~f0"
-  exit /B 0
-) else (
-  echo copy failed (exit %ERRORLEVEL%) >> "{logpath}"
-  if %tries% GEQ 20 (
-    echo giving up after %tries% attempts >> "{logpath}"
-    echo Update failed. See "{logpath}"
-    pause
-    exit /B 1
-  )
-  timeout /t 1 >nul
-  goto TRY_COPY
-)
-'''
-    with open(bat_path, "w", encoding="utf-8") as bat:
-        bat.write(bat_contents)
-
-    # Start batch in neuer Konsole, dann beenden die App damit das Batch ersetzen kann
-    subprocess.Popen(["cmd", "/k", bat_path], creationflags=subprocess.CREATE_NEW_CONSOLE)
-    sys.exit(0)
-
-def sync_from_remote():
-    import urllib.request, json, hashlib, tempfile, os, shutil, subprocess, sys, random
-    from packaging import version
-    from PyQt5.QtWidgets import QMessageBox
-
-    log = os.path.join(tempfile.gettempdir(), "inat_update_debug.log")
-    def dbg(s):
-        try:
-            with open(log, "a", encoding="utf-8") as f:
-                f.write(s + "\n")
-        except Exception:
-            pass
-
-    dbg("sync_from_remote start")
-    try:
-        # --- KORREKTUR: Cache-Busting durch zufälligen Parameter ---
-        cache_buster = f"?v={random.randint(1000, 9999)}"
-        version_url = f"https://valdrinhaxhimurati.github.io/INAT-Solutions-Updates/version.json{cache_buster}"
-        
-        dbg(f"fetching {version_url}")
-        with urllib.request.urlopen(version_url, timeout=10) as r:
-            meta = json.load(r)
-        dbg(f"meta: {meta!r}")
-
-        remote_ver_str = str(meta.get("version", "0")).lstrip("vV")
-        current_ver_str = str(__version__).lstrip("vV")
-        remote_ver = version.parse(remote_ver_str)
-        current_ver = version.parse(current_ver_str)
-        dbg(f"remote={remote_ver} current={current_ver}")
-
-        if remote_ver <= current_ver:
-            dbg("no update available")
-            return
-
-        ans = QMessageBox.question(None, "Update verfügbar",
-            f"Neue Version {remote_ver} verfügbar (aktuell {current_ver}). Jetzt aktualisieren?",
-            QMessageBox.Yes | QMessageBox.No)
-        dbg(f"user_answer={ans}")
-        if ans != QMessageBox.Yes:
-            dbg("user declined")
-            return
-
-        url = meta.get("url")
-        expected_sha = str(meta.get("sha256", "")).lower()
-        # --- NEU: Dynamischen Dateinamen aus der version.json holen ---
-        installer_filename = meta.get("filename", "INAT-Solutions-Setup.exe")
-
-        if not url:
-            dbg("no url in meta")
-            QMessageBox.critical(None, "Update fehlgeschlagen", "Keine Download-URL in version.json")
-            return
-
-        tmp_dir = tempfile.gettempdir()
-        installer_path = os.path.join(tmp_dir, installer_filename)
-        dbg(f"downloading to {installer_path}")
-
-        # --- NEU: Download mit Fortschrittsanzeige ---
-        progress_dialog = ThemedProgressDialog("Update wird heruntergeladen...", "Abbrechen", 0, 100)
-        progress_dialog.setWindowModality(Qt.WindowModal)
-        progress_dialog.show()
-        
-        response = urllib.request.urlopen(url)
-        total_size = int(response.headers.get('content-length', 0))
-        downloaded_size = 0
-        
-        with open(installer_path, 'wb') as f:
-            while True:
-                if progress_dialog.wasCanceled():
-                    dbg("download canceled by user")
-                    return
-                chunk = response.read(8192)
-                if not chunk:
-                    break
-                f.write(chunk)
-                downloaded_size += len(chunk)
-                if total_size > 0:
-                    progress = (downloaded_size / total_size) * 100
-                    progress_dialog.setValue(int(progress))
-        
-        progress_dialog.setValue(100)
-
-        # Checksum
-        h = hashlib.sha256()
-        with open(installer_path, "rb") as f:
-            for chunk in iter(lambda: f.read(8192), b""):
-                h.update(chunk)
-        got = h.hexdigest().lower()
-        dbg(f"got_sha={got} expected_sha={expected_sha}")
-        if expected_sha and got != expected_sha:
-            dbg("sha mismatch")
-            QMessageBox.critical(None, "Integritätsfehler", "SHA256 stimmt nicht überein.")
-            return
-
-        # --- KORREKTUR: Installer starten und Anwendung beenden ---
-        QMessageBox.information(None, "Download abgeschlossen", "Der Installer wird nun gestartet. Die Anwendung wird geschlossen.")
-        
-        # Starte den Installer als separaten Prozess
-        subprocess.Popen([installer_path])
-        
-        # Schließe die aktuelle Anwendung
-        dbg("starting installer and quitting application")
-        QApplication.instance().quit()
-
-    except Exception as e:
-        dbg("exception: " + repr(e))
-        try:
-            QMessageBox.critical(None, "Update-Fehler", str(e))
-        except Exception:
-            pass
 
 def apply_stylesheet(app, filename="style.qss"):
     import sys, os, re
@@ -289,6 +79,15 @@ def apply_stylesheet(app, filename="style.qss"):
     qss_mod = re.sub(pattern, repl, qss)
     app.setStyleSheet(qss_mod)
 
+
+def bootstrap_updater(window):
+    try:
+        updater = UpdateManager(current_version=__version__, parent=window)
+        setattr(window, "_update_manager", updater)
+        updater.check_for_updates()
+    except Exception as exc:
+        print(f"[UPDATE] Initialisierung fehlgeschlagen: {exc}", flush=True)
+
 def run():
     app = QApplication(sys.argv)
 
@@ -302,14 +101,6 @@ def run():
     apply_stylesheet(app, "style.qss")
 
     import threading
-    def _bg_run(fn, *a, **kw):
-        try:
-            fn(*a, **kw)
-        except Exception as e:
-            print(f"[BG] {fn.__name__} failed: {e}", flush=True)
-
-
-    threading.Thread(target=_bg_run, args=(sync_from_remote,), daemon=True).start()
 
     try:
      pass   
@@ -396,6 +187,8 @@ def run():
         
         # --- ÄNDERUNG: Explizit "normal" anzeigen, nicht maximiert ---
         mw.showNormal()
+
+        bootstrap_updater(mw)
         
         app._main_window = mw
         if splash is not None:
