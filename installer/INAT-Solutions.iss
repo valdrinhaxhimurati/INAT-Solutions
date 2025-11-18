@@ -20,7 +20,9 @@ DisableProgramGroupPage=yes
 ShowLanguageDialog=yes
 SetupIconFile={#MyAssetsDir}\app.ico
 UninstallDisplayIcon={app}\{#MyAppExeName}
-OutputBaseFilename=INAT Solutions Setup
+; Ausgabeverzeichnis und Dateiname so setzen, dass CI die Datei unter dist/ findet
+OutputDir=dist
+OutputBaseFilename=INAT-Solutions-Setup
 
 [Languages]
 Name: "de"; MessagesFile: "compiler:Languages\German.isl"
