@@ -294,6 +294,71 @@ QLabel#dialogTitleLabel {
     color: #333;
 }
 
+QLabel#messageBoxIcon {
+    font-size: 24px;
+    font-weight: 700;
+    color: #2a3c66;
+    background: #e6ecf7;
+    border-radius: 14px;
+    min-width: 60px;
+    min-height: 60px;
+    max-width: 60px;
+    max-height: 60px;
+    border: 1px solid #d5ddef;
+}
+
+QLabel#messageBoxIcon[state="warning"] {
+    background: #fff4e5;
+    border-color: #ffe1b5;
+    color: #a35b05;
+}
+
+QLabel#messageBoxIcon[state="critical"] {
+    background: #fdeaea;
+    border-color: #ffc7c7;
+    color: #a82424;
+}
+
+QLabel#messageBoxIcon[state="question"] {
+    background: #edf5ff;
+    border-color: #c9e0ff;
+    color: #1f4d85;
+}
+
+QLabel#messageBoxText {
+    font-size: 14px;
+    color: #2c2c2c;
+    line-height: 1.4em;
+}
+
+QDialogButtonBox#messageBoxButtons {
+    padding-top: 8px;
+}
+
+QDialogButtonBox#messageBoxButtons QPushButton {
+    min-width: 130px;
+    max-width: 170px;
+    padding: 8px 18px;
+}
+
+QLabel#progressDialogLabel {
+    font-size: 14px;
+    color: #2c2c2c;
+    line-height: 1.4em;
+}
+
+QProgressBar#progressDialogBar {
+    min-height: 18px;
+    border-radius: 9px;
+    background: #eef1f7;
+    border: 1px solid #d5ddef;
+}
+
+QProgressBar#progressDialogBar::chunk {
+    border-radius: 9px;
+    background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #4a6fa5, stop:1 #3b5b85);
+}
+
 /* ========== EINSTELLUNGEN TAB ========== */
 QLabel#settingsTitle {
     font-size: 18px;
@@ -432,7 +497,7 @@ QProgressDialog {
   border: 1px solid #aaa;
   border-radius: 6px;
   padding: 10px;
-  font-family: "Arial";
+    font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
   font-size: 12pt;
 }
 

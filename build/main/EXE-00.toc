@@ -1,9 +1,9 @@
-('C:\\Users\\V.Haxhimurati\\Documents\\GitHub '
+('C:\\Users\\V.H\\Documents\\Inat Solutions GitHub '
  'Repository\\INAT-Solutions\\build\\main\\INAT-Solutions.exe',
  False,
  False,
  True,
- ['C:\\Users\\V.Haxhimurati\\Documents\\GitHub '
+ ['C:\\Users\\V.H\\Documents\\Inat Solutions GitHub '
   'Repository\\INAT-Solutions\\favicon.ico'],
  None,
  False,
@@ -31,70 +31,70 @@
  None,
  None,
  None,
- 'C:\\Users\\V.Haxhimurati\\Documents\\GitHub '
+ 'C:\\Users\\V.H\\Documents\\Inat Solutions GitHub '
  'Repository\\INAT-Solutions\\build\\main\\INAT-Solutions.pkg',
  [('pyi-contents-directory _internal', '', 'OPTION'),
   ('PYZ-00.pyz',
-   'C:\\Users\\V.Haxhimurati\\Documents\\GitHub '
+   'C:\\Users\\V.H\\Documents\\Inat Solutions GitHub '
    'Repository\\INAT-Solutions\\build\\main\\PYZ-00.pyz',
    'PYZ'),
   ('struct',
-   'C:\\Users\\V.Haxhimurati\\Documents\\GitHub '
+   'C:\\Users\\V.H\\Documents\\Inat Solutions GitHub '
    'Repository\\INAT-Solutions\\build\\main\\localpycs\\struct.pyc',
    'PYMODULE'),
   ('pyimod01_archive',
-   'C:\\Users\\V.Haxhimurati\\Documents\\GitHub '
+   'C:\\Users\\V.H\\Documents\\Inat Solutions GitHub '
    'Repository\\INAT-Solutions\\build\\main\\localpycs\\pyimod01_archive.pyc',
    'PYMODULE'),
   ('pyimod02_importers',
-   'C:\\Users\\V.Haxhimurati\\Documents\\GitHub '
+   'C:\\Users\\V.H\\Documents\\Inat Solutions GitHub '
    'Repository\\INAT-Solutions\\build\\main\\localpycs\\pyimod02_importers.pyc',
    'PYMODULE'),
   ('pyimod03_ctypes',
-   'C:\\Users\\V.Haxhimurati\\Documents\\GitHub '
+   'C:\\Users\\V.H\\Documents\\Inat Solutions GitHub '
    'Repository\\INAT-Solutions\\build\\main\\localpycs\\pyimod03_ctypes.pyc',
    'PYMODULE'),
   ('pyimod04_pywin32',
-   'C:\\Users\\V.Haxhimurati\\Documents\\GitHub '
+   'C:\\Users\\V.H\\Documents\\Inat Solutions GitHub '
    'Repository\\INAT-Solutions\\build\\main\\localpycs\\pyimod04_pywin32.pyc',
    'PYMODULE'),
   ('pyiboot01_bootstrap',
-   'C:\\Users\\V.Haxhimurati\\AppData\\Local\\Programs\\Python\\Python313\\Lib\\site-packages\\PyInstaller\\loader\\pyiboot01_bootstrap.py',
+   'C:\\Users\\V.H\\AppData\\Local\\Programs\\Python\\Python313\\Lib\\site-packages\\PyInstaller\\loader\\pyiboot01_bootstrap.py',
    'PYSOURCE'),
   ('pyi_rescopy',
-   'C:\\Users\\V.Haxhimurati\\Documents\\GitHub '
+   'C:\\Users\\V.H\\Documents\\Inat Solutions GitHub '
    'Repository\\INAT-Solutions\\pyi_rescopy.py',
    'PYSOURCE'),
+  ('pyi_rth_inspect',
+   'C:\\Users\\V.H\\AppData\\Local\\Programs\\Python\\Python313\\Lib\\site-packages\\PyInstaller\\hooks\\rthooks\\pyi_rth_inspect.py',
+   'PYSOURCE'),
   ('pyi_rth_pyqt5',
-   'C:\\Users\\V.Haxhimurati\\AppData\\Local\\Programs\\Python\\Python313\\Lib\\site-packages\\PyInstaller\\hooks\\rthooks\\pyi_rth_pyqt5.py',
+   'C:\\Users\\V.H\\AppData\\Local\\Programs\\Python\\Python313\\Lib\\site-packages\\PyInstaller\\hooks\\rthooks\\pyi_rth_pyqt5.py',
    'PYSOURCE'),
   ('pyi_rth_pkgutil',
-   'C:\\Users\\V.Haxhimurati\\AppData\\Local\\Programs\\Python\\Python313\\Lib\\site-packages\\PyInstaller\\hooks\\rthooks\\pyi_rth_pkgutil.py',
-   'PYSOURCE'),
-  ('pyi_rth_inspect',
-   'C:\\Users\\V.Haxhimurati\\AppData\\Local\\Programs\\Python\\Python313\\Lib\\site-packages\\PyInstaller\\hooks\\rthooks\\pyi_rth_inspect.py',
+   'C:\\Users\\V.H\\AppData\\Local\\Programs\\Python\\Python313\\Lib\\site-packages\\PyInstaller\\hooks\\rthooks\\pyi_rth_pkgutil.py',
    'PYSOURCE'),
   ('pyi_rth_multiprocessing',
-   'C:\\Users\\V.Haxhimurati\\AppData\\Local\\Programs\\Python\\Python313\\Lib\\site-packages\\PyInstaller\\hooks\\rthooks\\pyi_rth_multiprocessing.py',
-   'PYSOURCE'),
-  ('pyi_rth_setuptools',
-   'C:\\Users\\V.Haxhimurati\\AppData\\Local\\Programs\\Python\\Python313\\Lib\\site-packages\\PyInstaller\\hooks\\rthooks\\pyi_rth_setuptools.py',
-   'PYSOURCE'),
-  ('pyi_rth_cryptography_openssl',
-   'C:\\Users\\V.Haxhimurati\\AppData\\Local\\Programs\\Python\\Python313\\Lib\\site-packages\\_pyinstaller_hooks_contrib\\rthooks\\pyi_rth_cryptography_openssl.py',
+   'C:\\Users\\V.H\\AppData\\Local\\Programs\\Python\\Python313\\Lib\\site-packages\\PyInstaller\\hooks\\rthooks\\pyi_rth_multiprocessing.py',
    'PYSOURCE'),
   ('pyi_rth_pkgres',
-   'C:\\Users\\V.Haxhimurati\\AppData\\Local\\Programs\\Python\\Python313\\Lib\\site-packages\\PyInstaller\\hooks\\rthooks\\pyi_rth_pkgres.py',
+   'C:\\Users\\V.H\\AppData\\Local\\Programs\\Python\\Python313\\Lib\\site-packages\\PyInstaller\\hooks\\rthooks\\pyi_rth_pkgres.py',
+   'PYSOURCE'),
+  ('pyi_rth_setuptools',
+   'C:\\Users\\V.H\\AppData\\Local\\Programs\\Python\\Python313\\Lib\\site-packages\\PyInstaller\\hooks\\rthooks\\pyi_rth_setuptools.py',
+   'PYSOURCE'),
+  ('pyi_rth_cryptography_openssl',
+   'C:\\Users\\V.H\\AppData\\Local\\Programs\\Python\\Python313\\Lib\\site-packages\\_pyinstaller_hooks_contrib\\rthooks\\pyi_rth_cryptography_openssl.py',
    'PYSOURCE'),
   ('main',
-   'C:\\Users\\V.Haxhimurati\\Documents\\GitHub '
+   'C:\\Users\\V.H\\Documents\\Inat Solutions GitHub '
    'Repository\\INAT-Solutions\\main.py',
    'PYSOURCE')],
  [],
  False,
  False,
- 1763135122,
+ 1763468240,
  [('runw.exe',
-   'C:\\Users\\V.Haxhimurati\\AppData\\Local\\Programs\\Python\\Python313\\Lib\\site-packages\\PyInstaller\\bootloader\\Windows-64bit-intel\\runw.exe',
+   'C:\\Users\\V.H\\AppData\\Local\\Programs\\Python\\Python313\\Lib\\site-packages\\PyInstaller\\bootloader\\Windows-64bit-intel\\runw.exe',
    'EXECUTABLE')],
- 'C:\\Users\\V.Haxhimurati\\AppData\\Local\\Programs\\Python\\Python313\\python313.dll')
+ 'C:\\Users\\V.H\\AppData\\Local\\Programs\\Python\\Python313\\python313.dll')
