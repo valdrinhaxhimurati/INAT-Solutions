@@ -29,7 +29,8 @@ a = Analysis(
         'PyQt5.sip','PyQt5.QtPrintSupport',
         'reportlab.lib.utils','reportlab.pdfgen','reportlab.graphics.renderPM',
         'PIL.Image','packaging','swissqr',
-        'PyQt5.QtWinExtras'
+        'PyQt5.QtWinExtras',
+        'svglib.svglib'
     ],
     hookspath=[],
     runtime_hooks=[here('pyi_rescopy.py')],
