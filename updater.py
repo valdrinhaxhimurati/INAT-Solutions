@@ -329,28 +329,93 @@ class UpdateManager(QObject):
             f"Das Update {manifest.version} wurde erfolgreich heruntergeladen.\n\n"
             "Die Anwendung muss jetzt geschlossen werden, damit der Installer gestartet werden kann."
         )
-        answer = QMessageBox.question(
-            self.parent(),
-            "Update installieren",
-            msg,
-            QMessageBox.Yes | QMessageBox.No,
-            QMessageBox.Yes,
-        )
-        if answer != QMessageBox.Yes:
+        # Ask the user whether they want the application to be restarted after the
+        # installer runs. Provide two clear choices (install + restart) OR
+        # (install only).
+        box = QMessageBox(self.parent())
+        box.setWindowTitle("Update installieren")
+        box.setText(msg)
+        # Add two explicit buttons with clear labels
+        install_restart_btn = box.addButton("Installieren und neu starten", QMessageBox.YesRole)
+        install_only_btn = box.addButton("Nur installieren", QMessageBox.NoRole)
+        box.setDefaultButton(install_restart_btn)
+        box.exec()
+        clicked = box.clickedButton()
+        if clicked is None:
             return
-        self._launch_installer(installer_path)
+        auto_restart = clicked == install_restart_btn
+        self._launch_installer(installer_path, auto_restart)
 
-    def _launch_installer(self, installer_path: Path) -> None:
-        args = [str(installer_path)]
-        if self._silent_install_args:
-            args.extend(self._silent_install_args)
+    def _launch_installer(self, installer_path: Path, auto_restart: bool = False) -> None:
+        """
+        Launch the installer. If auto_restart is True, create and launch a small
+        batch wrapper that waits for the installer to finish and then restarts the
+        application executable. The wrapper is executed as a user process and will
+        therefore start the updated application after the installer returns.
+        """
         try:
-            subprocess.Popen(args, close_fds=True)
+            # Build the command-line for the installer (keep silent args by default)
+            installer_command = [str(installer_path)]
+            if self._silent_install_args:
+                installer_command.extend(self._silent_install_args)
+            if auto_restart:
+                # Create a short .cmd wrapper that runs the installer and restarts the application
+                wrapper_dir = updates_dir()
+                wrapper_dir.mkdir(parents=True, exist_ok=True)
+                # Determine current executable path; in packaged app this will be the EXE
+                try:
+                    app_exe = str(Path(QApplication.instance().applicationFilePath()).resolve())
+                except Exception:
+                    import sys
+
+                    app_exe = str(Path(sys.executable).resolve())
+
+                wrapper_name = f"run_installer_{random.randint(1000,9999)}.cmd"
+                wrapper_path = wrapper_dir / wrapper_name
+                # Build quoted command strings
+                installer_cmdline = ' '.join([f'"{c}"' for c in installer_command])
+                # The script waits for the installer, checks returncode and restarts the app on success
+                script = (
+                    '@echo off\r\n'
+                    f'{installer_cmdline}\r\n'
+                    'set rc=%ERRORLEVEL%\r\n'
+                    'if "%rc%" == "0" (\r\n'
+                    '  timeout /t 2 /nobreak > NUL\r\n'
+                    f'  start "" "{app_exe}"\r\n'
+                    ') else (\r\n'
+                    '  rem Installer returned non-zero exit code\r\n'
+                    ')\r\n'
+                    'exit /b %rc%\r\n'
+                )
+                try:
+                    wrapper_path.write_text(script, encoding="utf-8")
+                except Exception as exc:  # noqa: BLE001
+                    # If we cannot write the wrapper, fall back to direct launch
+                    subprocess.Popen(installer_command, close_fds=True)
+                else:
+                    subprocess.Popen(["cmd.exe", "/c", str(wrapper_path)], close_fds=True)
+            else:
+                subprocess.Popen(installer_command, close_fds=True)
         except Exception as exc:  # noqa: BLE001
             self._show_error(f"Installer konnte nicht gestartet werden: {exc}")
             return
         app = QApplication.instance()
         if app is not None:
+            # Inform the user what to expect, then gracefully exit so the
+            # installer can replace files. We call the message before quitting
+            # so the user sees what happens.
+            if auto_restart:
+                QMessageBox.information(
+                    self.parent(),
+                    "Update gestartet",
+                    "Der Installer wurde gestartet. Nach Abschluss wird die Anwendung automatisch neu gestartet.",
+                )
+            else:
+                QMessageBox.information(
+                    self.parent(),
+                    "Update gestartet",
+                    "Der Installer wurde gestartet. Bitte starten Sie die Anwendung nach Abschluss manuell neu.",
+                )
             app.quit()
 
     def _close_download_dialog(self) -> None:
