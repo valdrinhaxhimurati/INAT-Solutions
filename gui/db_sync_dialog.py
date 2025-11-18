@@ -1,11 +1,12 @@
 from PyQt5.QtWidgets import (
-    QDialog, QVBoxLayout, QHBoxLayout, QLabel, QComboBox, QLineEdit,
+    QHBoxLayout, QLabel, QComboBox, QLineEdit,
     QPushButton, QCheckBox, QMessageBox, QGroupBox
 )
 from PyQt5.QtCore import Qt
 import traceback
 import os, shutil, time, tempfile, hashlib, sqlite3
 from pathlib import Path
+from .base_dialog import BaseDialog
 try:
     import psycopg2
     import psycopg2.extras
@@ -514,12 +515,13 @@ def _all_sqlite_tables(local_db: str | Path) -> list:
     finally:
         con.close()
 
-class DBSyncDialog(QDialog):
+class DBSyncDialog(BaseDialog):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setWindowTitle("Datenbank synchronisieren")
         self.setMinimumWidth(480)
-        v = QVBoxLayout(self)
+        v = self.content_layout
+        v.setSpacing(14)
 
         # Richtung: Download (remote -> lokal) oder Upload (lokal -> remote)
         row_dir = QHBoxLayout()

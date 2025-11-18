@@ -1,10 +1,11 @@
 ﻿from PyQt5.QtWidgets import (
-    QDialog, QVBoxLayout, QLabel, QLineEdit, QTextEdit, QComboBox,
+    QLabel, QLineEdit, QTextEdit, QComboBox,
     QPushButton, QDateEdit
 )
 from PyQt5.QtCore import Qt, QDate
 import datetime
 from gui.utils import create_button_bar
+from .base_dialog import BaseDialog
 
 def _to_qdate_dateonly(val):
     """Konvertiert val zu QDate (Datum-only)."""
@@ -46,13 +47,14 @@ def _to_date_str(val):
         except Exception:
             return ""
 
-class BuchhaltungDialog(QDialog):
+class BuchhaltungDialog(BaseDialog):
     def __init__(self, eintrag=None, kategorien=None):
         super().__init__()
         self.setWindowTitle("Buchhaltungseintrag")
         self.resize(800, 600)
 
-        layout = QVBoxLayout()
+        layout = self.content_layout
+        layout.setSpacing(12)
 
         # NEU: Editierbares Feld für Nr
         layout.addWidget(QLabel("Nr"))
@@ -100,7 +102,6 @@ class BuchhaltungDialog(QDialog):
         self.btn_abbrechen.clicked.connect(self.reject)
 
         layout.addLayout(create_button_bar(self.btn_speichern, self.btn_abbrechen))
-        self.setLayout(layout)
 
         # Eintrag initialisieren (wenn vorhanden)
         if isinstance(eintrag, dict):

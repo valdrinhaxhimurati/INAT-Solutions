@@ -1,7 +1,7 @@
 ﻿# -*- coding: utf-8 -*-
 from PyQt5.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QToolButton, QTableWidget, QTableWidgetItem,
-    QMessageBox, QDialog, QFileDialog, QInputDialog, QLabel, QHeaderView,
+    QMessageBox, QDialog, QFileDialog, QLabel, QHeaderView,
     QLineEdit, QComboBox, QDateEdit, QPushButton
 )
 from PyQt5.QtGui import QBrush, QColor, QFont
@@ -23,6 +23,7 @@ from svglib.svglib import svg2rlg
 from reportlab.graphics import renderPDF
 from decimal import Decimal
 from datetime import datetime, timedelta
+from gui.themed_input_dialog import get_item as themed_get_item
 
 # Pastell-Farben wie im Buchhaltungstab
 PASTELL_GRUEN  = QColor(230, 255, 230)   # bezahlt
@@ -59,10 +60,11 @@ class RechnungenTab(QWidget):
         self.suchfeld = QLineEdit()
         self.suchfeld.setPlaceholderText("Suchen...")
         self.suchfeld.textChanged.connect(self.filter_tabelle)
-        left_layout.addWidget(self.suchfeld)
 
         # Filter-Layout
         filter_layout = QHBoxLayout()
+        filter_layout.setSpacing(12)
+        filter_layout.addWidget(self.suchfeld, stretch=2)
         
         self.filter_status = QComboBox()
         self.filter_status.addItems(["Alle Status", "offen", "überfällig", "bezahlt"])
@@ -90,6 +92,8 @@ class RechnungenTab(QWidget):
         self.btn_filter_anwenden = QPushButton("Filter anwenden")
         self.btn_filter_anwenden.clicked.connect(self.lade_rechnungen)
         filter_layout.addWidget(self.btn_filter_anwenden)
+
+        filter_layout.addStretch()
 
         left_layout.addLayout(filter_layout)
 
@@ -595,7 +599,7 @@ class RechnungenTab(QWidget):
             return
         rechnung_id = int(self.table.item(zeile, 0).text())
 
-        status, ok = QInputDialog.getItem(
+        status, ok = themed_get_item(
             self, "Rechnungsstatus wählen", "Status:",
             ["offen", "bezahlt", "überfällig"], 0, False
         )

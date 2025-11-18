@@ -155,9 +155,10 @@ class BuchhaltungTab(QWidget):
         self.suchfeld = QLineEdit()
         self.suchfeld.setPlaceholderText("Suchen...")
         self.suchfeld.textChanged.connect(self.filter_tabelle)
-        left_layout.addWidget(self.suchfeld)
 
         filter_layout = QHBoxLayout()
+        filter_layout.setSpacing(12)
+        filter_layout.addWidget(self.suchfeld, stretch=2)
 
         self.filter_typ = QComboBox()
         self.filter_typ.addItems(["Alle", "Einnahme", "Ausgabe"])
@@ -187,6 +188,7 @@ class BuchhaltungTab(QWidget):
         self.btn_filter.clicked.connect(self.filter_anwenden_async)
         filter_layout.addWidget(self.btn_filter)
 
+        filter_layout.addStretch()
         left_layout.addLayout(filter_layout)
 
         self.table = QTableWidget()
@@ -202,7 +204,7 @@ class BuchhaltungTab(QWidget):
         self.gesamtbilanz_label = QPushButton("Gesamtbilanz: 0.00 CHF")
         self.gesamtbilanz_label.setEnabled(False)
         self.gesamtbilanz_label.setMinimumHeight(40)
-        self.gesamtbilanz_label.setFont(QFont("Arial", 14, QFont.Bold))
+        self.gesamtbilanz_label.setFont(QFont("Segoe UI", 14, QFont.Bold))
 
         left_layout.addWidget(self.table)
         main_layout.addLayout(left_layout, 3)

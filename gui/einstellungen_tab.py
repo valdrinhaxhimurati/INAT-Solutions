@@ -3,7 +3,7 @@ import os, json, csv, importlib
 import datetime
 from PyQt5.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QFrame, QLabel,
-    QLineEdit, QSizePolicy, QFileDialog, QScrollArea, QMessageBox, QInputDialog, QDialog
+    QLineEdit, QSizePolicy, QFileDialog, QScrollArea, QMessageBox, QDialog
 )
 from PyQt5.QtCore import Qt, QObject, pyqtSignal, QThread
 from db_connection import get_db, get_remote_status, clear_business_database, get_config_value, set_config_value
@@ -13,6 +13,7 @@ from gui.kategorien_dialog import KategorienDialog
 from gui.rechnung_layout_dialog import RechnungLayoutDialog
 from paths import data_dir
 from gui.device_login_dialog import DeviceLoginDialog  # <-- NEUER IMPORT
+from gui.themed_input_dialog import get_item as themed_get_item
 
 def get_current_theme():
     try:
@@ -300,7 +301,7 @@ class EinstellungenTab(QWidget):
             QMessageBox.warning(self, "Fehler", "Keine Tabellen gefunden!")
             return
 
-        tabelle, ok = QInputDialog.getItem(self, "Tabelle wählen", "Welche Tabelle exportieren?", tabellen, 0, False)
+        tabelle, ok = themed_get_item(self, "Tabelle wählen", "Welche Tabelle exportieren?", tabellen, 0, False)
         if not ok or not tabelle: return
 
         ziel, _ = QFileDialog.getSaveFileName(self, "CSV speichern unter", f"{tabelle}.csv", "CSV (*.csv)")
@@ -336,7 +337,7 @@ class EinstellungenTab(QWidget):
             QMessageBox.warning(self, "Fehler", "Keine Tabellen gefunden!")
             return
 
-        tabelle, ok = QInputDialog.getItem(self, "Tabelle wählen", "In welche Tabelle importieren?", tabellen, 0, False)
+        tabelle, ok = themed_get_item(self, "Tabelle wählen", "In welche Tabelle importieren?", tabellen, 0, False)
         if not ok or not tabelle: return
 
         pfad, _ = QFileDialog.getOpenFileName(self, "CSV Datei auswählen", "", "CSV (*.csv)")
@@ -496,7 +497,7 @@ class EinstellungenTab(QWidget):
             "als Präfix (z.B. 1234_rechnung.pdf).\n\n"
             "Jahr:"
         )
-        year, ok = QInputDialog.getItem(self, "Rechnungen exportieren - Jahr wählen", label, years, 0, False)
+        year, ok = themed_get_item(self, "Rechnungen exportieren - Jahr wählen", label, years, 0, False)
         if not ok or not year:
             return
 

@@ -1,12 +1,12 @@
 from PyQt5.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QCalendarWidget, QListWidget, 
     QMessageBox, QLabel, QListWidgetItem, QToolButton, QFrame, QDialog, QScrollArea, QSpinBox,
-    QInputDialog
 )
 from PyQt5.QtCore import QDate, Qt
 from PyQt5.QtGui import QFont, QTextCharFormat, QColor, QPainter, QBrush
 from db_connection import get_db
 from gui.auftrag_dialog import AuftragDialog
+from gui.themed_input_dialog import get_int as themed_get_int
 from datetime import datetime, date
 import resources_rc
 
@@ -265,7 +265,7 @@ class AuftragskalenderTab(QWidget):
     def select_year(self, event):
         """Öffnet einen Dialog zur Auswahl des Jahres."""
         current_year = self.calendar.yearShown()
-        new_year, ok = QInputDialog.getInt(self, "Jahr auswählen", "Jahr:", current_year, 1900, 2100, 1)
+        new_year, ok = themed_get_int(self, "Jahr auswählen", "Jahr:", current_year, 1900, 2100, 1)
         if ok:
             current_month = self.calendar.monthShown()
             self.calendar.setCurrentPage(new_year, current_month)

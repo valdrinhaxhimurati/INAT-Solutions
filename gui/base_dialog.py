@@ -60,8 +60,8 @@ class BaseDialog(QDialog):
         title_layout.addWidget(self.title_label)
         title_layout.addStretch()
 
-        # Fenster-Buttons
-        self.window_buttons = WindowButtons(self)
+        # Fenster-Buttons (Dialoge nur mit Schließen)
+        self.window_buttons = WindowButtons(self, show_minimize=False, show_maximize=False)
         title_layout.addWidget(self.window_buttons)
         
         self._main_layout.addWidget(self.title_bar)

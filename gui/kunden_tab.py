@@ -1,7 +1,8 @@
 ﻿# -*- coding: utf-8 -*-
 from PyQt5.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QTableWidget, QTableWidgetItem,
-    QToolButton, QDialog, QMessageBox, QLabel, QHeaderView, QLineEdit
+    QToolButton, QDialog, QMessageBox, QLabel, QHeaderView, QLineEdit,
+    QPushButton, QComboBox
 )
 from PyQt5.QtCore import Qt, pyqtSignal
 # KORREKTUR: DBConnection entfernt, da es nicht existiert. Wir verwenden get_db().
@@ -53,10 +54,32 @@ class KundenTab(QWidget):
         
         # --- NEU: Layout für Suche und Tabelle ---
         table_layout = QVBoxLayout()
+        filter_row = QHBoxLayout()
+        filter_row.setSpacing(12)
         self.suchfeld = QLineEdit()
         self.suchfeld.setPlaceholderText("Suchen...")
         self.suchfeld.textChanged.connect(self.filter_tabelle)
-        table_layout.addWidget(self.suchfeld)
+        filter_row.addWidget(self.suchfeld, stretch=2)
+
+        filter_row.addWidget(QLabel("PLZ:"))
+        self.filter_plz = QComboBox()
+        self.filter_plz.addItem("Alle", "")
+        filter_row.addWidget(self.filter_plz)
+        self.filter_plz.currentIndexChanged.connect(self._apply_filters)
+
+        filter_row.addWidget(QLabel("Ort:"))
+        self.filter_stadt = QComboBox()
+        self.filter_stadt.addItem("Alle", "")
+        filter_row.addWidget(self.filter_stadt)
+        self.filter_stadt.currentIndexChanged.connect(self._apply_filters)
+
+        filter_row.addStretch(1)
+
+        self.btn_filter = QPushButton("Filter anwenden")
+        self.btn_filter.clicked.connect(self._apply_filters)
+        filter_row.addWidget(self.btn_filter)
+
+        table_layout.addLayout(filter_row)
         table_layout.addWidget(self.table)
 
         main.addLayout(table_layout);
@@ -76,12 +99,71 @@ class KundenTab(QWidget):
 
     # --- NEU: Filterfunktion für die Tabelle ---
     def filter_tabelle(self, text):
-        """Filtert die Tabelle basierend auf dem Suchtext."""
+        self._apply_filters()
+
+    def _apply_filters(self):
+        search = self.suchfeld.text().strip().lower()
+        plz_filter = getattr(self, "filter_plz", None)
+        ort_filter = getattr(self, "filter_stadt", None)
+        plz = plz_filter.currentData() if plz_filter else ""
+        ort = ort_filter.currentData() if ort_filter else ""
+        plz = (plz or "").strip().lower()
+        ort = (ort or "").strip().lower()
+
         for row in range(self.table.rowCount()):
-            match = any(text.lower() in self.table.item(row, col).text().lower()
-                        for col in range(self.table.columnCount())
-                        if self.table.item(row, col))
-            self.table.setRowHidden(row, not match)
+            matches_search = True
+            if search:
+                matches_search = any(
+                    search in (self.table.item(row, col).text().lower() if self.table.item(row, col) else "")
+                    for col in range(self.table.columnCount())
+                )
+
+            matches_plz = True
+            if plz:
+                plz_item = self.table.item(row, 4)
+                matches_plz = plz in (plz_item.text().lower() if plz_item else "")
+
+            matches_ort = True
+            if ort:
+                ort_item = self.table.item(row, 6)
+                matches_ort = ort in (ort_item.text().lower() if ort_item else "")
+
+            self.table.setRowHidden(row, not (matches_search and matches_plz and matches_ort))
+
+    def _populate_filter_values(self):
+        combo_plz = getattr(self, "filter_plz", None)
+        combo_ort = getattr(self, "filter_stadt", None)
+        if not combo_plz or not combo_ort:
+            return
+
+        plz_values = set()
+        ort_values = set()
+        for row in range(self.table.rowCount()):
+            plz_item = self.table.item(row, 4)
+            ort_item = self.table.item(row, 6)
+            if plz_item:
+                txt = plz_item.text().strip()
+                if txt:
+                    plz_values.add(txt)
+            if ort_item:
+                txt = ort_item.text().strip()
+                if txt:
+                    ort_values.add(txt)
+
+        self._reload_combo(combo_plz, sorted(plz_values, key=str.lower))
+        self._reload_combo(combo_ort, sorted(ort_values, key=str.lower))
+
+    def _reload_combo(self, combo, values):
+        current_value = combo.currentData()
+        combo.blockSignals(True)
+        combo.clear()
+        combo.addItem("Alle", "")
+        for value in values:
+            combo.addItem(value, value)
+
+        idx = combo.findData(current_value)
+        combo.setCurrentIndex(idx if idx > -1 else 0)
+        combo.blockSignals(False)
 
     # --- Helpers: Spalten erkennen und Adressausdruck bauen ---
     def _detect_kunden_columns(self, conn_wrapper):
@@ -241,6 +323,8 @@ class KundenTab(QWidget):
             except Exception:
                 pass
 
+            self._populate_filter_values()
+
         finally:
              try:
                  conn.close()
@@ -336,6 +420,8 @@ class KundenTab(QWidget):
 
             except Exception:
                 pass
+
+            self._populate_filter_values()
 
         except Exception as e:
             print(f"[DBG] KundenTab.append_rows error: {e}", flush=True)

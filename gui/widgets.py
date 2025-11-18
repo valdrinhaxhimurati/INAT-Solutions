@@ -79,8 +79,9 @@ class NumericLineEdit(QLineEdit):
 
 # --- NEU: WindowButtons aus main_window.py hierher verschoben ---
 class WindowButtons(QWidget):
-    """Ein Widget, das nur die Fenster-Buttons (Min, Max, Close) enthält."""
-    def __init__(self, parent):
+    """Ein Widget mit optionalen Fenster-Buttons (Min, Max/Restore, Close)."""
+
+    def __init__(self, parent, *, show_minimize=True, show_maximize=True, show_close=True):
         super().__init__(parent)
         self.parent_window = parent
 
@@ -91,11 +92,11 @@ class WindowButtons(QWidget):
         self.minimize_btn = QToolButton()
         self.minimize_btn.setObjectName("windowButton")
         self.minimize_btn.setProperty("buttonRole", "minimize")
-        
+
         self.maximize_btn = QToolButton()
         self.maximize_btn.setObjectName("windowButton")
         self.maximize_btn.setProperty("buttonRole", "maximize")
-        
+
         self.close_btn = QToolButton()
         self.close_btn.setObjectName("windowButton")
         self.close_btn.setProperty("buttonRole", "close")
@@ -104,10 +105,21 @@ class WindowButtons(QWidget):
         layout.addWidget(self.maximize_btn)
         layout.addWidget(self.close_btn)
 
-        self.minimize_btn.clicked.connect(self.parent_window.showMinimized)
-        self.maximize_btn.clicked.connect(self.toggle_maximize)
-        self.close_btn.clicked.connect(self.parent_window.close)
-        
+        if show_minimize:
+            self.minimize_btn.clicked.connect(self.parent_window.showMinimized)
+        else:
+            self.minimize_btn.hide()
+
+        if show_maximize:
+            self.maximize_btn.clicked.connect(self.toggle_maximize)
+        else:
+            self.maximize_btn.hide()
+
+        if show_close:
+            self.close_btn.clicked.connect(self.parent_window.close)
+        else:
+            self.close_btn.hide()
+
         self.update_maximize_icon()
 
     def toggle_maximize(self):
@@ -118,6 +130,8 @@ class WindowButtons(QWidget):
         self.update_maximize_icon()
 
     def update_maximize_icon(self):
+        if not self.maximize_btn.isVisible():
+            return
         if self.parent_window.isMaximized():
             self.maximize_btn.setProperty("buttonRole", "restore")
         else:

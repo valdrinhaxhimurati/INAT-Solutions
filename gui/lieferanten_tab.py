@@ -1,6 +1,6 @@
 ﻿from PyQt5.QtWidgets import (
-    QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QTableWidget,
-    QTableWidgetItem, QDialog, QMessageBox
+    QWidget, QVBoxLayout, QHBoxLayout, QTableWidget,
+    QTableWidgetItem, QDialog, QMessageBox, QLineEdit, QComboBox, QLabel, QPushButton
 )
 from db_connection import get_db, dict_cursor_factory
 import sqlite3
@@ -13,15 +13,47 @@ class LieferantenTab(QWidget):
 
     def __init__(self):
         super().__init__()
+        self._all_rows = []
+
         self.table = QTableWidget()
         self.table.setSelectionBehavior(QTableWidget.SelectRows)
         self.table.setSelectionMode(QTableWidget.SingleSelection)
+        self.table.setSortingEnabled(True)
         try:
             self.table.verticalHeader().setVisible(False)
         except Exception:
             pass
 
         # Data will be loaded asynchronously via TabLoader
+
+        # Filter-/Suchleiste analog zu Buchhaltung/Rechnungen
+        self.search_input = QLineEdit()
+        self.search_input.setPlaceholderText("Suchen…")
+
+        filter_panel = QHBoxLayout()
+        filter_panel.setSpacing(12)
+        filter_panel.addWidget(self.search_input, stretch=2)
+
+        self.filter_field = QComboBox()
+        self.filter_field.addItem("Alle Felder", None)
+        self.filter_field.addItem("Lieferantennummer", 1)
+        self.filter_field.addItem("Name", 2)
+        self.filter_field.addItem("Portal-Link", 3)
+        self.filter_field.addItem("Login", 4)
+
+        self.portal_filter = QComboBox()
+        self.portal_filter.addItem("Alle", "all")
+        self.portal_filter.addItem("Portal-Link vorhanden", "with")
+        self.portal_filter.addItem("Kein Portal-Link", "without")
+
+        self.btn_apply_filter = QPushButton("Filter anwenden")
+
+        filter_panel.addWidget(QLabel("Feld:"))
+        filter_panel.addWidget(self.filter_field)
+        filter_panel.addWidget(QLabel("Portal-Link:"))
+        filter_panel.addWidget(self.portal_filter)
+        filter_panel.addStretch()
+        filter_panel.addWidget(self.btn_apply_filter)
 
         btn_layout = QVBoxLayout()
 
@@ -47,8 +79,13 @@ class LieferantenTab(QWidget):
         btn_layout.addWidget(btn_portal)
         btn_layout.addStretch()
 
+        left_layout = QVBoxLayout()
+        left_layout.setSpacing(12)
+        left_layout.addLayout(filter_panel)
+        left_layout.addWidget(self.table)
+
         main_layout = QHBoxLayout()
-        main_layout.addWidget(self.table)
+        main_layout.addLayout(left_layout, stretch=1)
         main_layout.addLayout(btn_layout)
 
         self.setLayout(main_layout)
@@ -57,6 +94,8 @@ class LieferantenTab(QWidget):
         btn_bearbeiten.clicked.connect(self.lieferant_bearbeiten)
         btn_loeschen.clicked.connect(self.lieferant_loeschen)
         btn_portal.clicked.connect(self.portal_link_oeffnen)
+        self.search_input.textChanged.connect(self._apply_filters)
+        self.btn_apply_filter.clicked.connect(self._apply_filters)
 
     def lade_lieferanten(self):
         conn = get_db()
@@ -130,14 +169,44 @@ class LieferantenTab(QWidget):
                     seq.append(None)
                 daten.append((seq[0], seq[1], seq[2], seq[3], seq[4], seq[5]))
 
+        self._all_rows = daten
+        self._apply_filters()
+
+    def _apply_filters(self):
+        rows = list(self._all_rows)
+        query = self.search_input.text().strip().lower()
+        field_idx = self.filter_field.currentData()
+        portal_filter = self.portal_filter.currentData()
+
+        filtered = []
+        for row in rows:
+            if portal_filter == "with" and not (row[3] or "").strip():
+                continue
+            if portal_filter == "without" and (row[3] or "").strip():
+                continue
+
+            if query:
+                haystacks = []
+                if field_idx is None:
+                    haystacks = [str(val or "") for val in row[1:]]
+                else:
+                    haystacks = [str(row[field_idx] or "")]
+                if not any(query in h.lower() for h in haystacks):
+                    continue
+            filtered.append(row)
+
+        self._populate_table(filtered)
+
+    def _populate_table(self, daten):
+        self.table.setSortingEnabled(False)
         self.table.setRowCount(len(daten))
         self.table.setColumnCount(6)
         self.table.setHorizontalHeaderLabels(["ID", "LieferantNr", "Name", "Portal-Link", "Login", "Passwort"])
         self.table.setColumnHidden(0, False)
         self.table.setColumnWidth(0, 60)
-        self.table.setColumnWidth(1, 100)
+        self.table.setColumnWidth(1, 110)
         self.table.setColumnWidth(2, 250)
-        self.table.setColumnWidth(3, 400)
+        self.table.setColumnWidth(3, 360)
         self.table.setColumnWidth(4, 150)
         self.table.setColumnWidth(5, 150)
 
@@ -153,6 +222,7 @@ class LieferantenTab(QWidget):
                         item.setData(Qt.UserRole, None)
                 item.setTextAlignment(Qt.AlignLeft | Qt.AlignVCenter)
                 self.table.setItem(ri, ci, item)
+        self.table.setSortingEnabled(True)
 
     def lieferant_hinzufuegen(self):
         from gui.lieferanten_dialog import LieferantenDialog
@@ -254,7 +324,8 @@ class LieferantenTab(QWidget):
         zeile = self.table.currentRow()
         if zeile < 0:
             return
-        link = self.table.item(zeile, 2).text()
+        link_item = self.table.item(zeile, 3)
+        link = link_item.text() if link_item else ""
         if link:
             webbrowser.open(link)
         else:
@@ -274,19 +345,14 @@ class LieferantenTab(QWidget):
 
     def append_rows(self, rows):
         try:
-            self.table.setSortingEnabled(False)
-            for row_data in reversed(rows):
-                row_position = 0
-                self.table.insertRow(row_position)
-                for col, value in enumerate(row_data):
-                    item = QTableWidgetItem(str(value or ''))
-                    if col == 0:  # ID column
-                        try:
-                            item.setData(Qt.UserRole, int(value) if value else None)
-                        except:
-                            pass
-                    self.table.setItem(row_position, col, item)
-            self.table.setSortingEnabled(True)
+            normalized = []
+            for row_data in rows:
+                row = list(row_data)
+                while len(row) < 6:
+                    row.append("")
+                normalized.append(tuple(row[:6]))
+            self._all_rows = list(normalized) + self._all_rows
+            self._apply_filters()
         except Exception as e:
             print(f"[DBG] LieferantenTab.append_rows error: {e}", flush=True)
 

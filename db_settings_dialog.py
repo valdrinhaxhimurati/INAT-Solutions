@@ -1,12 +1,13 @@
 ﻿from PyQt5.QtWidgets import (
-    QDialog, QVBoxLayout, QGroupBox, QLabel, QLineEdit, QCheckBox,
+    QGroupBox, QLabel, QLineEdit, QCheckBox,
     QPushButton, QWidget, QHBoxLayout, QFormLayout, QMessageBox, QRadioButton, QApplication
 )
 from PyQt5.QtCore import Qt, QProcess
 from gui.utils import create_button_bar
 from db_connection import get_remote_status, test_remote_connection, enable_remote, disable_remote
+from gui.base_dialog import BaseDialog
 
-class DBSettingsDialog(QDialog):
+class DBSettingsDialog(BaseDialog):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setWindowTitle("Datenbank-Einstellungen")
@@ -16,7 +17,7 @@ class DBSettingsDialog(QDialog):
         self._initial_url = (status.get("db_url") or "").strip()
 
         # Root-Layout
-        root = QVBoxLayout(self)
+        root = self.content_layout
         root.setContentsMargins(16, 16, 16, 16)
         root.setSpacing(12)
 

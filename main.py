@@ -9,10 +9,11 @@ import traceback
 import logging
 from db_connection import get_db, ensure_database_and_tables
 
-from PyQt5.QtWidgets import QApplication, QMessageBox, QFileDialog, QDialog, QProgressDialog
+from PyQt5.QtWidgets import QApplication, QMessageBox, QFileDialog, QDialog
 from PyQt5.QtCore import Qt
 from PyQt5.QtGui import QIcon
 from gui.main_window import resource_path
+from gui.progress_dialog import ThemedProgressDialog
 
 app = QApplication(sys.argv)
 
@@ -52,7 +53,7 @@ LOCAL_EXE = "INAT Solutions.exe"
 
 def sync_from_local():
     # alte lokale Prüfung entfernen oder belassen als Fallback
-    progress = QProgressDialog("Suche nach Updates…", None, 0, 0)
+    progress = ThemedProgressDialog("Suche nach Updates…", cancel_text=None, minimum=0, maximum=0)
     progress.resize(400, 120)
     progress.setWindowModality(Qt.ApplicationModal)
     progress.setWindowTitle("Update prüfen")
@@ -147,8 +148,7 @@ if %ERRORLEVEL%==0 (
 def sync_from_remote():
     import urllib.request, json, hashlib, tempfile, os, shutil, subprocess, sys, random
     from packaging import version
-    from PyQt5.QtWidgets import QMessageBox, QProgressDialog
-    from PyQt5.QtCore import Qt
+    from PyQt5.QtWidgets import QMessageBox
 
     log = os.path.join(tempfile.gettempdir(), "inat_update_debug.log")
     def dbg(s):
@@ -202,7 +202,7 @@ def sync_from_remote():
         dbg(f"downloading to {installer_path}")
 
         # --- NEU: Download mit Fortschrittsanzeige ---
-        progress_dialog = QProgressDialog("Update wird heruntergeladen...", "Abbrechen", 0, 100)
+        progress_dialog = ThemedProgressDialog("Update wird heruntergeladen...", "Abbrechen", 0, 100)
         progress_dialog.setWindowModality(Qt.WindowModal)
         progress_dialog.show()
         
