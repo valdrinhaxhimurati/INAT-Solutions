@@ -13,3 +13,5 @@ qrcode
 lxml
 requests
 pandas
+msal
+paramiko

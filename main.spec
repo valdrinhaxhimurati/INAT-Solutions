@@ -38,7 +38,9 @@ a = Analysis(
         'qrcode',
         'pandas',
         'iso4217',
-        'pyban'
+        'pyban',
+        'msal',
+        'paramiko'
     ],
     hookspath=[],
     runtime_hooks=[here('pyi_rescopy.py')],
