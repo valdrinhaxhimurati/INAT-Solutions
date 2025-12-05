@@ -1,0 +1,342 @@
+﻿from PyQt5.QtWidgets import (
+    QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QTableWidget,
+    QTableWidgetItem, QDialog, QMessageBox
+)
+from db_connection import get_db, dict_cursor_factory
+import sqlite3
+import datetime
+from PyQt5.QtGui import QColor
+from PyQt5.QtCore import Qt
+from PyQt5.QtWidgets import QLabel, QHBoxLayout
+from PyQt5.QtGui import QPixmap, QPainter, QColor
+from PyQt5.QtWidgets import QToolButton
+from i18n import _
+
+
+class ReifenlagerTab(QWidget):
+    def __init__(self):
+        super().__init__()
+        self.table = QTableWidget()
+        self.table.setSelectionBehavior(QTableWidget.SelectRows)
+        # klassisches Verhalten: Shift/Ctrl für Mehrfachauswahl
+        self.table.setSelectionMode(QTableWidget.ExtendedSelection)
+
+        self.lade_reifen()
+
+        btn_layout = QVBoxLayout()
+
+        btn_hinzufuegen = QToolButton()
+        btn_hinzufuegen.setText(_('Reifen erfassen'))
+        btn_hinzufuegen.setProperty("role", "add")
+
+        btn_bearbeiten = QToolButton()
+        btn_bearbeiten.setText(_('Reifen bearbeiten'))
+        btn_bearbeiten.setProperty("role", "edit")
+
+        btn_loeschen = QToolButton()
+        btn_loeschen.setText(_('Reifen löschen'))
+        btn_loeschen.setProperty("role", "delete")
+
+        btn_layout.addWidget(btn_hinzufuegen)
+        btn_layout.addWidget(btn_bearbeiten)
+        btn_layout.addWidget(btn_loeschen)
+
+        # ----------- Legende als einfache Labels -----------
+        label_gruen = QLabel(_("DOT < 5 Jahre"))
+        label_gruen.setStyleSheet("background-color: #e6ffe6; padding:3px; border-radius:4px;")
+        btn_layout.addWidget(label_gruen)
+
+        label_orange = QLabel(_("DOT ≥ 5 Jahre"))
+        label_orange.setStyleSheet("background-color: #ffe6b3; padding:3px; border-radius:4px;")
+        btn_layout.addWidget(label_orange)
+
+        label_rot = QLabel(_("DOT ≥ 6 Jahre"))
+        label_rot.setStyleSheet("background-color: #ffe6e6; padding:3px; border-radius:4px;")
+        btn_layout.addWidget(label_rot)
+        btn_layout.addStretch()
+
+        main_layout = QHBoxLayout()
+        main_layout.addWidget(self.table)
+        main_layout.addLayout(btn_layout)
+        self.setLayout(main_layout)
+
+ 
+        btn_hinzufuegen.clicked.connect(self.reifen_hinzufuegen)
+        btn_bearbeiten.clicked.connect(self.reifen_bearbeiten)
+        btn_loeschen.clicked.connect(self.reifen_loeschen)
+    
+
+    def lade_reifen(self):
+        conn = get_db()
+        cursor = conn.cursor(cursor_factory=dict_cursor_factory(conn))
+        # create table with DB-appropriate id type (auto-incrementing primary key)
+        try:
+            is_sqlite = getattr(conn, "is_sqlite", False) or getattr(conn, "is_sqlite_conn", False)
+        except Exception:
+            is_sqlite = False
+        if is_sqlite:
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS reifenlager (
+                    reifen_id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    kundennr INTEGER,
+                    kunde_anzeige TEXT,
+                    fahrzeug TEXT,
+                    dimension TEXT,
+                    typ TEXT,
+                    dot TEXT,
+                    lagerort TEXT,
+                    eingelagert_am TEXT,
+                    ausgelagert_am TEXT,
+                    preis REAL,
+                    waehrung TEXT DEFAULT 'CHF',
+                    bemerkung TEXT
+                )
+            """)
+        else:
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS reifenlager (
+                    reifen_id BIGSERIAL PRIMARY KEY,
+                    kundennr INTEGER,
+                    kunde_anzeige TEXT,
+                    fahrzeug TEXT,
+                    dimension TEXT,
+                    typ TEXT,
+                    dot TEXT,
+                    lagerort TEXT,
+                    eingelagert_am TEXT,
+                    ausgelagert_am TEXT,
+                    preis NUMERIC(10,2),
+                    waehrung TEXT DEFAULT 'CHF',
+                    bemerkung TEXT
+                )
+            """)
+        # Explizite Spalten in der gewünschten Reihenfolge (13 Spalten für die Tabelle)
+        cursor.execute("""
+            SELECT reifen_id, kundennr, kunde_anzeige, fahrzeug, dimension, typ, dot, lagerort, eingelagert_am, ausgelagert_am, preis, waehrung, bemerkung
+            FROM reifenlager ORDER BY dimension
+        """)
+        daten = cursor.fetchall()
+
+        self.table.setRowCount(len(daten))
+        self.table.setColumnCount(13)
+        self.table.setHorizontalHeaderLabels([_("ID"), _("Kundennr"), _("Kunde"), _("Fahrzeug"), _("Dimension"), _("Typ"), _("DOT"), _("Lagerort"), _("Eingelagert"), _("Ausgelagert"), _("Preis"), _("Währung"), _("Bemerkung")])
+        self.table.setColumnHidden(0, True)  # ID-Spalte verstecken
+        
+        for row_idx, row in enumerate(daten):
+            # Reihe als dict oder Sequence behandeln und Werte in festgelegter Reihenfolge holen
+            if isinstance(row, dict):
+                vals = [
+                    row.get("reifen_id"),
+                    row.get("kundennr"),
+                    row.get("kunde_anzeige"),
+                    row.get("fahrzeug"),
+                    row.get("dimension"),
+                    row.get("typ"),
+                    row.get("dot"),
+                    row.get("lagerort"),
+                    row.get("eingelagert_am"),
+                    row.get("ausgelagert_am"),
+                    row.get("preis"),
+                    row.get("waehrung"),
+                    row.get("bemerkung"),
+                ]
+            else:
+                # Sequence / sqlite3.Row
+                vals = [row[i] for i in range(13)]
+
+            # --- DOT-Logik für Farbe ---
+            dot_jahr = None
+            dot_wert = "" if vals[6] is None else str(vals[6]).strip()  # DOT ist Index 6
+            # DOT als Jahr oder als KW/Jahr
+            if len(dot_wert) == 4 and dot_wert.isdigit():
+                if dot_wert.startswith("19") or dot_wert.startswith("20"):
+                    dot_jahr = int(dot_wert)
+                else:
+                    # falls Format wie "KW/YY" erwartet wird, hier ggf. anpassen
+                    try:
+                        dot_jahr = 2000 + int(dot_wert[2:])
+                    except Exception:
+                        dot_jahr = None
+
+            zeilenfarbe = QColor(230, 255, 230)  # #e6ffe6 green
+            if dot_jahr:
+                aktuelles_jahr = datetime.datetime.now().year
+                alter = aktuelles_jahr - dot_jahr
+                if alter >= 6:
+                    zeilenfarbe = QColor(255, 230, 230)  # #ffe6e6 red
+                elif alter >= 5:
+                    zeilenfarbe = QColor(255, 230, 179)  # #ffe6b3 orange
+
+            for col_idx, value in enumerate(vals):
+                txt = "" if value is None else str(value)
+                item = QTableWidgetItem(txt)
+                item.setTextAlignment(Qt.AlignLeft | Qt.AlignVCenter)
+                item.setBackground(zeilenfarbe)
+                self.table.setItem(row_idx, col_idx, item)
+
+                
+        #Alle Spaltenbreiten 
+        self.table.setColumnWidth(0, 40)    # ID
+        self.table.setColumnWidth(1, 80)    # Kundennr
+        self.table.setColumnWidth(2, 250)   # Kunde
+        self.table.setColumnWidth(3, 130)   # Fahrzeug
+        self.table.setColumnWidth(4, 90)   # Dimension
+        self.table.setColumnWidth(5, 80)   # Typ
+        self.table.setColumnWidth(6, 80)    # DOT
+        self.table.setColumnWidth(7, 120)   # Lagerort
+        self.table.setColumnWidth(8, 125)   # Eingelagert am
+        self.table.setColumnWidth(9, 125)   # Ausgelagert am
+        self.table.setColumnWidth(10, 100)  # Preis
+        self.table.setColumnWidth(11, 80)   # Währung
+        self.table.setColumnWidth(12, 170)   # Bemerkung        
+        # keine Zeilennummern (vertical header) anzeigen
+        try:
+            self.table.verticalHeader().setVisible(False)
+        except Exception:
+            pass
+        conn.close()
+
+    def reifen_hinzufuegen(self):
+        from gui.reifenlager_dialog import ReifenlagerDialog
+        dialog = ReifenlagerDialog(self, reifen=None)
+        if dialog.exec_() == QDialog.Accepted:
+            daten = dialog.get_daten()
+            conn = get_db()
+            cursor = conn.cursor(cursor_factory=dict_cursor_factory(conn))
+            # IMPORTANT: reifen_id wird nicht übergeben — DB erzeugt sie automatisch
+            cursor.execute("""
+                INSERT INTO reifenlager (kundennr, kunde_anzeige, fahrzeug, dimension, typ, dot, lagerort, eingelagert_am, ausgelagert_am, bemerkung, preis, waehrung)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+            """, (
+                daten["kundennr"], daten["kunde_anzeige"], daten["fahrzeug"], daten["dimension"],
+                daten["typ"], daten["dot"], daten["lagerort"],
+                daten["eingelagert_am"], daten["ausgelagert_am"], daten["bemerkung"],
+                daten["preis"], daten["waehrung"]
+            ))
+            conn.commit()
+            conn.close()
+            self.lade_reifen()  # zeigt nach Reload die automatisch vergebene ID
+
+    def reifen_bearbeiten(self):
+        from gui.reifenlager_dialog import ReifenlagerDialog
+        zeile = self.table.currentRow()
+        if zeile < 0:
+            return
+        # Spaltenreihenfolge: ID(0), Kundennr(1), Kunde(2), Fahrzeug(3), Dimension(4), Typ(5), DOT(6), Lagerort(7), Eingelagert(8), Ausgelagert(9), Preis(10), Währung(11), Bemerkung(12)
+        reifen = {
+            "reifen_id": int(self.table.item(zeile, 0).text()),
+            "kundennr": self.table.item(zeile, 1).text(),
+            "kunde_anzeige": self.table.item(zeile, 2).text(),
+            "fahrzeug": self.table.item(zeile, 3).text(),
+            "dimension": self.table.item(zeile, 4).text(),
+            "typ": self.table.item(zeile, 5).text(),
+            "dot": self.table.item(zeile, 6).text(),
+            "lagerort": self.table.item(zeile, 7).text(),
+            "eingelagert_am": self.table.item(zeile, 8).text(),
+            "ausgelagert_am": self.table.item(zeile, 9).text(),
+            "preis": self.table.item(zeile, 10).text(),
+            "waehrung": self.table.item(zeile, 11).text(),
+            "bemerkung": self.table.item(zeile, 12).text()
+        }
+        dialog = ReifenlagerDialog(self, reifen=reifen)
+        if dialog.exec_() == QDialog.Accepted:
+            daten = dialog.get_daten()
+            conn = get_db()
+            cursor = conn.cursor(cursor_factory=dict_cursor_factory(conn))
+            cursor.execute("""
+                UPDATE reifenlager
+                SET kundennr= %s, kunde_anzeige= %s, fahrzeug= %s, dimension= %s, typ= %s, dot= %s, lagerort= %s, eingelagert_am= %s, ausgelagert_am= %s, bemerkung= %s, preis= %s, waehrung= %s
+                WHERE reifen_id= %s
+            """, (
+                daten["kundennr"], daten["kunde_anzeige"], daten["fahrzeug"], daten["dimension"],
+                daten["typ"], daten["dot"], daten["lagerort"],
+                daten["eingelagert_am"], daten["ausgelagert_am"], daten["bemerkung"], daten["preis"], daten["waehrung"], reifen["reifen_id"]
+            ))
+            conn.commit()
+            conn.close()
+            self.lade_reifen()
+
+    def reifen_loeschen(self):
+        sel = self.table.selectionModel().selectedRows()
+        if not sel:
+            return
+        ids = []
+        for idx in sel:
+            try:
+                ids.append(int(self.table.item(idx.row(), 0).text()))
+            except Exception:
+                pass
+        if not ids:
+            return
+        try:
+            conn = get_db()
+            cursor = conn.cursor(cursor_factory=dict_cursor_factory(conn))
+            try:
+                placeholders = ','.join(['%s'] * len(ids))
+                cursor.execute(f"DELETE FROM reifenlager WHERE reifen_id IN ({placeholders})", tuple(ids))
+            except Exception:
+                placeholders = ','.join(['?'] * len(ids))
+                cursor.execute(f"DELETE FROM reifenlager WHERE reifen_id IN ({placeholders})", tuple(ids))
+            conn.commit()
+            conn.close()
+        except Exception:
+            # try deleting per id
+            conn = get_db()
+            cur = conn.cursor()
+            for rid in ids:
+                try:
+                    cur.execute("DELETE FROM reifenlager WHERE reifen_id = %s", (rid,))
+                except Exception:
+                    cur.execute("DELETE FROM reifenlager WHERE reifen_id = ?", (rid,))
+            conn.commit()
+            conn.close()
+        self.lade_reifen()
+
+    def _berechne_dot_farbe(self, dot_wert) -> QColor:
+        """Berechne Zeilenfarbe basierend auf DOT-Alter (grün/orange/rot)."""
+        import datetime
+        dot_jahr = None
+        dot_str = "" if dot_wert is None else str(dot_wert).strip()
+        if len(dot_str) == 4 and dot_str.isdigit():
+            if dot_str.startswith("19") or dot_str.startswith("20"):
+                dot_jahr = int(dot_str)
+            else:
+                try:
+                    dot_jahr = 2000 + int(dot_str[2:])
+                except:
+                    pass
+        
+        if dot_jahr:
+            alter = datetime.datetime.now().year - dot_jahr
+            if alter >= 6:
+                return QColor(255, 230, 230)  # rot
+            elif alter >= 5:
+                return QColor(255, 230, 179)  # orange
+        return QColor(230, 255, 230)  # grün
+
+    def append_rows(self, rows):
+        try:
+            self.table.setSortingEnabled(False)
+            for row_data in reversed(rows):
+                if isinstance(row_data, dict):
+                    vals = [row_data.get(c) for c in ["reifen_id", "kundennr", "kunde_anzeige", "fahrzeug", "dimension", "typ", "dot", "lagerort", "eingelagert_am", "ausgelagert_am", "preis", "waehrung", "bemerkung"]]
+                else:
+                    vals = list(row_data)
+                
+                farbe = self._berechne_dot_farbe(vals[6] if len(vals) > 6 else None)  # DOT ist Index 6
+                
+                row_position = 0
+                self.table.insertRow(row_position)
+                for col_idx, value in enumerate(vals):
+                    item = QTableWidgetItem(str(value or ''))
+                    item.setBackground(farbe)
+                    self.table.setItem(row_position, col_idx, item)
+            self.table.setSortingEnabled(True)
+        except Exception as e:
+            print(f"[DBG] ReifenlagerTab.append_rows error: {e}", flush=True)
+
+    def load_finished(self):
+        pass
+
+
+

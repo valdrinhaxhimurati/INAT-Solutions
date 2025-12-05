@@ -1,0 +1,12 @@
+beautifulsoup4
+iso4217
+lxml
+pyban
+pyban-swift
+pycountry
+pydantic
+qrcode
+
+[dev]
+invoke
+twine

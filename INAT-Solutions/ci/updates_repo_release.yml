@@ -1,0 +1,140 @@
+name: Build & Publish Installer (from main repo)
+
+permissions:
+  contents: write
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Release-Version (z.B. 1.5.0)"
+        required: true
+  push:
+    tags:
+      - "v*"
+
+jobs:
+  build-release:
+    runs-on: windows-latest
+
+    env:
+      VERSION: ${{ github.event.inputs.version || github.ref_name }}
+      INSTALLER_NAME: INAT-Solutions-Setup.exe
+
+    steps:
+      - name: Checkout Updates Repo (this)
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Preflight – check MAIN_REPO_TOKEN and access
+        shell: pwsh
+        env:
+          PAT: ${{ secrets.MAIN_REPO_TOKEN }}
+        run: |
+          if (-not $env:PAT) { throw "Secret MAIN_REPO_TOKEN fehlt. Lege im Updates-Repo ein PAT-Secret mit read access auf INAT-Solutions an." }
+          $Headers = @{ Authorization = "token $env:PAT"; 'User-Agent' = 'inat-updater' }
+          try {
+            $r = Invoke-RestMethod -Method Get -Headers $Headers -Uri "https://api.github.com/repos/valdrinhaxhimurati/INAT-Solutions"
+            Write-Host "Zugriff erfolgreich: $($r.full_name)"
+          } catch {
+            throw "Kein Zugriff auf valdrinhaxhimurati/INAT-Solutions mit MAIN_REPO_TOKEN: $($_.Exception.Message)"
+          }
+
+      - name: Checkout Main App Repo
+        uses: actions/checkout@v4
+        with:
+          repository: valdrinhaxhimurati/INAT-Solutions
+          path: app
+          fetch-depth: 0
+          ref: main
+          token: ${{ secrets.MAIN_REPO_TOKEN }}
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install build deps (optional)
+        shell: pwsh
+        run: |
+          python -m pip install --upgrade pip
+          if (Test-Path "app/requirements.txt") {
+            pip install -r app/requirements.txt
+          } else {
+            Write-Host "requirements.txt nicht gefunden – Schritt übersprungen"
+          }
+          pip install pyinstaller
+
+      - name: Install Inno Setup
+        run: choco install innosetup --no-progress
+        shell: pwsh
+
+      - name: Build Application (PyInstaller)
+        working-directory: app
+        shell: pwsh
+        run: |
+          pyinstaller -y main.spec
+
+      - name: Sanity check: ensure locales exist in app
+        shell: pwsh
+        run: |
+          if (!(Test-Path "app/locales")) { throw "Locales directory not found at app/locales" }
+          $count = (Get-ChildItem -Path app/locales -File -ErrorAction SilentlyContinue | Measure-Object).Count
+          if ($count -eq 0) { throw "No locale JSON files found in app/locales" }
+          Write-Host "Found $count locale files:"
+          Get-ChildItem -Path app/locales -File | ForEach-Object { Write-Host " - $($_.Name)" }
+
+      - name: Build Installer (Inno Setup)
+        shell: pwsh
+        run: |
+          iscc app/installer/INAT-Solutions.iss
+
+      - name: Compute SHA256
+        id: hash
+        shell: pwsh
+        run: |
+          $path = "app/installer/dist/${{ env.INSTALLER_NAME }}"
+          if (!(Test-Path $path)) { throw "Installer nicht gefunden: $path" }
+          $hash = (Get-FileHash $path -Algorithm SHA256).Hash.ToLower()
+          echo "sha256=$hash" >> $env:GITHUB_OUTPUT
+
+      - name: Write manifest
+        shell: pwsh
+        run: |
+          $manifest = @{
+            version    = "${{ env.VERSION }}"
+            installer  = @{
+              filename = "${{ env.INSTALLER_NAME }}"
+              url      = "https://github.com/${{ github.repository }}/releases/download/v${{ env.VERSION }}/${{ env.INSTALLER_NAME }}"
+              sha256   = "${{ steps.hash.outputs.sha256 }}"
+            }
+            notes_url      = "https://github.com/${{ github.repository }}/releases/tag/v${{ env.VERSION }}"
+            release_notes  = "Automatisch erzeugtes Release für Version ${{ env.VERSION }}"
+          } | ConvertTo-Json -Depth 4
+          $manifest | Set-Content -Encoding utf8 update_manifest.json
+
+      - name: Create Release (in Updates repo)
+        uses: softprops/action-gh-release@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: v${{ env.VERSION }}
+          name: v${{ env.VERSION }}
+          draft: false
+          prerelease: false
+          files: |
+            app/installer/dist/${{ env.INSTALLER_NAME }}
+            update_manifest.json
+
+      - name: Publish manifest to Pages (gh-pages)
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_branch: gh-pages
+          publish_dir: .
+          destination_dir: .
+          keep_files: true
+          user_name: "github-actions[bot]"
+          user_email: "github-actions[bot]@users.noreply.github.com"
+          enable_jekyll: false

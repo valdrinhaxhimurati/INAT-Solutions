@@ -1,0 +1,3 @@
+﻿class StandardViolation(Exception):
+    pass
+
